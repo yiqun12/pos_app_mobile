@@ -3,10 +3,10 @@ import { MenuListTab } from "@/components/menu/tabs/MenuListTab";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalAction } from "@/hooks/useModalAction";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useState } from "react";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
-
 /**
  * Menu Screen
  *
@@ -22,6 +22,12 @@ export default function MenuScreen() {
   // Memoize callbacks to prevent unnecessary re-renders
   const handleOpenScanner = useCallback(() => setScannerVisible(true), []);
   const handleCloseScanner = useCallback(() => setScannerVisible(false), []);
+
+  useModalAction((modalName) => {
+    if (modalName === "scanner") {
+      setScannerVisible(true);
+    }
+  });
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
