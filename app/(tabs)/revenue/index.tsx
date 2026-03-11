@@ -4,8 +4,10 @@ import { OrdersList } from "@/components/revenue/OrdersList";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalAction } from "@/hooks/useModalAction";
+import { useLocalSearchParams } from "expo-router"; // 用来获取 URL 里的 orderId
 import React, { useMemo, useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { Alert, RefreshControl, ScrollView, View } from "react-native";
 
 type Order = {
   id: string;
@@ -163,6 +165,29 @@ export default function RevenueScreen() {
     setSelectedOrder(order);
     setOrderModalVisible(true);
   };
+  // 1. 获取 AI 可能传过来的 orderId
+  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+
+  // 2. 监听弹窗指令
+  useModalAction((modalName) => {
+    if (modalName === "orderDetail") {
+      // 如果 AI 传了特定订单号，就去找这个订单
+      if (orderId) {
+        const targetOrder = orders.find((o) => o.id === orderId);
+        if (targetOrder) {
+          setSelectedOrder(targetOrder);
+          setOrderModalVisible(true);
+        } else {
+          Alert.alert("Error", `Order ${orderId} not found.`);
+        }
+      } 
+      // 如果没有传订单号，默认打开列表里的第一个订单（防止弹窗空白）
+      else if (orders.length > 0) {
+        setSelectedOrder(orders[0]);
+        setOrderModalVisible(true);
+      }
+    }
+  });
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">

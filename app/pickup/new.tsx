@@ -8,6 +8,7 @@ import { Order, OrderItem } from "@/components/seats/types";
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalAction } from "@/hooks/useModalAction";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -26,6 +27,17 @@ export default function NewPickupScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
+// ✅ 加上这个 Hook 调用
+useModalAction((modalName) => {
+  if (modalName === "menu") {
+    setMenuModalVisible(true);
+  } else if (modalName === "adjustment") {
+    setAdjustmentModalVisible(true);
+  } else if (modalName === "payment") {
+    setPaymentModalVisible(true);
+  }
+});
+
   // --- State ---
   const [customerName, setCustomerName] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -38,6 +50,7 @@ export default function NewPickupScreen() {
   const [priceEditItem, setPriceEditItem] = useState<OrderItem | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
+
 
   // --- Calculations ---
   const order = useMemo<Order>(() => {

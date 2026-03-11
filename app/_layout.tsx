@@ -9,6 +9,10 @@ import {
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
+// 1. 引入我们刚才写的 AI 组件
+// 注意：如果报错找不到文件，请检查文件名是否是 AIChat.tsx
+import AIChat from "@/components/AIChat";
+
 import { ActivationModal } from "@/components/license";
 import { AuthProvider } from "@/context/auth";
 import { LicenseProvider } from "@/context/license";
@@ -29,6 +33,7 @@ export default function RootLayout() {
           <ThemeProvider
             value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
           >
+            {/* 这里的 Stack 负责页面跳转 */}
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
@@ -39,8 +44,13 @@ export default function RootLayout() {
               />
               <Stack.Screen name="analytics/index" />
             </Stack>
-            {/* Activation Modal - 全局弹窗 */}
+
+            {/* Activation Modal - 全局激活弹窗 */}
             <ActivationModal />
+
+            {/* === 2. AI 悬浮球在这里！(全剧置顶) === */}
+            <AIChat />
+
             <StatusBar style="auto" />
           </ThemeProvider>
         </MenuProvider>

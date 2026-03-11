@@ -1,0 +1,7 @@
+# 仅当使用 VOICE_ENGINE=omnilingual_asr 时需要安装
+# 注意：omnilingual-asr 0.2.0 要求 Python 3.10～3.12；若当前是 3.9 或 3.13+，请用 pyenv/conda 建 3.10～3.12 环境后再装
+# 使用独立 venv 示例（Mac/Linux）：
+#   python3.10 -m venv venv-omni && source venv-omni/bin/activate
+#   pip install -r backend_server/scripts/requirements-omnilingual.txt
+omnilingual-asr>=0.1.0
+pydub>=0.25.0

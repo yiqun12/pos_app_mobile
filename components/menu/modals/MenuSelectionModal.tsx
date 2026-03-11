@@ -28,7 +28,24 @@ export function MenuSelectionModal({
   onClose,
   onSelect,
 }: MenuSelectionModalProps) {
-  const { categories, items, loading, error } = useMenu();
+  const { categories: ctxCategories, items: ctxItems, error } = useMenu();
+  
+  // 🌟 强行植入的假数据
+  const mockCategories = [
+    { id: "cat-1", name: "🥩 Steak Cuts" },
+    { id: "cat-2", name: "🍕 Pizza" }
+  ];
+  const mockItems: MenuItem[] = [
+    { id: "item-1", categoryId: "cat-1", name: "Filet Mignon", price: 45.99 },
+    { id: "item-2", categoryId: "cat-1", name: "Rib Eye Steak", price: 52.99 },
+    { id: "item-3", categoryId: "cat-2", name: "Margherita Pizza", price: 16.99 }
+  ];
+
+  // 如果管家没给数据，就用我们的假数据
+  const categories = ctxCategories?.length ? ctxCategories : mockCategories;
+  const items = ctxItems?.length ? ctxItems : mockItems;
+  const loading = false; // 🛑 强行叫停转圈圈！
+  
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();

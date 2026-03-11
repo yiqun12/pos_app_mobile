@@ -8,16 +8,28 @@ import { Order, OrderItem } from "@/components/seats/types";
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalAction } from "@/hooks/useModalAction"; // 注意检查你的相对路径是否正确
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function SeatScreen() {
-  const { seatId } = useLocalSearchParams<{ seatId: string }>();
+  const { seatId, openModal } = useLocalSearchParams<{ seatId: string; openModal?: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+
+ // AI 跳转并打开弹窗/执行操作
+ // 使用 Hook 集中处理 AI 传来的指令
+ useModalAction((modalName) => {
+  if (modalName === "menu") setMenuModalVisible(true);
+  else if (modalName === "adjustment") setAdjustmentModalVisible(true);
+  else if (modalName === "payment") setPaymentModalVisible(true);
+  else if (modalName === "serviceFee") setServiceFeeEnabled(true);
+  else if (modalName === "printOrder") Alert.alert("Printing...", `Printing order for Seat ${seatId}`);
+  else if (modalName === "printReceipt") Alert.alert("Printing...", `Printing receipt for Seat ${seatId}`);
+}); 
 
   // --- State ---
   const [items, setItems] = useState<OrderItem[]>([]);
