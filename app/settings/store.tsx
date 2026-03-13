@@ -4,6 +4,7 @@ import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { db } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -16,6 +17,7 @@ import {
   Platform,
   ScrollView,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -49,6 +51,7 @@ export default function StoreScreen() {
 
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const responsive = useResponsiveLayout();
 
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
@@ -185,102 +188,121 @@ export default function StoreScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
       >
-        <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
-          <View className="gap-4">
-            {/* Basic Information */}
-            <View>
-              <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Basic Information
-              </Text>
-              <View className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-                <Input
-                  label="Store Name"
-                  value={data.Name}
-                  onChangeText={(v) => updateField("Name", v)}
-                  placeholder="Restaurant Name"
-                />
-              </View>
-            </View>
+        <ScrollView 
+          className="flex-1"
+          style={{ padding: responsive.mediumSpacing }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="flex-col md:flex-row gap-4">
+            
+            {/* Left Column: Store Info */}
+            <View className="flex-1 gap-4">
+                {/* Store Information Card */}
+                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
+                    <View className="flex-row justify-between items-center mb-6">
+                        <Text className="text-lg font-bold text-slate-900 dark:text-white">Store Information</Text>
+                        <TouchableOpacity className="border border-slate-200 rounded-lg px-3 py-1 dark:border-slate-700">
+                            <Text className="text-sm font-medium text-slate-600 dark:text-slate-400">Edit</Text>
+                        </TouchableOpacity>
+                    </View>
 
-            <View>
-              <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Contact Information
-              </Text>
-              <View className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-                <Input
-                  label="Phone"
-                  value={data.Phone}
-                  onChangeText={(v) => updateField("Phone", v)}
-                  placeholder="(555) 123-4567"
-                  keyboardType="phone-pad"
-                />
-              </View>
-            </View>
+                    {/* Logo Placeholder */}
+                    <View className="flex-row items-start mb-6">
+                        <View className="w-24 h-24 bg-orange-100 rounded-xl items-center justify-center mr-4 border-2 border-dashed border-orange-200">
+                            <Ionicons name="image-outline" size={32} color="#f97316" />
+                        </View>
+                        <View className="flex-1 gap-2">
+                            <View>
+                                <Text className="text-xs text-slate-500 uppercase font-bold">STORE NAME</Text>
+                                <Input
+                                    value={data.Name}
+                                    onChangeText={(v) => updateField("Name", v)}
+                                    placeholder="Store Name"
+                                    className="mb-0"
+                                />
+                            </View>
+                            <View className="flex-row gap-4">
+                                <View className="flex-1">
+                                    <Text className="text-xs text-slate-500 uppercase font-bold">TAX RATE</Text>
+                                    <Text className="text-base font-medium text-slate-900 dark:text-white">8.5%</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
 
-            {/* Location */}
-            <View>
-              <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Location
-              </Text>
-              <View className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-                <Input
-                  label="Address"
-                  value={data.Address}
-                  onChangeText={(v) => updateField("Address", v)}
-                  placeholder="Street Address"
-                />
-                <View className="mt-2 flex-row gap-2">
-                  <View className="flex-1">
-                    <Input
-                      label="State"
-                      value={data.State}
-                      onChangeText={(v) => updateField("State", v)}
-                      placeholder="CA"
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Input
-                      label="Zip Code"
-                      value={data.ZipCode}
-                      onChangeText={(v) => updateField("ZipCode", v)}
-                      placeholder="94103"
-                      keyboardType="number-pad"
-                    />
-                  </View>
+                    <View className="gap-4">
+                        <View>
+                            <Text className="text-xs text-slate-500 uppercase font-bold mb-1">ADDRESS</Text>
+                            <Input
+                                value={data.Address}
+                                onChangeText={(v) => updateField("Address", v)}
+                                placeholder="Street Address"
+                                className="mb-0"
+                            />
+                        </View>
+                        <View className="flex-row gap-4">
+                            <View className="flex-1">
+                                <Text className="text-xs text-slate-500 uppercase font-bold mb-1">PHONE</Text>
+                                <Text className="text-base font-medium text-slate-900 dark:text-white">+1 (555) 000-1234</Text>
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-xs text-slate-500 uppercase font-bold mb-1">WEBSITE URL</Text>
+                                <Text className="text-base font-medium text-orange-600">www.demostore.com</Text>
+                            </View>
+                        </View>
+                    </View>
                 </View>
-              </View>
+
+                {/* Payment Integration Card */}
+                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
+                    <Text className="text-lg font-bold text-slate-900 dark:text-white mb-4">Payment Integration</Text>
+                    <Text className="text-slate-500 mb-4">Receive payments directly through Stripe.</Text>
+                    <Button label="Connect with Stripe" icon="link" className="bg-indigo-600 border-indigo-600" />
+                </View>
+
+                {/* Store QR Code */}
+                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900 flex-row items-center gap-4">
+                    <View className="w-16 h-16 bg-slate-100 items-center justify-center rounded-lg">
+                        <Ionicons name="qr-code" size={32} color="#334155" />
+                    </View>
+                    <View className="flex-1">
+                        <Text className="text-lg font-bold text-slate-900 dark:text-white">Store QR Code</Text>
+                        <Text className="text-slate-500 text-sm">Print this code for customers to scan menu.</Text>
+                    </View>
+                    <Button label="Print QR" size="sm" variant="secondary" icon="print" />
+                </View>
             </View>
 
-            {/* Description */}
-            <View>
-              <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Description
-              </Text>
-              <View className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-                <Input
-                  label="Description"
-                  value={data.Description}
-                  onChangeText={(v) => updateField("Description", v)}
-                  placeholder="Short description..."
-                  multiline
-                  numberOfLines={3}
-                  className="h-24 py-2"
-                  textAlignVertical="top"
-                />
-              </View>
+            {/* Right Column: Business Hours & Security */}
+            <View className="flex-1 gap-4">
+                {/* Business Hours Card */}
+                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
+                    <Text className="text-lg font-bold text-slate-900 dark:text-white mb-2">Business Hours</Text>
+                    <Text className="text-slate-500 mb-6 text-sm">Set your operating schedule for each day.</Text>
+                    
+                    <WorkingHoursEditor
+                        initialValue={data.Open_time || "{}"}
+                        onChange={handleWorkingHoursChange}
+                    />
+                    
+                    <Button label="Apply to all days" variant="secondary" className="mt-4 bg-orange-50 text-orange-600 border-orange-100" />
+                </View>
+
+                {/* Security Card */}
+                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
+                    <Text className="text-lg font-bold text-slate-900 dark:text-white mb-4">Security</Text>
+                    <Text className="text-slate-500 mb-4">Update your account access credentials.</Text>
+                    <Button label="Reset Password" variant="outline" className="w-full" />
+                </View>
             </View>
 
-            {/* Working Hours Editor */}
-            <View>
-              <WorkingHoursEditor
-                initialValue={data.Open_time || "{}"}
-                onChange={handleWorkingHoursChange}
-              />
-            </View>
           </View>
         </ScrollView>
 
-        <View className="border-t border-slate-200 p-4 dark:border-slate-800">
+        <View 
+          className="border-t border-slate-200 dark:border-slate-800"
+          style={{ padding: responsive.mediumSpacing }}
+        >
           <Button
             label={isEditMode ? "Save Changes" : "Create Store"}
             onPress={handleSave}

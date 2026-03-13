@@ -1,5 +1,21 @@
 import { useWindowDimensions } from "react-native";
 
+// ─── 字体缩放倍率配置 ──────────────────────────────────────────
+// 手机端永远是 1.0（不受影响），只需在这里调整平板倍率
+const FONT_SCALE = {
+  phone:       1.0,
+  tablet:      1.35,  // 平板放大 35%
+  largeTablet: 1.5,   // 大平板放大 50%
+};
+
+const PHONE_FONTS = {
+  base:       16,
+  heading:    28,
+  subheading: 16,
+  caption:    12,
+};
+// ──────────────────────────────────────────────────────────────
+
 export interface ResponsiveValues {
   isTablet: boolean;
   isLargeTablet: boolean;
@@ -41,11 +57,17 @@ export function useResponsiveLayout(): ResponsiveValues {
   const seatSize = isTablet ? 90 : 80;
   const seatBorderRadius = isTablet ? 20 : 16;
 
-  // Font sizes - increase for iPad readability
-  const baseFontSize = isLargeTablet ? 18 : isTablet ? 17 : 16;
-  const headingFontSize = isLargeTablet ? 36 : isTablet ? 32 : 28;
-  const subheadingFontSize = isLargeTablet ? 20 : isTablet ? 18 : 16;
-  const captionFontSize = isLargeTablet ? 14 : isTablet ? 13 : 12;
+  // Font sizes - scale up for tablet readability
+  const scale = isLargeTablet
+    ? FONT_SCALE.largeTablet
+    : isTablet
+    ? FONT_SCALE.tablet
+    : FONT_SCALE.phone;
+
+  const baseFontSize       = Math.round(PHONE_FONTS.base       * scale);
+  const headingFontSize    = Math.round(PHONE_FONTS.heading     * scale);
+  const subheadingFontSize = Math.round(PHONE_FONTS.subheading  * scale);
+  const captionFontSize    = Math.round(PHONE_FONTS.caption     * scale);
 
   // Spacing & Padding
   const baseSpacing = isLargeTablet ? 20 : isTablet ? 16 : 12;

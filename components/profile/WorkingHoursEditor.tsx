@@ -1,16 +1,15 @@
+import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
-  ScrollView,
+  Platform,
   Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import DatePicker from "react-native-date-picker";
 
 interface WorkingHoursEditorProps {
   initialValue: string | Record<string, string>;
@@ -32,14 +31,23 @@ const DAY_MAP: Record<(typeof SHORT_DAYS)[number], string> = {
 const DEFAULT_OPEN = "09:00";
 const DEFAULT_CLOSE = "22:00";
 
+function getDateTimePicker() {
+  try {
+    return require("@react-native-community/datetimepicker").default;
+  } catch (error) {
+    console.warn("DateTimePicker module unavailable:", error);
+    return null;
+  }
+}
+
 export function WorkingHoursEditor({
   initialValue,
   onChange,
 }: WorkingHoursEditorProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const DateTimePicker = getDateTimePicker();
 
-  const [modalVisible, setModalVisible] = useState(false);
   const [hours, setHours] = useState<Record<string, string>>({});
   const [picker, setPicker] = useState<{
     visible: boolean;
@@ -81,156 +89,116 @@ export function WorkingHoursEditor({
     time: string
   ) => {
     const { open, close } = parseDay(hours[day]);
-    setHours((prev) => ({
-      ...prev,
-      [day]:
-        type === "open" ? `${time}-${close}` : `${open}-${time}`,
-    }));
+    setHours((prev) => {
+      const newHours = {
+        ...prev,
+        [day]:
+          type === "open" ? `${time}-${close}` : `${open}-${time}`,
+      };
+      onChange(JSON.stringify(newHours)); // Auto-save on change
+      return newHours;
+    });
   };
 
   const toggleDay = (day: string) => {
-    setHours((prev) => ({
-      ...prev,
-      [day]:
-        prev[day] && prev[day] !== "Closed"
-          ? "Closed"
-          : `${DEFAULT_OPEN}-${DEFAULT_CLOSE}`,
-    }));
-  };
-
-  const summary = useMemo(() => {
-    const count = Object.values(hours).filter((v) => v !== "Closed").length;
-    return count ? `${count} days configured` : "Not set";
-  }, [hours]);
-
-  /* ---------- Save ---------- */
-  const handleSave = () => {
-    onChange(JSON.stringify(hours));
-    setModalVisible(false);
+    setHours((prev) => {
+      const newHours = {
+        ...prev,
+        [day]:
+          prev[day] && prev[day] !== "Closed"
+            ? "Closed"
+            : `${DEFAULT_OPEN}-${DEFAULT_CLOSE}`,
+      };
+      onChange(JSON.stringify(newHours)); // Auto-save on change
+      return newHours;
+    });
   };
 
   /* ---------- Render ---------- */
   return (
     <View>
-      <Text className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-        Operating Hours
-      </Text>
-
-      <TouchableOpacity
-        onPress={() => setModalVisible(true)}
-        className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900"
-      >
-        <Text
-          numberOfLines={1}
-          className="flex-1 text-slate-900 dark:text-white"
-        >
-          {summary}
-        </Text>
-        <Ionicons name="pencil" size={16} color={colors.tint} />
-      </TouchableOpacity>
-
-      {/* ---------- Main Modal ---------- */}
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
-        <View className="flex-1 bg-white dark:bg-slate-950">
-          <View className="flex-row items-center justify-between border-b p-4 dark:border-slate-800">
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text className="text-slate-500">Cancel</Text>
-            </TouchableOpacity>
-            <Text className="text-lg font-bold dark:text-white">Edit Hours</Text>
-            <TouchableOpacity onPress={handleSave}>
-              <Text className="font-semibold text-blue-600">Save</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView className="px-4 pt-4">
-            {SHORT_DAYS.map((day) => {
-              const { isOpen, open, close } = parseDay(hours[day]);
-
-              return (
-                <View
-                  key={day}
-                  className="mb-4 rounded-xl border p-4 dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <View className="mb-3 flex-row items-center justify-between">
-                    <Text className="font-semibold dark:text-white">
-                      {DAY_MAP[day]}
-                    </Text>
-                    <Switch
-                      value={isOpen}
-                      onValueChange={() => toggleDay(day)}
-                      trackColor={{ false: "#e2e8f0", true: colors.tint }}
-                    />
-                  </View>
-
-                  <View className="flex-row gap-3 opacity-100">
-                    <View className="flex-1">
-                      <Text className="mb-1 text-xs text-slate-500">Open</Text>
-                      <TouchableOpacity
-                        disabled={!isOpen}
-                        onPress={() =>
-                          setPicker({ visible: true, day, mode: "open" })
-                        }
-                        className="rounded-lg border px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
-                      >
-                        <Text className="text-center font-semibold dark:text-white">
-                          {isOpen ? open : "--"}
-                        </Text>
-                      </TouchableOpacity>
+        {/* Render each day row directly inline instead of modal for better UX on tablet */}
+        {SHORT_DAYS.map((day) => {
+            const { isOpen, open, close } = parseDay(hours[day]);
+            return (
+                <View key={day} className="flex-row items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                    <View className="flex-row items-center gap-4">
+                        <Switch
+                            value={isOpen}
+                            onValueChange={() => toggleDay(day)}
+                            trackColor={{ false: "#e2e8f0", true: "#F97316" }}
+                            thumbColor={"#fff"}
+                        />
+                        <Text className="font-medium text-slate-900 w-24 dark:text-white">{DAY_MAP[day]}</Text>
                     </View>
-
-                    <View className="flex-1">
-                      <Text className="mb-1 text-xs text-slate-500">Close</Text>
-                      <TouchableOpacity
-                        disabled={!isOpen}
-                        onPress={() =>
-                          setPicker({ visible: true, day, mode: "close" })
-                        }
-                        className="rounded-lg border px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
-                      >
-                        <Text className="text-center font-semibold dark:text-white">
-                          {isOpen ? close : "--"}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                    
+                    {isOpen ? (
+                        <View className="flex-row items-center gap-2">
+                            <TouchableOpacity 
+                                onPress={() => setPicker({ visible: true, day, mode: "open" })}
+                                className="bg-slate-50 border border-slate-200 rounded px-3 py-1 dark:bg-slate-800 dark:border-slate-700"
+                            >
+                                <Text className="text-slate-900 dark:text-white">{open}</Text>
+                            </TouchableOpacity>
+                            <Text className="text-slate-400">~</Text>
+                            <TouchableOpacity 
+                                onPress={() => setPicker({ visible: true, day, mode: "close" })}
+                                className="bg-slate-50 border border-slate-200 rounded px-3 py-1 dark:bg-slate-800 dark:border-slate-700"
+                            >
+                                <Text className="text-slate-900 dark:text-white">{close}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <Text className="text-slate-400 text-sm italic mr-4">Closed</Text>
+                    )}
                 </View>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </Modal>
+            );
+        })}
 
-      {/* ---------- Time Picker ---------- */}
-      <Modal visible={picker.visible} transparent animationType="slide">
-        <View className="flex-1 bg-black/50">
-          <View className="absolute bottom-0 w-full rounded-t-2xl bg-white dark:bg-slate-900">
-            <View className="flex-row justify-between border-b p-4 dark:border-slate-800">
-              <TouchableOpacity onPress={() => setPicker({ visible: false })}>
-                <Text className="text-slate-500">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  const h = String(selectedDate.getHours()).padStart(2, "0");
-                  const m = String(selectedDate.getMinutes()).padStart(2, "0");
-                  picker.day &&
-                    picker.mode &&
-                    updateDay(picker.day, picker.mode, `${h}:${m}`);
-                  setPicker({ visible: false });
+        {/* ---------- Time Picker ---------- */}
+        {!DateTimePicker && (
+            <Text className="py-3 text-sm text-amber-600 dark:text-amber-400">
+                Native time picker is unavailable in the current app container.
+            </Text>
+        )}
+
+        {DateTimePicker && Platform.OS === "ios" && (
+            <Modal visible={picker.visible} transparent animationType="fade">
+                <View className="flex-1 bg-black/50 items-center justify-center p-4">
+                    <View className="w-full max-w-sm bg-white rounded-xl p-4 dark:bg-slate-900">
+                        <DateTimePicker
+                            value={selectedDate}
+                            onChange={(_, date) => setSelectedDate(date || selectedDate)}
+                            mode="time"
+                            display="spinner"
+                            textColor={colors.text}
+                        />
+                        <Button label="Done" onPress={() => {
+                            const h = String(selectedDate.getHours()).padStart(2, "0");
+                            const m = String(selectedDate.getMinutes()).padStart(2, "0");
+                            picker.day && picker.mode && updateDay(picker.day, picker.mode, `${h}:${m}`);
+                            setPicker({ visible: false });
+                        }} />
+                    </View>
+                </View>
+            </Modal>
+        )}
+
+        {DateTimePicker && Platform.OS === "android" && picker.visible && (
+            <DateTimePicker
+                value={selectedDate}
+                mode="time"
+                display="default"
+                onChange={(event, date) => {
+                    setPicker({ visible: false });
+                    if (date) {
+                        const h = String(date.getHours()).padStart(2, "0");
+                        const m = String(date.getMinutes()).padStart(2, "0");
+                        picker.day && picker.mode && updateDay(picker.day, picker.mode, `${h}:${m}`);
+                    }
                 }}
-              >
-                <Text className="font-semibold text-blue-600">Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            <DatePicker
-              date={selectedDate}
-              onDateChange={setSelectedDate}
-              mode="time"
-              is24hourSource="locale"
             />
-          </View>
-        </View>
-      </Modal>
+        )}
     </View>
   );
 }

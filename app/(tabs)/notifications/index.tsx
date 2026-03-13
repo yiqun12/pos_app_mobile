@@ -6,6 +6,7 @@ import {
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -92,6 +93,11 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const responsive = useResponsiveLayout();
+  const isTablet = responsive.isTablet;
+  const filterLabelSize = isTablet ? 17 : 14;
+  const filterCountSize = isTablet ? 15 : 12;
+  const markAllFontSize = isTablet ? 16 : 12;
 
   const [notifications, setNotifications] =
     useState<Notification[]>(MOCK_NOTIFICATIONS);
@@ -151,9 +157,12 @@ export default function NotificationsScreen() {
           unreadCount > 0 ? (
             <TouchableOpacity
               onPress={handleMarkAllRead}
-              className="rounded-full bg-blue-100 px-3 py-1.5 dark:bg-blue-900/30"
+              className="rounded-full bg-orange-100 px-3 py-1.5 dark:bg-orange-900/30"
             >
-              <Text className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+              <Text
+                className="font-semibold text-orange-600 dark:text-orange-400"
+                style={{ fontSize: markAllFontSize }}
+              >
                 Mark all read
               </Text>
             </TouchableOpacity>
@@ -167,7 +176,7 @@ export default function NotificationsScreen() {
           horizontal
           data={filters}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
+          contentContainerStyle={{ paddingHorizontal: responsive.mediumSpacing, paddingVertical: 12 }}
           keyExtractor={(item) => item.key}
           renderItem={({ item }) => {
             const isActive = activeFilter === item.key;
@@ -180,15 +189,14 @@ export default function NotificationsScreen() {
               <TouchableOpacity
                 onPress={() => setActiveFilter(item.key)}
                 className={`mr-2 flex-row items-center rounded-full px-4 py-2 ${
-                  isActive ? "bg-blue-600" : "bg-slate-100 dark:bg-slate-800"
+                  isActive ? "bg-orange-500" : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
                 <Text
-                  className={`text-sm font-medium ${
-                    isActive
-                      ? "text-white"
-                      : "text-slate-600 dark:text-slate-400"
+                  className={`font-medium ${
+                    isActive ? "text-white" : "text-slate-600 dark:text-slate-400"
                   }`}
+                  style={{ fontSize: filterLabelSize }}
                 >
                   {item.label}
                 </Text>
@@ -201,11 +209,10 @@ export default function NotificationsScreen() {
                     }`}
                   >
                     <Text
-                      className={`text-xs font-semibold ${
-                        isActive
-                          ? "text-white"
-                          : "text-slate-600 dark:text-slate-400"
+                      className={`font-semibold ${
+                        isActive ? "text-white" : "text-slate-600 dark:text-slate-400"
                       }`}
+                      style={{ fontSize: filterCountSize }}
                     >
                       {count}
                     </Text>
@@ -227,7 +234,7 @@ export default function NotificationsScreen() {
           />
         )}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: responsive.mediumSpacing, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -258,7 +265,10 @@ export default function NotificationsScreen() {
             <View className="mb-4 flex-row items-center justify-between">
               <View className="flex-row items-center">
                 <View className="mr-2 h-2 w-2 rounded-full bg-blue-600" />
-                <Text className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                <Text
+                  className="font-medium text-slate-600 dark:text-slate-400"
+                  style={{ fontSize: isTablet ? 16 : 14 }}
+                >
                   {unreadCount} unread notification{unreadCount > 1 ? "s" : ""}
                 </Text>
               </View>
@@ -269,7 +279,10 @@ export default function NotificationsScreen() {
 
       {/* Clear All Button (when there are notifications) */}
       {notifications.length > 0 && (
-        <View className="absolute bottom-8 left-4 right-4">
+        <View 
+          className="absolute bottom-8"
+          style={{ left: responsive.mediumSpacing, right: responsive.mediumSpacing }}
+        >
           <TouchableOpacity
             onPress={handleClearAll}
             activeOpacity={0.7}
@@ -280,7 +293,10 @@ export default function NotificationsScreen() {
               size={18}
               color={colors.tabIconDefault}
             />
-            <Text className="ml-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+            <Text
+              className="ml-2 font-medium text-slate-600 dark:text-slate-400"
+              style={{ fontSize: isTablet ? 16 : 14 }}
+            >
               Clear All Notifications
             </Text>
           </TouchableOpacity>

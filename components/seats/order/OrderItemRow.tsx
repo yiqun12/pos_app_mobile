@@ -27,8 +27,11 @@ export function OrderItemRow({
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => onPress(item)}
-      className="mb-2 flex-row items-start justify-between rounded-lg border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="mb-3 flex-row items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800"
     >
+      {/* Food Image Placeholder */}
+      <View className="mr-3 h-12 w-12 rounded-lg bg-slate-200 dark:bg-slate-700" />
+
       <View className="flex-1">
         <Text
           style={{ fontSize: responsive.baseFontSize }}

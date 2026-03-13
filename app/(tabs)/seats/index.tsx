@@ -61,12 +61,16 @@ function parseSeatArrangement(jsonString: string): Seat[] {
 export default function SeatsScreen() {
   const [seats, setSeats] = useState<Seat[]>(MOCK_SEATS);
   const [loading, setLoading] = useState(true);
+  const [dataNotice, setDataNotice] = useState<string | null>(null);
   const [containerLayout, setContainerLayout] = useState({
     width: 0,
     height: 0,
   });
   const router = useRouter();
   const responsive = useResponsiveLayout();
+  const isTablet = responsive.isTablet;
+  const adminTextSize = isTablet ? 14 : 12;
+  const areaTabTextSize = isTablet ? 15 : 14;
 
   // Canvas transform values
   const scale = useSharedValue(1);
@@ -85,6 +89,7 @@ export default function SeatsScreen() {
     const fetchSeats = async () => {
       try {
         setLoading(true);
+        setDataNotice(null);
         const docRef = doc(db, "TitleLogoNameContent", "aapp-sf-90011-38");
         const docSnap = await getDoc(docRef);
 
@@ -97,15 +102,19 @@ export default function SeatsScreen() {
               data.restaurant_seat_arrangement,
             );
             setSeats(parsedSeats);
+            setDataNotice(null);
           } else {
             setSeats(MOCK_SEATS);
+            setDataNotice("未读取到云端座位图，当前显示演示数据");
           }
         } else {
           setSeats(MOCK_SEATS);
+          setDataNotice("未找到云端座位配置，当前显示演示数据");
         }
       } catch (error) {
-        console.error("Error fetching seats:", error);
+        console.log("Error fetching seats (using mock):", error);
         setSeats(MOCK_SEATS);
+        setDataNotice("数据库连接失败，当前显示演示数据");
       } finally {
         setLoading(false);
       }
@@ -193,8 +202,44 @@ export default function SeatsScreen() {
   const buttonContainerGap = responsive.isTablet ? responsive.baseSpacing : 8;
 
   return (
-    <GestureHandlerRootView className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Seats">
+    <GestureHandlerRootView className="flex-1 bg-slate-50 dark:bg-slate-950">
+      <ScreenHeader 
+        title="7美元POS机" 
+        subtitle="10:30 AM - 2026年3月6日"
+        rightElement={
+          <View className="flex-row items-center gap-3">
+             <View className="flex-row items-center gap-2 mr-2">
+                <Text className="text-slate-500" style={{ fontSize: adminTextSize }}>
+                  Admin Mode | 管理员模式
+                </Text>
+                <View className="w-10 h-6 bg-slate-200 rounded-full p-1 items-start justify-center">
+                    <View className="w-4 h-4 bg-white rounded-full shadow-sm" />
+                </View>
+             </View>
+             {/* 区域切换模拟 */}
+             <View className="flex-row bg-slate-100 rounded-lg p-1 mr-4 hidden md:flex">
+                <View className="bg-white shadow-sm rounded-md px-3 py-1">
+                  <Text
+                    className="font-medium text-orange-600"
+                    style={{ fontSize: areaTabTextSize }}
+                  >
+                    Main Hall
+                  </Text>
+                </View>
+                <View className="px-3 py-1">
+                  <Text className="text-slate-500" style={{ fontSize: areaTabTextSize }}>
+                    VIP Rooms
+                  </Text>
+                </View>
+                <View className="px-3 py-1">
+                  <Text className="text-slate-500" style={{ fontSize: areaTabTextSize }}>
+                    Terrace
+                  </Text>
+                </View>
+             </View>
+          </View>
+        }
+      >
         <View
           className="flex-row"
           style={{
@@ -208,7 +253,7 @@ export default function SeatsScreen() {
             onPress={handleResetView}
           />
           <Button
-            variant="outline"
+            variant="primary" // Changed to primary for better visibility
             label="Pickup"
             icon="bag-add"
             onPress={handleNewPickupOrder}
@@ -217,9 +262,18 @@ export default function SeatsScreen() {
       </ScreenHeader>
 
       <View
-        className="flex-1 bg-slate-50 dark:bg-slate-900 overflow-hidden relative"
+        className="flex-1 bg-white dark:bg-slate-900 overflow-hidden relative rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800"
+        style={{ margin: responsive.mediumSpacing }}
         onLayout={(e) => setContainerLayout(e.nativeEvent.layout)}
       >
+        {dataNotice ? (
+          <View className="border-b border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/30">
+            <Text className="text-sm font-medium text-amber-700 dark:text-amber-300">
+              {dataNotice}
+            </Text>
+          </View>
+        ) : null}
+
         {loading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color="#2563eb" />

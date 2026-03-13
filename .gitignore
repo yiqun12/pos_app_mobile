@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# NativeWind auto-generated
+nativewind-env.d.ts
+
 # Native
 .kotlin/
 *.orig.*
@@ -21,17 +24,36 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
-# debug
+# debug & logs
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
 # macOS
 .DS_Store
-*.pem
 
-# local env files
-.env*.local
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# env files
+.env
+.env.*
+!.env.example
+
+# keys & certs
+*.pem
 
 # typescript
 *.tsbuildinfo
@@ -44,4 +66,13 @@ app-example
 
 # build artifacts
 *.apk
+*.aab
+*.ipa
 eatifyPos/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/

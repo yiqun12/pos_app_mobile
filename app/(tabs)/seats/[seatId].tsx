@@ -162,111 +162,115 @@ export default function SeatScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Main Content */}
-      <View className="flex-1 flex-row">
-        {/* Left: Items List */}
-        <View className="flex-1 px-4 py-4">
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          >
-            {items.length === 0 ? (
-              <View className="items-center justify-center py-20">
-                <Ionicons
-                  name="cart-outline"
-                  size={64}
-                  color={colors.tabIconDefault}
-                />
-                <Text className="mt-4 text-slate-500">
-                  No items added to this order yet.
-                </Text>
-              </View>
-            ) : (
-              items.map((item) => (
-                <OrderItemRow
-                  key={item.id}
-                  item={item}
-                  onIncrement={handleIncrement}
-                  onDecrement={handleDecrement}
-                  onPress={setPriceEditItem}
-                />
-              ))
-            )}
+      {/* Main Content - Responsive Grid */}
+      <View className="flex-1 flex-col md:flex-row bg-slate-50 dark:bg-slate-950">
+        
+        {/* Left: Itemized Receipt */}
+        <View className="flex-1 px-4 py-4 md:mr-4 md:bg-transparent">
+          <View className="bg-white rounded-xl shadow-sm p-4 h-full dark:bg-slate-900">
+            <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-lg font-bold text-slate-900 dark:text-white">Itemized Receipt</Text>
+                <Text className="text-sm text-slate-500">{items.length} Items</Text>
+            </View>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 20 }}
+            >
+                {items.length === 0 ? (
+                <View className="items-center justify-center py-20">
+                    <Ionicons
+                    name="cart-outline"
+                    size={64}
+                    color={colors.tabIconDefault}
+                    />
+                    <Text className="mt-4 text-slate-500">
+                    No items added to this order yet.
+                    </Text>
+                </View>
+                ) : (
+                items.map((item) => (
+                    <OrderItemRow
+                    key={item.id}
+                    item={item}
+                    onIncrement={handleIncrement}
+                    onDecrement={handleDecrement}
+                    onPress={setPriceEditItem}
+                    />
+                ))
+                )}
 
-            <Button
-              label="Add Item"
-              icon="add-circle"
-              variant="outline"
-              className="mt-4 border-dashed"
-              onPress={() => setMenuModalVisible(true)}
-            />
-          </ScrollView>
+                <Button
+                label="Add Items"
+                icon="add"
+                variant="ghost"
+                className="mt-2 border border-dashed border-slate-300 dark:border-slate-700"
+                onPress={() => setMenuModalVisible(true)}
+                />
+            </ScrollView>
+          </View>
         </View>
 
-        {/* Right (or Bottom on small screens): Summary & Actions */}
-        {/* For now assuming single column mobile view, so this is bottom fixed */}
-      </View>
+        {/* Right: Summary & Actions */}
+        <View className="w-full md:w-[400px] bg-slate-50 dark:bg-slate-950 p-4 pt-0 md:pt-4">
+            <OrderSummary order={order} />
+            
+            {/* Pay Now Button */}
+            <View className="mt-6">
+                <Button
+                    label="Pay Now"
+                    variant="primary" // Orange
+                    size="lg"
+                    icon="card"
+                    onPress={() => setPaymentModalVisible(true)}
+                    disabled={order.status === "paid"}
+                />
+            </View>
 
-      {/* Footer Actions */}
-      <OrderSummary order={order} />
+            {/* Secondary Actions */}
+            <View className="flex-row gap-3 mt-4">
+                <View className="flex-1">
+                    <Button
+                        label="Print"
+                        variant="outline"
+                        icon="print"
+                        onPress={() => handlePrint("receipt")}
+                    />
+                </View>
+                <View className="flex-1">
+                    <Button
+                        label="Split Bill"
+                        variant="outline"
+                        icon="git-branch"
+                        onPress={() => {}}
+                    />
+                </View>
+            </View>
+            <View className="mt-3">
+                <Button
+                    label="Share Order"
+                    variant="secondary"
+                    icon="share-social"
+                    className="bg-slate-800 text-white dark:bg-slate-700"
+                    onPress={() => {}}
+                />
+            </View>
 
-      <View className="border-t border-slate-200 bg-white p-4 pb-8 dark:border-slate-800 dark:bg-slate-950">
-        {/* Action Grid */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-4 gap-x-4"
-        >
-          <Button
-            label={serviceFeeEnabled ? "Remove Fee" : "Add Service Fee"}
-            size="sm"
-            className="mr-3"
-            variant={serviceFeeEnabled ? "primary" : "secondary"}
-            onPress={() => setServiceFeeEnabled(!serviceFeeEnabled)}
-          />
-          <Button
-            label="Adjust Total"
-            size="sm"
-            className="mr-3"
-            variant="secondary"
-            onPress={() => setAdjustmentModalVisible(true)}
-          />
-          <Button
-            label="Print Order"
-            size="sm"
-            className="mr-3"
-            variant="secondary"
-            icon="print"
-            onPress={() => handlePrint("order")}
-          />
-          <Button
-            label="Unpaid Items"
-            size="sm"
-            variant="secondary"
-            // icon="alert-circle"
-            onPress={() => {}}
-          />
-        </ScrollView>
-
-        <View className="flex-row gap-3">
-          <View className="flex-1">
-            <Button
-              label="Print Receipt"
-              variant="outline"
-              icon="receipt"
-              onPress={() => handlePrint("receipt")}
-            />
-          </View>
-          <View className="flex-[2]">
-            <Button
-              label={`Pay $${(order.total - order.paidAmount).toFixed(2)}`}
-              variant={order.status === "paid" ? "secondary" : "primary"}
-              disabled={order.status === "paid"}
-              // className=""
-              icon="card"
-              onPress={() => setPaymentModalVisible(true)}
-            />
-          </View>
+            {/* Customer Loyalty */}
+            <View className="mt-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800">
+                <View className="flex-row items-center gap-3 mb-3">
+                    <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
+                        <Ionicons name="person" size={20} color="#3b82f6" />
+                    </View>
+                    <View>
+                        <Text className="font-bold text-blue-900 dark:text-blue-100 text-xs">CUSTOMER LOYALTY</Text>
+                        <Text className="text-blue-600 dark:text-blue-300 text-xs">Add phone or scan card</Text>
+                    </View>
+                </View>
+                <View className="bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex-row justify-between items-center">
+                    <Text className="text-slate-400">Phone Number</Text>
+                    <Ionicons name="checkmark-circle" size={20} color="#3b82f6" />
+                </View>
+            </View>
         </View>
       </View>
 

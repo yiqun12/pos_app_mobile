@@ -6,48 +6,56 @@ import { Text, View } from "react-native";
 interface StatCardProps {
   title: string;
   value: string;
-  icon: string;
-  bgColor: string;
-  textColor: string;
-  darkBg: string;
-  darkText: string;
-  fullWidth?: boolean;
+  trend?: string; // e.g. "+12.5%"
+  trendUp?: boolean;
 }
 
 export function StatCard({
   title,
   value,
-  icon,
-  bgColor,
-  textColor,
-  darkBg,
-  darkText,
-  fullWidth = false,
+  trend,
+  trendUp,
 }: StatCardProps) {
   const responsive = useResponsiveLayout();
+  const valueFontSize = responsive.isTablet ? responsive.headingFontSize : 20;
+
   return (
     <View
-      className={`rounded-lg border border-slate-200 p-3 dark:border-slate-800 ${fullWidth ? "w-full" : "flex-1"} ${bgColor} ${darkBg}`}
+      className="rounded-xl bg-white p-4 shadow-sm border border-slate-100 dark:border-slate-800 dark:bg-slate-900"
     >
-      <View className="flex-row items-center justify-between">
-        <View>
-          <Text style={{ fontSize: responsive.captionFontSize }} className="font-semibold text-slate-600 dark:text-slate-400">
-            {title}
-          </Text>
-          <Text style={{ fontSize: responsive.subheadingFontSize }} className={`font-bold ${textColor} ${darkText}`}>
-            {value}
+      <View className="mb-2">
+        <Text
+          numberOfLines={2}
+          style={{ fontSize: responsive.captionFontSize }}
+          className="font-medium text-slate-500 dark:text-slate-400"
+        >
+          {title}
+        </Text>
+      </View>
+
+      <Text
+        numberOfLines={2}
+        style={{ fontSize: valueFontSize, lineHeight: valueFontSize + 6 }}
+        className="font-bold text-slate-900 dark:text-white"
+      >
+        {value}
+      </Text>
+
+      {trend && (
+        <View className="mt-2 flex-row items-center">
+          <Ionicons
+            name={trendUp ? "trending-up" : "trending-down"}
+            size={14}
+            color={trendUp ? "#10b981" : "#ef4444"}
+          />
+          <Text
+            style={{ fontSize: responsive.captionFontSize }}
+            className={`ml-1 font-medium ${trendUp ? "text-emerald-500" : "text-red-500"}`}
+          >
+            {trend}
           </Text>
         </View>
-        <Ionicons
-          name={icon as any}
-          size={24}
-          color={
-            textColor.split(
-              "-"
-            )[1] /* extracting color code from class name might not work if it's hex, but here it's tailwind class text-blue-600. simple approximation or passed prop would be better if split fails. Actually the icon color rendering in previous code was: textColor.split("-")[1]. This is assuming text-color-shade format. The icon color logic is a bit fragile but keeping it as is to match existing behavior. */
-          }
-        />
-      </View>
+      )}
     </View>
   );
 }

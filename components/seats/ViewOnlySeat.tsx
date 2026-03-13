@@ -19,21 +19,30 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
   // Use seat dimensions from Firebase if available, otherwise fall back to responsive default
   const seatWidth = seat.width || responsive.seatSize;
   const seatHeight = seat.height || responsive.seatSize;
+  const minSide = Math.min(seatWidth, seatHeight);
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), max);
+  const nameFontSize = Math.round(clamp(minSide * 0.34, 12, responsive.isTablet ? 20 : 18));
+  const statusFontSize = Math.round(clamp(minSide * 0.19, 9, responsive.isTablet ? 12 : 10));
+  const showStatusText = minSide >= 62;
+  const nameLineHeight = Math.round(nameFontSize * 1.12);
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "vacant":
-        return "bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600";
+        return "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700";
       case "reserved":
-        return "bg-amber-100 dark:bg-amber-900/50 border-amber-300 dark:border-amber-700";
+        return "bg-orange-200 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700";
       case "occupied":
-        return "bg-red-100 dark:bg-red-900/50 border-red-300 dark:border-red-700";
+        return "bg-orange-600 dark:bg-orange-700 border-orange-700 dark:border-orange-800";
       default:
-        return "bg-slate-200 dark:bg-slate-700";
+        return "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700";
     }
   };
 
   const statusColor = getStatusColor(seat.status);
+  const isOccupied = seat.status === "occupied";
 
   return (
     <View
@@ -54,39 +63,52 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
           height: "100%",
           alignItems: "center",
           justifyContent: "center",
-          borderWidth: 2,
+          borderWidth: 1, // Thinner border for cleaner look
         }}
         className={`${statusColor} shadow-sm`}
       >
         <Text
           style={{
-            fontSize: responsive.isTablet ? 20 : 18,
+            fontSize: nameFontSize,
+            lineHeight: nameLineHeight,
+            textAlign: "center",
+            paddingHorizontal: 2,
           }}
-          className="font-bold text-slate-700 dark:text-slate-100"
+          className={`font-bold ${isOccupied ? "text-white" : "text-slate-800 dark:text-slate-100"}`}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
+          ellipsizeMode="tail"
         >
           {seat.name}
         </Text>
-        {seat.itemCount ? (
+        {showStatusText && seat.itemCount ? (
           <Text
             style={{
-              fontSize: responsive.isTablet ? 12 : 10,
-              marginTop: responsive.isTablet ? 6 : 4,
+              fontSize: statusFontSize,
+              marginTop: minSide < 72 ? 2 : responsive.isTablet ? 6 : 4,
             }}
-            className="text-slate-500 dark:text-slate-400"
+            className={`${isOccupied ? "text-orange-100" : "text-slate-500 dark:text-slate-400"}`}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {seat.itemCount} items
           </Text>
-        ) : (
+        ) : showStatusText ? (
           <Text
             style={{
-              fontSize: responsive.isTablet ? 12 : 10,
-              marginTop: responsive.isTablet ? 6 : 4,
+              fontSize: statusFontSize,
+              marginTop: minSide < 72 ? 2 : responsive.isTablet ? 6 : 4,
             }}
-            className="text-slate-400 dark:text-slate-500 font-medium uppercase"
+            className={`${isOccupied ? "text-orange-100" : "text-slate-400 dark:text-slate-500"} font-medium uppercase`}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {seat.status}
           </Text>
-        )}
+        ) : null}
       </TouchableOpacity>
     </View>
   );

@@ -1,5 +1,6 @@
 import { MenuAIScannerTab } from "@/components/menu/tabs/MenuAIScannerTab";
 import { MenuListTab } from "@/components/menu/tabs/MenuListTab";
+import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -31,7 +32,12 @@ export default function MenuScreen() {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Menu Management" />
+      <ScreenHeader 
+        title="Menu Management" 
+        rightElement={
+            <Button label="Save Changes" size="sm" variant="primary" icon="save" onPress={() => {}} />
+        }
+      />
 
       <View className="flex-1">
         <MenuListTab onScanPress={handleOpenScanner} />

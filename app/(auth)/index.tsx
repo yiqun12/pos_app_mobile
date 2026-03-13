@@ -2,10 +2,11 @@ import { DemoModeBanner } from "@/components/license";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Colors } from "@/constants/theme";
+import { useLanguage } from "@/context/language";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,8 +16,6 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-type Language = "en" | "zh";
 
 const translations = {
   en: {
@@ -59,8 +58,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { language, setLanguage } = useLanguage();
 
-  const [language, setLanguage] = useState<Language>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,7 +67,7 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-  const t = translations[language];
+  const t = useMemo(() => translations[language], [language]);
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -159,7 +158,7 @@ export default function LoginScreen() {
                 onPress={() => setLanguage("en")}
                 className={`rounded-l-lg px-3 py-1.5 ${
                   language === "en"
-                    ? "bg-blue-600"
+                    ? "bg-orange-500"
                     : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
@@ -175,7 +174,7 @@ export default function LoginScreen() {
                 onPress={() => setLanguage("zh")}
                 className={`rounded-r-lg px-3 py-1.5 ${
                   language === "zh"
-                    ? "bg-blue-600"
+                    ? "bg-orange-500"
                     : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
@@ -192,7 +191,7 @@ export default function LoginScreen() {
 
           {/* Logo & Title */}
           <View className="mb-8 items-center">
-            <View className="mb-4 h-20 w-20 items-center justify-center rounded-2xl bg-blue-600">
+            <View className="mb-4 h-20 w-20 items-center justify-center rounded-2xl bg-orange-500 shadow-lg shadow-orange-500/30">
               <Ionicons name="restaurant" size={40} color="white" />
             </View>
             <Text className="text-2xl font-bold text-slate-900 dark:text-white">
@@ -244,7 +243,7 @@ export default function LoginScreen() {
 
             {/* Forgot Password */}
             <TouchableOpacity className="mb-6 self-end">
-              <Text className="text-sm font-medium text-blue-600 dark:text-blue-400">
+              <Text className="text-sm font-medium text-orange-600 dark:text-orange-400">
                 {t.forgotPassword}
               </Text>
             </TouchableOpacity>
@@ -294,7 +293,7 @@ export default function LoginScreen() {
               {t.noAccount}{" "}
             </Text>
             <TouchableOpacity>
-              <Text className="font-semibold text-blue-600 dark:text-blue-400">
+              <Text className="font-semibold text-orange-600 dark:text-orange-400">
                 {t.signUp}
               </Text>
             </TouchableOpacity>
