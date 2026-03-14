@@ -4,14 +4,18 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { DemoModeBanner } from "@/components/license";
-import { Colors } from "@/constants/theme";
+import { BottomTabTokens, Colors } from "@/constants/theme";
 import { useLanguage } from "@/context/language";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const responsive = useResponsiveLayout();
   const { language } = useLanguage();
+  const tabSizeKey = responsive.isTablet ? "tablet" : "phone";
+  const tabTokens = BottomTabTokens[tabSizeKey];
   const tabTitles =
     language === "zh"
       ? {
@@ -40,6 +44,29 @@ export default function TabLayout() {
           tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
           headerShown: false,
           sceneStyle: { backgroundColor: "transparent" },
+          tabBarStyle: {
+            height: tabTokens.barHeight,
+            paddingTop: tabTokens.paddingTop,
+            paddingBottom: tabTokens.paddingBottom,
+            paddingHorizontal: tabTokens.paddingHorizontal,
+          },
+          tabBarItemStyle: {
+            paddingVertical: tabTokens.itemPaddingVertical,
+            minHeight: tabTokens.itemMinHeight,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+          tabBarLabelPosition: "beside-icon",
+          tabBarAllowFontScaling: true,
+          tabBarLabelStyle: {
+            fontSize: tabTokens.labelFontSize,
+            lineHeight: tabTokens.labelLineHeight,
+            fontWeight: "600",
+            textAlign: "left",
+          },
+          tabBarIconStyle: {
+            marginRight: tabTokens.iconMarginRight,
+          },
         }}
       >
         <Tabs.Screen
@@ -47,7 +74,7 @@ export default function TabLayout() {
           options={{
             title: tabTitles.seats,
             tabBarIcon: ({ color }) => (
-              <Ionicons name="grid" size={28} color={color} />
+              <Ionicons name="grid" size={tabTokens.iconSize} color={color} />
             ),
           }}
         />
@@ -56,7 +83,11 @@ export default function TabLayout() {
           options={{
             title: tabTitles.menu,
             tabBarIcon: ({ color }) => (
-              <Ionicons name="fast-food" size={28} color={color} />
+              <Ionicons
+                name="fast-food"
+                size={tabTokens.iconSize}
+                color={color}
+              />
             ),
           }}
         />
@@ -65,7 +96,7 @@ export default function TabLayout() {
           options={{
             title: tabTitles.revenue,
             tabBarIcon: ({ color }) => (
-              <Ionicons name="cash" size={28} color={color} />
+              <Ionicons name="cash" size={tabTokens.iconSize} color={color} />
             ),
           }}
         />
@@ -74,7 +105,11 @@ export default function TabLayout() {
           options={{
             title: tabTitles.alerts,
             tabBarIcon: ({ color }) => (
-              <Ionicons name="notifications" size={28} color={color} />
+              <Ionicons
+                name="notifications"
+                size={tabTokens.iconSize}
+                color={color}
+              />
             ),
           }}
         />
@@ -83,7 +118,11 @@ export default function TabLayout() {
           options={{
             title: tabTitles.profile,
             tabBarIcon: ({ color }) => (
-              <Ionicons name="person" size={28} color={color} />
+              <Ionicons
+                name="person"
+                size={tabTokens.iconSize}
+                color={color}
+              />
             ),
           }}
         />
