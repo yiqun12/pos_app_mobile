@@ -1,15 +1,13 @@
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
+import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
-import { db } from "@/lib/firebase";
-import { GlobalCustomization, GlobalCustomizationGroup, MenuItem, OptionGroup } from "@/types/menu";
+import { GlobalCustomization, MenuItem, OptionGroup } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-    ActivityIndicator,
     Modal,
     ScrollView,
     Text,
@@ -19,82 +17,6 @@ import {
 
 const ADD_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求添加";
 const REMOVE_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求减少";
-
-// Fallback global customizations
-const FALLBACK_GLOBAL_CUSTOMIZATIONS: GlobalCustomization[] = [
-  { id: "gc-1", type: "Takeout", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
-  { id: "gc-2", type: "Extra sauce", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
-  { id: "gc-3", type: "Extra spice", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
-  { id: "gc-4", type: "Extra scallion", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
-  { id: "gc-5", type: "Dine in", price: 0, typeCategory: REMOVE_REQUEST_CATEGORY },
-  { id: "gc-6", type: "No spice", price: 0, typeCategory: REMOVE_REQUEST_CATEGORY },
-  { id: "gc-7", type: "No scallion", price: 0, typeCategory: REMOVE_REQUEST_CATEGORY },
-];
-
-function normalizeTypeCategory(raw: unknown): GlobalCustomization["typeCategory"] {
-  const value = String(raw ?? "").trim().toLowerCase();
-  if (
-    value === REMOVE_REQUEST_CATEGORY ||
-    value.includes("减少") ||
-    value.includes("remove") ||
-    value.includes("minus") ||
-    value.includes("less")
-  ) {
-    return REMOVE_REQUEST_CATEGORY;
-  }
-  return ADD_REQUEST_CATEGORY;
-}
-
-/**
- * Parse global customizations from Firebase JSON string
- * Expected format: [{ type: "Takeout", price: 0, typeCategory: "要求添加" }, ...]
- */
-function parseGlobalCustomizations(jsonString: string): GlobalCustomization[] {
-  try {
-    if (!jsonString) return FALLBACK_GLOBAL_CUSTOMIZATIONS;
-    
-    const parsed = JSON.parse(jsonString);
-    if (!Array.isArray(parsed)) return FALLBACK_GLOBAL_CUSTOMIZATIONS;
-    
-    return parsed.map((item: any, index: number) => ({
-      id: `gc-${index}`,
-      type: item.type || "",
-      price: item.price || 0,
-      typeCategory: normalizeTypeCategory(item.typeCategory),
-    }));
-  } catch (error) {
-    console.error("Error parsing global customizations:", error);
-    return FALLBACK_GLOBAL_CUSTOMIZATIONS;
-  }
-}
-
-/**
- * Group global customizations by category
- */
-function groupCustomizations(customizations: GlobalCustomization[]): GlobalCustomizationGroup[] {
-  const addItems = customizations.filter((c) => c.typeCategory === ADD_REQUEST_CATEGORY);
-  const removeItems = customizations.filter((c) => c.typeCategory === REMOVE_REQUEST_CATEGORY);
-
-  const groups: GlobalCustomizationGroup[] = [];
-
-  if (addItems.length > 0) {
-    groups.push({
-      category: ADD_REQUEST_CATEGORY,
-      categoryLabel: "menu.options.groupAddRequests",
-      items: addItems,
-    });
-  }
-
-  if (removeItems.length > 0) {
-    groups.push({
-      category: REMOVE_REQUEST_CATEGORY,
-      categoryLabel: "menu.options.groupRemoveRequests",
-      items: removeItems,
-    });
-  }
-
-  return groups;
-}
 
 interface SelectedOption {
   groupId: string;
@@ -150,55 +72,16 @@ export function ItemOptionsModal({
   const [selectedGlobalCustomizations, setSelectedGlobalCustomizations] = useState<
     SelectedGlobalCustomization[]
   >([]);
-  
-  // Global customizations fetched from Firebase
-  const [globalCustomizationGroups, setGlobalCustomizationGroups] = useState<GlobalCustomizationGroup[]>([]);
-  const [loadingCustomizations, setLoadingCustomizations] = useState(false);
 
-  // Fetch global customizations from Firebase when modal opens
+  // Global customization groups come from the MenuProvider (firestore-backed).
+  const { globalCustomizationGroups } = useMenu();
+
+  // Reset selections whenever the modal opens for a new item.
   useEffect(() => {
     if (visible && item) {
-      // Reset selections when modal opens
       setSelectedOptions([]);
       setSelectedIngredients([]);
       setSelectedGlobalCustomizations([]);
-      
-      // Fetch global customizations
-      const fetchGlobalCustomizations = async () => {
-        try {
-          setLoadingCustomizations(true);
-          const docRef = doc(db, "TitleLogoNameContent", "aapp-sf-90011-38");
-          const docSnap = await getDoc(docRef);
-          
-          if (docSnap.exists()) {
-            const data = docSnap.data() as { global_customizations?: string };
-            const customizationsJson = data.global_customizations;
-            
-            if (customizationsJson) {
-              const customizations = parseGlobalCustomizations(customizationsJson);
-              const groups = groupCustomizations(customizations);
-              setGlobalCustomizationGroups(groups);
-            } else {
-              // Use fallback if no data in Firebase
-              const groups = groupCustomizations(FALLBACK_GLOBAL_CUSTOMIZATIONS);
-              setGlobalCustomizationGroups(groups);
-            }
-          } else {
-            // Use fallback if document doesn't exist
-            const groups = groupCustomizations(FALLBACK_GLOBAL_CUSTOMIZATIONS);
-            setGlobalCustomizationGroups(groups);
-          }
-        } catch (error) {
-          console.error("Error fetching global customizations:", error);
-          // Use fallback on error
-          const groups = groupCustomizations(FALLBACK_GLOBAL_CUSTOMIZATIONS);
-          setGlobalCustomizationGroups(groups);
-        } finally {
-          setLoadingCustomizations(false);
-        }
-      };
-      
-      fetchGlobalCustomizations();
     }
   }, [visible, item]);
 
@@ -532,12 +415,7 @@ export function ItemOptionsModal({
               className="mb-3 font-bold text-slate-900 dark:text-white"
             >{t("menu.options.specialRequests")}</Text>
 
-            {loadingCustomizations ? (
-              <View className="items-center py-4">
-                <ActivityIndicator size="small" color={colors.tint} />
-                <Text className="mt-2 text-slate-500">{t("menu.options.loadingOptions")}</Text>
-              </View>
-            ) : globalCustomizationGroups.length > 0 ? (
+            {globalCustomizationGroups.length > 0 ? (
               globalCustomizationGroups.map((group) => (
                 <View key={group.category} className="mb-4">
                   <Text
