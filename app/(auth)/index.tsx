@@ -2,6 +2,7 @@ import { DemoModeBanner } from "@/components/license";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -59,6 +60,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { login } = useAuth();
 
   const [language, setLanguage] = useState<Language>("en");
   const [email, setEmail] = useState("");
@@ -76,12 +78,10 @@ export default function LoginScreen() {
   };
 
   const handleSignIn = async () => {
-    // Reset errors
     setError("");
     setEmailError("");
     setPasswordError("");
 
-    // Validate
     let hasError = false;
     if (!email || !validateEmail(email)) {
       setEmailError(t.invalidEmail);
@@ -91,21 +91,21 @@ export default function LoginScreen() {
       setPasswordError(t.passwordRequired);
       hasError = true;
     }
-
     if (hasError) return;
 
     setLoading(true);
     try {
-      // TODO: 调用实际的登录API
-      // await login(email, password);
-      
-      // 模拟登录延迟
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      // 登录成功后跳转到主页
+      await login(email, password);
       router.replace("/(tabs)/seats");
-    } catch (err) {
-      setError("Login failed. Please check your credentials.");
+    } catch (err: any) {
+      const code = err?.code as string | undefined;
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        setError("Invalid email or password.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Network error. Check your connection.");
+      } else {
+        setError(err?.message ?? "Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
