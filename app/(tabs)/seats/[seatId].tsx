@@ -1,4 +1,4 @@
-﻿import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
+import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
 import { PriceEditModal } from "@/components/seats/modals/PriceEditModal";
@@ -11,9 +11,14 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useModalAction } from "@/hooks/useModalAction";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useAuth } from "@/context/auth";
+import { useStoreSelection } from "@/context/store";
+import { useStore } from "@/hooks/firestore/useStore";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 export default function SeatScreen() {
   const { seatId } = useLocalSearchParams<{ seatId: string; openModal?: string }>();
@@ -22,7 +27,12 @@ export default function SeatScreen() {
   const colors = Colors[colorScheme ?? "light"];
   const { t } = useTranslation();
 
+  const { user } = useAuth();
+  const { currentStoreId } = useStoreSelection();
+  const { data: store } = useStore();
+
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [rawProducts, setRawProducts] = useState<any[]>([]);
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [manualAdjustment, setManualAdjustment] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
@@ -31,6 +41,79 @@ export default function SeatScreen() {
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
+
+  // Find the tableName matching the seatId
+  const tableName = useMemo(() => {
+    if (!store?.seatLayout?.tables) return seatId;
+    const seatObj = store.seatLayout.tables.find((t) => t.id === seatId);
+    return seatObj ? seatObj.name : seatId;
+  }, [store, seatId]);
+
+  // Firestore listener
+  useEffect(() => {
+    if (!user || !currentStoreId || !tableName) return;
+
+    const docId = `${currentStoreId}-${tableName}`;
+    const docRef = doc(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "Table", docId);
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.product) {
+          try {
+            const parsed = JSON.parse(data.product);
+            if (Array.isArray(parsed)) {
+              setRawProducts(parsed);
+              
+              const uiItems: OrderItem[] = parsed.map((item: any) => {
+                const priceVal = item.subtotal ?? item.price;
+                const price = typeof priceVal === "number" ? priceVal : parseFloat(priceVal || "0");
+                return {
+                  id: item.count ? String(item.count) : (item.id || `item-${Date.now()}-${Math.random()}`),
+                  name: item.name || "Untitled",
+                  price: price,
+                  quantity: typeof item.quantity === "number" ? item.quantity : 1,
+                  count: item.count,
+                } as OrderItem;
+              });
+              setItems(uiItems);
+              return;
+            }
+          } catch (e) {
+            console.error("Error parsing table product:", e);
+          }
+        }
+      }
+      setRawProducts([]);
+      setItems([]);
+    }, (error) => {
+      console.error("Error listening to table updates:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user, currentStoreId, tableName]);
+
+  // Save updates helper
+  const saveToFirestore = async (newRawProducts: any[]) => {
+    if (!user || !currentStoreId || !tableName) return;
+    const docId = `${currentStoreId}-${tableName}`;
+    const docRef = doc(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "Table", docId);
+    
+    const dateTime = new Date().toISOString();
+    const dateStr = dateTime.slice(0, 10) + '-' + dateTime.slice(11, 13) + '-' + dateTime.slice(14, 16) + '-' + dateTime.slice(17, 19) + '-' + dateTime.slice(20, 22);
+    
+    const docData = {
+      product: JSON.stringify(newRawProducts),
+      date: dateStr
+    };
+    
+    try {
+      await setDoc(docRef, docData);
+    } catch (e) {
+      console.error("Error writing to Table collection:", e);
+      Alert.alert(t("common.error"), "Failed to update table in database");
+    }
+  };
 
   useModalAction((modalName) => {
     if (modalName === "menu") setMenuModalVisible(true);
@@ -82,43 +165,86 @@ export default function SeatScreen() {
   }, [items, serviceFeeEnabled, manualAdjustment, paidAmount, seatId]);
 
   const handleAddItem = (orderItem: OrderItem) => {
-    setItems((prev) => [...prev, orderItem]);
+    const menuItems = store?.menu?.items || [];
+    const menuItem = menuItems.find((i) => i.name === orderItem.name);
+    const menuItemId = menuItem ? menuItem.id : orderItem.id;
+    
+    const existingIndex = rawProducts.findIndex((p) => p.name === orderItem.name);
+    let newRaw: any[];
+    if (existingIndex > -1) {
+      newRaw = [...rawProducts];
+      const existing = newRaw[existingIndex];
+      const newQty = existing.quantity + 1;
+      const basePrice = parseFloat(existing.subtotal || "0");
+      newRaw[existingIndex] = {
+        ...existing,
+        quantity: newQty,
+        itemTotalPrice: parseFloat((basePrice * newQty).toFixed(2))
+      };
+    } else {
+      const basePrice = orderItem.price;
+      const newProduct = {
+        id: menuItemId,
+        name: orderItem.name,
+        subtotal: basePrice.toFixed(2),
+        quantity: 1,
+        itemTotalPrice: basePrice,
+        count: Date.now() + Math.floor(Math.random() * 1000),
+        attributeSelected: {},
+        attributesArr: [],
+        CHI: (menuItem as any)?.CHI || "",
+      };
+      newRaw = [newProduct, ...rawProducts];
+    }
+    saveToFirestore(newRaw);
   };
 
   const handleIncrement = (id: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-      )
-    );
+    const newRaw = rawProducts.map((p) => {
+      if (String(p.count) === id) {
+        const newQty = p.quantity + 1;
+        const basePrice = parseFloat(p.subtotal || "0");
+        return {
+          ...p,
+          quantity: newQty,
+          itemTotalPrice: parseFloat((basePrice * newQty).toFixed(2))
+        };
+      }
+      return p;
+    });
+    saveToFirestore(newRaw);
   };
 
   const handleDecrement = (id: string) => {
-    setItems((prev) =>
-      prev
-        .map((item) => {
-          if (item.id === id) {
-            return { ...item, quantity: item.quantity - 1 };
-          }
-          return item;
-        })
-        .filter((item) => item.quantity > 0)
-    );
+    const newRaw = rawProducts.map((p) => {
+      if (String(p.count) === id) {
+        const newQty = p.quantity - 1;
+        if (newQty <= 0) return null;
+        const basePrice = parseFloat(p.subtotal || "0");
+        return {
+          ...p,
+          quantity: newQty,
+          itemTotalPrice: parseFloat((basePrice * newQty).toFixed(2))
+        };
+      }
+      return p;
+    }).filter(Boolean);
+    saveToFirestore(newRaw);
   };
 
   const handleEditPriceSave = (newPrice: number) => {
     if (priceEditItem) {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === priceEditItem.id
-            ? {
-                ...item,
-                price: newPrice,
-                originalPrice: item.originalPrice ?? item.price,
-              }
-            : item
-        )
-      );
+      const newRaw = rawProducts.map((p) => {
+        if (String(p.count) === priceEditItem.id) {
+          return {
+            ...p,
+            subtotal: newPrice.toFixed(2),
+            itemTotalPrice: parseFloat((newPrice * p.quantity).toFixed(2)),
+          };
+        }
+        return p;
+      });
+      saveToFirestore(newRaw);
     }
   };
 

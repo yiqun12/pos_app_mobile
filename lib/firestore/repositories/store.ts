@@ -4,7 +4,6 @@ import { storeListPath, storePath } from "../paths";
 import type {
   RawGlobalModItem,
   RawGlobalModifications,
-  RawMenu,
   RawMenuCategory,
   RawMenuItem,
   RawOpenHours,
@@ -66,7 +65,7 @@ function transformStore(id: string, raw: RawStoreDoc): Store {
     seatLayout: transformSeatLayout(
       parseJsonField<RawSeatLayout>(raw.restaurant_seat_arrangement, {})
     ),
-    menu: transformMenu(parseJsonField<RawMenu>(raw.key, {})),
+    menu: transformMenu(parseJsonField<any>(raw.key, [])),
     globalModifications: transformGlobalMods(
       parseJsonField<RawGlobalModifications>(raw.globalModification, {})
     ),
@@ -88,26 +87,62 @@ function transformSeatLayout(raw: RawSeatLayout): SeatLayout {
   return { tables };
 }
 
-function transformMenu(raw: RawMenu): Menu {
-  const rawCats = (raw.categories ?? []) as RawMenuCategory[];
-  const rawItems = ((raw.menu ?? raw.items) ?? []) as RawMenuItem[];
+function transformMenu(raw: any): Menu {
+  let rawItems: RawMenuItem[] = [];
+  let rawCats: RawMenuCategory[] = [];
 
-  const categories: MenuCategory[] = rawCats.map((c, i) => ({
-    id: c.id ?? `cat-${i}`,
-    name: c.name ?? `Category ${i + 1}`,
-  }));
+  if (Array.isArray(raw)) {
+    rawItems = raw as RawMenuItem[];
+  } else if (raw && typeof raw === "object") {
+    rawItems = ((raw.menu ?? raw.items) ?? []) as RawMenuItem[];
+    rawCats = (raw.categories ?? []) as RawMenuCategory[];
+  }
 
-  const items: MenuItem[] = rawItems.map((m, i) => ({
-    id: m.id ?? `item-${i}`,
-    categoryId: m.categoryId ?? m.category ?? "",
-    name: m.name ?? "Untitled",
-    price:
-      typeof m.price === "number"
-        ? m.price
-        : parseNumericField(m.price, 0),
-    imageUrl: m.imageUrl ?? m.image,
-    description: m.description,
-  }));
+  const categories: MenuCategory[] = [];
+  const categoryIds = new Set<string>();
+
+  if (rawCats.length > 0) {
+    rawCats.forEach((c, i) => {
+      const catId = c.id ?? `cat-${i}`;
+      categories.push({
+        id: catId,
+        name: c.name ?? `Category ${i + 1}`,
+      });
+      categoryIds.add(catId);
+    });
+  }
+
+  const items: MenuItem[] = rawItems.map((m, i) => {
+    const catName = m.category ?? "Uncategorized";
+    const catId = m.categoryId ?? m.category ?? "uncategorized";
+
+    if (!categoryIds.has(catId)) {
+      const catDisplayName = m.categoryCHI && m.categoryCHI !== m.category 
+        ? `${m.category} / ${m.categoryCHI}` 
+        : catName;
+      categories.push({
+        id: catId,
+        name: catDisplayName,
+      });
+      categoryIds.add(catId);
+    }
+
+    const priceVal = m.price ?? m.subtotal;
+    const price = typeof priceVal === "number" ? priceVal : parseNumericField(priceVal, 0);
+
+    const displayName = m.CHI && m.CHI !== m.name 
+      ? `${m.name} / ${m.CHI}` 
+      : (m.name ?? "Untitled");
+
+    return {
+      id: m.id ?? `item-${i}`,
+      categoryId: catId,
+      name: displayName,
+      price,
+      imageUrl: m.imageUrl ?? m.image,
+      description: m.description,
+    };
+  });
 
   return { categories, items };
 }

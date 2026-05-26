@@ -1,4 +1,4 @@
-﻿import { StatCard } from "@/components/analytics/StatCard";
+import { StatCard } from "@/components/analytics/StatCard";
 import { DateRangeSelector } from "@/components/revenue/DateRangeSelector";
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
@@ -8,8 +8,12 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useModalAction } from "@/hooks/useModalAction";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/context/auth";
+import { useStoreSelection } from "@/context/store";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import {
   Alert,
   RefreshControl,
@@ -40,95 +44,53 @@ type OrderItem = {
   total: number;
 };
 
+function parseDateToFirestoreString(dateStr: string, isEnd: boolean): string {
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return "";
+  const month = parts[0].padStart(2, "0");
+  const day = parts[1].padStart(2, "0");
+  const year = parts[2];
+  
+  if (isEnd) {
+    return `${year}-${month}-${day}-23-59-59-99`;
+  } else {
+    return `${year}-${month}-${day}-00-00-00-00`;
+  }
+}
+
+function parseTimeToDisplay(dateTimeStr: string): string {
+  if (!dateTimeStr) return "";
+  const parts = dateTimeStr.split("-");
+  if (parts.length < 6) return dateTimeStr;
+  try {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const hour = parseInt(parts[3], 10);
+    const min = parseInt(parts[4], 10);
+    const sec = parseInt(parts[5], 10);
+    
+    const date = new Date(Date.UTC(year, month, day, hour, min, sec));
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return dateTimeStr;
+  }
+}
+
+const todayStr = (() => {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${month}/${day}/${year}`;
+})();
+
 const DEFAULT_RANGE = {
-  startDate: "01/01/2026",
-  endDate: "01/11/2026",
+  startDate: todayStr,
+  endDate: todayStr,
 };
 
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: "A1001",
-    guest: "Table 12",
-    time: "10:12 AM",
-    amount: 42.5,
-    channel: "Dine-In",
-    items: [
-      {
-        name: "Hot And Spicy Sichuan Style Chicken",
-        quantity: 1,
-        price: 16.95,
-        total: 16.95,
-      },
-      { name: "Beef Rice Noodle Rolls", quantity: 1, price: 6.8, total: 6.8 },
-      {
-        name: "3pc Leek and Pork Dumplings",
-        quantity: 1,
-        price: 7.2,
-        total: 7.2,
-      },
-      {
-        name: "Garlic Romaine Lettuce (A choy)",
-        quantity: 1,
-        price: 15.0,
-        total: 15.0,
-      },
-      {
-        name: "Ginkgo and Scallop Congee (Porridge)",
-        quantity: 1,
-        price: 8.5,
-        total: 8.5,
-      },
-      {
-        name: "Eel Claypot Crispy Rice",
-        quantity: 1,
-        price: 15.8,
-        total: 15.8,
-      },
-    ],
-    subtotal: 70.25,
-    serviceFee: 10.54,
-    tax: 6.06,
-    gratuity: 0.0,
-    total: 86.85,
-  },
-  {
-    id: "A1002",
-    guest: "DoorDash",
-    time: "10:30 AM",
-    amount: 28.0,
-    channel: "Pickup",
-    items: [
-      { name: "Beef Rice Noodle Rolls", quantity: 2, price: 6.8, total: 13.6 },
-      { name: "Spring Rolls", quantity: 1, price: 5.0, total: 5.0 },
-    ],
-    subtotal: 18.6,
-    serviceFee: 2.79,
-    tax: 1.61,
-    gratuity: 5.0,
-    total: 28.0,
-  },
-  {
-    id: "A1003",
-    guest: "Table 4",
-    time: "11:05 AM",
-    amount: 65.75,
-    channel: "Dine-In",
-  },
-  {
-    id: "A1004",
-    guest: "Uber Eats",
-    time: "11:25 AM",
-    amount: 33.25,
-    channel: "Delivery",
-  },
-  {
-    id: "A1005",
-    guest: "Table 2",
-    time: "12:10 PM",
-    amount: 85.0,
-    channel: "Dine-In",
-  },
-];
+const INITIAL_ORDERS: Order[] = [];
 
 export default function RevenueScreen() {
   const colorScheme = useColorScheme();
@@ -138,23 +100,59 @@ export default function RevenueScreen() {
   const tabFontSize = responsive.isTablet ? 17 : 14;
   const { t } = useTranslation();
 
-  const PRESETS = useMemo(
-    () => [
-      { label: t("revenue.preset.today"), startDate: "01/11/2026", endDate: "01/11/2026" },
+  const { user } = useAuth();
+  const { currentStoreId } = useStoreSelection();
+
+  const PRESETS = useMemo(() => {
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    const formatDate = (date: Date) => {
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    };
+
+    const getMonthRange = (year: number, monthZeroIndexed: number) => {
+      const start = new Date(year, monthZeroIndexed, 1);
+      const end = new Date(year, monthZeroIndexed + 1, 0);
+      return {
+        startDate: formatDate(start),
+        endDate: formatDate(end),
+      };
+    };
+
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    const currentMonthLabel = today.toLocaleString("default", { month: "long" });
+    const lastMonthLabel = new Date(lastMonthYear, lastMonth, 1).toLocaleString("default", { month: "long" });
+
+    return [
+      {
+        label: t("revenue.preset.today"),
+        startDate: formatDate(today),
+        endDate: formatDate(today),
+      },
       {
         label: t("revenue.preset.yesterday"),
-        startDate: "01/10/2026",
-        endDate: "01/10/2026",
+        startDate: formatDate(yesterday),
+        endDate: formatDate(yesterday),
       },
-      { label: t("revenue.preset.january"), startDate: "01/01/2026", endDate: "01/31/2026" },
       {
-        label: t("revenue.preset.december"),
-        startDate: "12/01/2025",
-        endDate: "12/31/2025",
+        label: currentMonthLabel,
+        ...getMonthRange(currentYear, currentMonth),
       },
-    ],
-    [t]
-  );
+      {
+        label: lastMonthLabel,
+        ...getMonthRange(lastMonthYear, lastMonth),
+      },
+    ];
+  }, [t]);
 
   const tabs = useMemo(
     () => [
@@ -175,10 +173,104 @@ export default function RevenueScreen() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderModalVisible, setOrderModalVisible] = useState(false);
 
-  const total = useMemo(
-    () => orders.reduce((sum, order) => sum + order.amount, 0).toFixed(2),
-    [orders]
-  );
+  // Load from Firestore success_payment
+  useEffect(() => {
+    if (!user || !currentStoreId) return;
+
+    const startStr = parseDateToFirestoreString(dateRange.startDate, false);
+    const endStr = parseDateToFirestoreString(dateRange.endDate, true);
+
+    const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
+    const q = query(
+      colRef,
+      where("dateTime", ">=", startStr),
+      where("dateTime", "<=", endStr)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched: Order[] = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        const meta = data.metadata || {};
+        
+        const subtotal = typeof meta.subtotal === "number" ? meta.subtotal : parseFloat(meta.subtotal || "0");
+        const tax = typeof meta.tax === "number" ? meta.tax : parseFloat(meta.tax || "0");
+        const gratuity = typeof meta.tips === "number" ? meta.tips : parseFloat(meta.tips || "0");
+        const serviceFee = typeof meta.service_fee === "number" ? meta.service_fee : parseFloat(meta.service_fee || "0");
+        const totalVal = typeof meta.total === "number" ? meta.total : parseFloat(meta.total || "0");
+        const amount = typeof data.amount === "number" ? data.amount / 100 : totalVal;
+
+        let parsedItems: OrderItem[] = [];
+        if (data.receiptData) {
+          try {
+            const rawItems = JSON.parse(data.receiptData);
+            if (Array.isArray(rawItems)) {
+              parsedItems = rawItems.map((ri: any) => {
+                const riSubtotal = ri.subtotal ?? ri.price;
+                const riPrice = typeof riSubtotal === "number" ? riSubtotal : parseFloat(riSubtotal || "0");
+                return {
+                  name: ri.name || "Untitled",
+                  quantity: typeof ri.quantity === "number" ? ri.quantity : 1,
+                  price: riPrice,
+                  total: ri.itemTotalPrice ? parseFloat(ri.itemTotalPrice) : (riPrice * (ri.quantity || 1)),
+                };
+              });
+            }
+          } catch (e) {
+            console.error("Error parsing receiptData:", e);
+          }
+        }
+
+        const channel = data.powerBy || (meta.isDine ? "Dine-In" : "TakeOut");
+        const guest = meta.isDine && data.tableNum ? `Table ${data.tableNum}` : "TakeOut";
+
+        return {
+          id: docSnap.id,
+          guest,
+          time: parseTimeToDisplay(data.dateTime || ""),
+          amount,
+          channel,
+          items: parsedItems,
+          subtotal,
+          serviceFee,
+          tax,
+          gratuity,
+          total: totalVal,
+        };
+      });
+
+      // Sort by doc id / dateTime descending
+      fetched.sort((a, b) => b.id.localeCompare(a.id));
+
+      setOrders(fetched);
+    }, (err) => {
+      console.error("Error loading success_payment:", err);
+    });
+
+    return () => unsubscribe();
+  }, [user, currentStoreId, dateRange]);
+
+  const stats = useMemo(() => {
+    let totalRevenue = 0;
+    let netSales = 0;
+    let tax = 0;
+    let tips = 0;
+
+    orders.forEach((o) => {
+      totalRevenue += o.total ?? o.amount ?? 0;
+      netSales += o.subtotal ?? 0;
+      tax += o.tax ?? 0;
+      tips += o.gratuity ?? 0;
+    });
+
+    return {
+      totalRevenue: totalRevenue.toFixed(2),
+      netSales: netSales.toFixed(2),
+      tax: tax.toFixed(2),
+      tips: tips.toFixed(2),
+    };
+  }, [orders]);
+
+  const total = stats.totalRevenue;
 
   const handlePreset = (label: string) => {
     const preset = PRESETS.find((p) => p.label === label);
@@ -190,10 +282,6 @@ export default function RevenueScreen() {
   const handleRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
-      setOrders((prev) => {
-        const rotated = [...prev.slice(1), prev[0]];
-        return rotated;
-      });
       setRefreshing(false);
     }, 600);
   };
@@ -264,31 +352,31 @@ export default function RevenueScreen() {
             contentContainerStyle={{ gap: responsive.baseSpacing }}
           >
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalRevenue")} value={`$${total}`} trend="+12.5%" trendUp={true} />
+              <StatCard title={t("revenue.totalRevenue")} value={`$${stats.totalRevenue}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.netSales")} value="$130,500.00" trend="+10.2%" trendUp={true} />
+              <StatCard title={t("revenue.netSales")} value={`$${stats.netSales}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.tax")} value="$12,040.22" trend="+5.4%" trendUp={true} />
+              <StatCard title={t("revenue.tax")} value={`$${stats.tax}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalTips")} value="$5,225.06" trend="+2.1%" trendUp={true} />
+              <StatCard title={t("revenue.totalTips")} value={`$${stats.tips}`} />
             </View>
           </ScrollView>
         ) : (
           <View className="flex-row gap-4">
             <View className="flex-1">
-              <StatCard title={t("revenue.totalRevenue")} value={`$${total}`} trend="+12.5%" trendUp={true} />
+              <StatCard title={t("revenue.totalRevenue")} value={`$${stats.totalRevenue}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.netSales")} value="$130,500.00" trend="+10.2%" trendUp={true} />
+              <StatCard title={t("revenue.netSales")} value={`$${stats.netSales}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.tax")} value="$12,040.22" trend="+5.4%" trendUp={true} />
+              <StatCard title={t("revenue.tax")} value={`$${stats.tax}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.totalTips")} value="$5,225.06" trend="+2.1%" trendUp={true} />
+              <StatCard title={t("revenue.totalTips")} value={`$${stats.tips}`} />
             </View>
           </View>
         )}
