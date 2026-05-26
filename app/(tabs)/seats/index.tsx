@@ -1,4 +1,4 @@
-import { Seat, SeatsLegend, ViewOnlySeat } from "@/components/seats";
+﻿import { Seat, SeatsLegend, ViewOnlySeat } from "@/components/seats";
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Text, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
@@ -14,7 +15,6 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-// Mock data for seats as fallback
 const MOCK_SEATS: Seat[] = [
   { id: "1", name: "A1", status: "vacant", x: 20, y: 20 },
   { id: "2", name: "A2", status: "reserved", x: 120, y: 20 },
@@ -26,14 +26,9 @@ const MOCK_SEATS: Seat[] = [
   { id: "8", name: "C2", status: "occupied", itemCount: 2, x: 120, y: 220 },
 ];
 
-// Zoom constraints
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 
-/**
- * Parse restaurant seat arrangement from Firestore JSON
- * Expected format: { table: [{ type, left, top, width, height, tableName, id, scaleX, scaleY, angle, ... }, ...] }
- */
 function parseSeatArrangement(jsonString: string): Seat[] {
   try {
     if (!jsonString) return MOCK_SEATS;
@@ -61,14 +56,18 @@ function parseSeatArrangement(jsonString: string): Seat[] {
 export default function SeatsScreen() {
   const [seats, setSeats] = useState<Seat[]>(MOCK_SEATS);
   const [loading, setLoading] = useState(true);
+  const [dataNotice, setDataNotice] = useState<string | null>(null);
   const [containerLayout, setContainerLayout] = useState({
     width: 0,
     height: 0,
   });
   const router = useRouter();
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
+  const isTablet = responsive.isTablet;
+  const adminTextSize = isTablet ? 14 : 12;
+  const areaTabTextSize = isTablet ? 15 : 14;
 
-  // Canvas transform values
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -76,15 +75,14 @@ export default function SeatsScreen() {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  // Pinch focal point for zoom centering
   const focalX = useSharedValue(0);
   const focalY = useSharedValue(0);
 
-  // Fetch seat arrangement from Firestore
   useEffect(() => {
     const fetchSeats = async () => {
       try {
         setLoading(true);
+        setDataNotice(null);
         const docRef = doc(db, "TitleLogoNameContent", "aapp-sf-90011-38");
         const docSnap = await getDoc(docRef);
 
@@ -93,29 +91,31 @@ export default function SeatsScreen() {
             restaurant_seat_arrangement?: string;
           };
           if (data.restaurant_seat_arrangement) {
-            const parsedSeats = parseSeatArrangement(
-              data.restaurant_seat_arrangement,
-            );
+            const parsedSeats = parseSeatArrangement(data.restaurant_seat_arrangement);
             setSeats(parsedSeats);
+            setDataNotice(null);
           } else {
             setSeats(MOCK_SEATS);
+            setDataNotice(t("seats.cloudSeatMapMissing"));
           }
         } else {
           setSeats(MOCK_SEATS);
+          setDataNotice(t("seats.cloudSeatConfigMissing"));
         }
       } catch (error) {
-        console.error("Error fetching seats:", error);
+        console.log("Error fetching seats (using mock):", error);
         setSeats(MOCK_SEATS);
+        setDataNotice(t("seats.databaseConnectionFailed"));
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSeats();
-  }, []);
+    void fetchSeats();
+  }, [t]);
 
-  const handleSeatPress = (seatId: string) => {
-    router.push(`/(tabs)/seats/${seatId}`);
+  const handleSeatPress = (nextSeatId: string) => {
+    router.push(`/(tabs)/seats/${nextSeatId}`);
   };
 
   const handleNewPickupOrder = () => {
@@ -131,7 +131,6 @@ export default function SeatsScreen() {
     savedTranslateY.value = 0;
   };
 
-  // Pan gesture for dragging the canvas
   const panGesture = Gesture.Pan()
     .onStart(() => {
       savedTranslateX.value = translateX.value;
@@ -142,31 +141,24 @@ export default function SeatsScreen() {
       translateY.value = savedTranslateY.value + event.translationY;
     });
 
-  // Pinch gesture for zooming
   const pinchGesture = Gesture.Pinch()
     .onStart((event) => {
       savedScale.value = scale.value;
-      // Store focal point at start
       focalX.value = event.focalX;
       focalY.value = event.focalY;
     })
     .onUpdate((event) => {
-      // Calculate new scale with clamping
       const newScale = Math.min(
         Math.max(savedScale.value * event.scale, MIN_SCALE),
         MAX_SCALE
       );
 
-      // Zoom centered on pinch focal point
-      // Adjust translation to keep focal point stationary
       const scaleDiff = newScale / savedScale.value;
       const focalOffsetX = focalX.value - containerLayout.width / 2;
       const focalOffsetY = focalY.value - containerLayout.height / 2;
 
-      translateX.value =
-        savedTranslateX.value - focalOffsetX * (scaleDiff - 1);
-      translateY.value =
-        savedTranslateY.value - focalOffsetY * (scaleDiff - 1);
+      translateX.value = savedTranslateX.value - focalOffsetX * (scaleDiff - 1);
+      translateY.value = savedTranslateY.value - focalOffsetY * (scaleDiff - 1);
 
       scale.value = newScale;
     })
@@ -176,10 +168,8 @@ export default function SeatsScreen() {
       savedTranslateY.value = translateY.value;
     });
 
-  // Combine pan and pinch gestures to work simultaneously
   const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
 
-  // Animated style for the canvas container
   const animatedCanvasStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -193,23 +183,53 @@ export default function SeatsScreen() {
   const buttonContainerGap = responsive.isTablet ? responsive.baseSpacing : 8;
 
   return (
-    <GestureHandlerRootView className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Seats">
-        <View
-          className="flex-row"
-          style={{
-            gap: buttonContainerGap,
-          }}
-        >
+    <GestureHandlerRootView className="flex-1 bg-slate-50 dark:bg-slate-950">
+      <ScreenHeader
+        title={t("seats.headerTitle")}
+        subtitle={t("seats.headerSubtitle")}
+        rightElement={
+          <View className="flex-row items-center gap-3">
+            <View className="mr-2 flex-row items-center gap-2">
+              <Text className="text-slate-500" style={{ fontSize: adminTextSize }}>
+                {t("seats.adminMode")}
+              </Text>
+              <View className="h-6 w-10 items-start justify-center rounded-full bg-slate-200 p-1">
+                <View className="h-4 w-4 rounded-full bg-white shadow-sm" />
+              </View>
+            </View>
+            <View className="mr-4 hidden flex-row rounded-lg bg-slate-100 p-1 md:flex">
+              <View className="rounded-md bg-white px-3 py-1 shadow-sm">
+                <Text
+                  className="font-medium text-orange-600"
+                  style={{ fontSize: areaTabTextSize }}
+                >
+                  {t("seats.mainHall")}
+                </Text>
+              </View>
+              <View className="px-3 py-1">
+                <Text className="text-slate-500" style={{ fontSize: areaTabTextSize }}>
+                  {t("seats.vipRooms")}
+                </Text>
+              </View>
+              <View className="px-3 py-1">
+                <Text className="text-slate-500" style={{ fontSize: areaTabTextSize }}>
+                  {t("seats.terrace")}
+                </Text>
+              </View>
+            </View>
+          </View>
+        }
+      >
+        <View className="flex-row" style={{ gap: buttonContainerGap }}>
           <Button
             variant="outline"
-            label="Reset View"
+            label={t("seats.resetView")}
             icon="refresh"
             onPress={handleResetView}
           />
           <Button
-            variant="outline"
-            label="Pickup"
+            variant="primary"
+            label={t("seats.pickup")}
             icon="bag-add"
             onPress={handleNewPickupOrder}
           />
@@ -217,13 +237,21 @@ export default function SeatsScreen() {
       </ScreenHeader>
 
       <View
-        className="flex-1 bg-slate-50 dark:bg-slate-900 overflow-hidden relative"
+        className="relative m-4 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
         onLayout={(e) => setContainerLayout(e.nativeEvent.layout)}
       >
+        {dataNotice ? (
+          <View className="border-b border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/30">
+            <Text className="text-sm font-medium text-amber-700 dark:text-amber-300">
+              {dataNotice}
+            </Text>
+          </View>
+        ) : null}
+
         {loading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color="#2563eb" />
-            <Text className="mt-4 text-slate-500">Loading seats...</Text>
+            <Text className="mt-4 text-slate-500">{t("seats.loadingSeats")}</Text>
           </View>
         ) : (
           <GestureDetector gesture={composedGesture}>

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 
 export interface ItemAnalytic {
@@ -15,20 +16,22 @@ interface AnalyticsTableProps {
 }
 
 export function AnalyticsTable({ data }: AnalyticsTableProps) {
+  const { t } = useTranslation();
+
   return (
     <View className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <View className="mb-3 flex-row items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-700">
         <Text className="w-2/5 text-xs font-bold text-slate-900 dark:text-white">
-          Item
+          {t("analytics.table.item")}
         </Text>
         <Text className="w-1/6 text-right text-xs font-bold text-slate-900 dark:text-white">
-          Qty
+          {t("analytics.table.qty")}
         </Text>
         <Text className="w-1/4 text-right text-xs font-bold text-slate-900 dark:text-white">
-          Revenue
+          {t("analytics.table.revenue")}
         </Text>
         <Text className="w-1/5 text-right text-xs font-bold text-slate-900 dark:text-white">
-          Price
+          {t("analytics.table.price")}
         </Text>
       </View>
 

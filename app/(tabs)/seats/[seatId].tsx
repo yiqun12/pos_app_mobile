@@ -1,4 +1,4 @@
-import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
+﻿import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
 import { PriceEditModal } from "@/components/seats/modals/PriceEditModal";
@@ -8,42 +8,48 @@ import { Order, OrderItem } from "@/components/seats/types";
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useModalAction } from "@/hooks/useModalAction"; // 注意检查你的相对路径是否正确
+import { useModalAction } from "@/hooks/useModalAction";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function SeatScreen() {
-  const { seatId, openModal } = useLocalSearchParams<{ seatId: string; openModal?: string }>();
+  const { seatId } = useLocalSearchParams<{ seatId: string; openModal?: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
- // AI 跳转并打开弹窗/执行操作
- // 使用 Hook 集中处理 AI 传来的指令
- useModalAction((modalName) => {
-  if (modalName === "menu") setMenuModalVisible(true);
-  else if (modalName === "adjustment") setAdjustmentModalVisible(true);
-  else if (modalName === "payment") setPaymentModalVisible(true);
-  else if (modalName === "serviceFee") setServiceFeeEnabled(true);
-  else if (modalName === "printOrder") Alert.alert("Printing...", `Printing order for Seat ${seatId}`);
-  else if (modalName === "printReceipt") Alert.alert("Printing...", `Printing receipt for Seat ${seatId}`);
-}); 
-
-  // --- State ---
   const [items, setItems] = useState<OrderItem[]>([]);
   const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
   const [manualAdjustment, setManualAdjustment] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
 
-  // Modals
   const [priceEditItem, setPriceEditItem] = useState<OrderItem | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
 
-  // --- Calculations ---
+  useModalAction((modalName) => {
+    if (modalName === "menu") setMenuModalVisible(true);
+    else if (modalName === "adjustment") setAdjustmentModalVisible(true);
+    else if (modalName === "payment") setPaymentModalVisible(true);
+    else if (modalName === "serviceFee") setServiceFeeEnabled(true);
+    else if (modalName === "printOrder") {
+      Alert.alert(
+        t("seats.printing"),
+        t("seats.printingOrderForSeat", { seatId: seatId ?? "-" })
+      );
+    } else if (modalName === "printReceipt") {
+      Alert.alert(
+        t("seats.printing"),
+        t("seats.printingReceiptForSeat", { seatId: seatId ?? "-" })
+      );
+    }
+  });
+
   const order = useMemo<Order>(() => {
     const subtotal = items.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -75,10 +81,7 @@ export default function SeatScreen() {
     };
   }, [items, serviceFeeEnabled, manualAdjustment, paidAmount, seatId]);
 
-  // --- Handlers ---
-
   const handleAddItem = (orderItem: OrderItem) => {
-    // The item already comes with all properties from MenuSelectionModal
     setItems((prev) => [...prev, orderItem]);
   };
 
@@ -121,20 +124,21 @@ export default function SeatScreen() {
 
   const handlePayment = (method: "cash" | "card" | "split", amount: number) => {
     setPaidAmount((prev) => prev + amount);
-    // In real app: create payment record
     Alert.alert(
-      "Payment Successful",
-      `Paid $${amount.toFixed(2)} via ${method}`
+      t("seats.paymentSuccessful"),
+      t("seats.paidViaMethod", { amount: amount.toFixed(2), method })
     );
   };
 
   const handlePrint = (type: "order" | "receipt") => {
-    Alert.alert("Printing...", `Printing ${type} for Seat ${seatId}`);
+    Alert.alert(
+      t("seats.printing"),
+      t("seats.printingTypeForSeat", { type, seatId: seatId ?? "-" })
+    );
   };
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      {/* Header */}
       <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <TouchableOpacity
           onPress={() => router.back()}
@@ -143,18 +147,22 @@ export default function SeatScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-slate-900 dark:text-white">
-          Seat {seatId} Order
+          {t("seats.seatOrder", { seatId: seatId ?? "-" })}
         </Text>
         <TouchableOpacity
           onPress={() => {
-            Alert.alert("Options", "Select action", [
-              {
-                text: "Change Seat",
-                onPress: () => console.log("Change Seat"),
-              },
-              { text: "Mark Unpaid", onPress: () => setPaidAmount(0) },
-              { text: "Cancel", style: "cancel" },
-            ]);
+            Alert.alert(
+              t("seats.options"),
+              t("seats.selectAction"),
+              [
+                {
+                  text: t("seats.changeSeat"),
+                  onPress: () => console.log("Change Seat"),
+                },
+                { text: t("seats.markUnpaid"), onPress: () => setPaidAmount(0) },
+                { text: t("common.cancel"), style: "cancel" },
+              ]
+            );
           }}
           className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
         >
@@ -162,110 +170,115 @@ export default function SeatScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Main Content */}
-      <View className="flex-1 flex-row">
-        {/* Left: Items List */}
-        <View className="flex-1 px-4 py-4">
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          >
-            {items.length === 0 ? (
-              <View className="items-center justify-center py-20">
-                <Ionicons
-                  name="cart-outline"
-                  size={64}
-                  color={colors.tabIconDefault}
-                />
-                <Text className="mt-4 text-slate-500">
-                  No items added to this order yet.
-                </Text>
-              </View>
-            ) : (
-              items.map((item) => (
-                <OrderItemRow
-                  key={item.id}
-                  item={item}
-                  onIncrement={handleIncrement}
-                  onDecrement={handleDecrement}
-                  onPress={setPriceEditItem}
-                />
-              ))
-            )}
+      <View className="flex-1 flex-col bg-slate-50 dark:bg-slate-950 md:flex-row">
+        <View className="flex-1 px-4 py-4 md:mr-4 md:bg-transparent">
+          <View className="h-full rounded-xl bg-white p-4 shadow-sm dark:bg-slate-900">
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                {t("seats.itemizedReceipt")}
+              </Text>
+              <Text className="text-sm text-slate-500">
+                {t("seats.itemsCount", { count: items.length })}
+              </Text>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              {items.length === 0 ? (
+                <View className="items-center justify-center py-20">
+                  <Ionicons
+                    name="cart-outline"
+                    size={64}
+                    color={colors.tabIconDefault}
+                  />
+                  <Text className="mt-4 text-slate-500">
+                    {t("seats.noItemsInOrder")}
+                  </Text>
+                </View>
+              ) : (
+                items.map((item) => (
+                  <OrderItemRow
+                    key={item.id}
+                    item={item}
+                    onIncrement={handleIncrement}
+                    onDecrement={handleDecrement}
+                    onPress={setPriceEditItem}
+                  />
+                ))
+              )}
 
-            <Button
-              label="Add Item"
-              icon="add-circle"
-              variant="outline"
-              className="mt-4 border-dashed"
-              onPress={() => setMenuModalVisible(true)}
-            />
-          </ScrollView>
+              <Button
+                label={t("seats.addItems")}
+                icon="add"
+                variant="ghost"
+                className="mt-2 border border-dashed border-slate-300 dark:border-slate-700"
+                onPress={() => setMenuModalVisible(true)}
+              />
+            </ScrollView>
+          </View>
         </View>
 
-        {/* Right (or Bottom on small screens): Summary & Actions */}
-        {/* For now assuming single column mobile view, so this is bottom fixed */}
-      </View>
+        <View className="w-full bg-slate-50 p-4 pt-0 dark:bg-slate-950 md:w-[400px] md:pt-4">
+          <OrderSummary order={order} />
 
-      {/* Footer Actions */}
-      <OrderSummary order={order} />
-
-      <View className="border-t border-slate-200 bg-white p-4 pb-8 dark:border-slate-800 dark:bg-slate-950">
-        {/* Action Grid */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-4 gap-x-4"
-        >
-          <Button
-            label={serviceFeeEnabled ? "Remove Fee" : "Add Service Fee"}
-            size="sm"
-            className="mr-3"
-            variant={serviceFeeEnabled ? "primary" : "secondary"}
-            onPress={() => setServiceFeeEnabled(!serviceFeeEnabled)}
-          />
-          <Button
-            label="Adjust Total"
-            size="sm"
-            className="mr-3"
-            variant="secondary"
-            onPress={() => setAdjustmentModalVisible(true)}
-          />
-          <Button
-            label="Print Order"
-            size="sm"
-            className="mr-3"
-            variant="secondary"
-            icon="print"
-            onPress={() => handlePrint("order")}
-          />
-          <Button
-            label="Unpaid Items"
-            size="sm"
-            variant="secondary"
-            // icon="alert-circle"
-            onPress={() => {}}
-          />
-        </ScrollView>
-
-        <View className="flex-row gap-3">
-          <View className="flex-1">
+          <View className="mt-6">
             <Button
-              label="Print Receipt"
-              variant="outline"
-              icon="receipt"
-              onPress={() => handlePrint("receipt")}
-            />
-          </View>
-          <View className="flex-[2]">
-            <Button
-              label={`Pay $${(order.total - order.paidAmount).toFixed(2)}`}
-              variant={order.status === "paid" ? "secondary" : "primary"}
-              disabled={order.status === "paid"}
-              // className=""
+              label={t("seats.payNow")}
+              variant="primary"
+              size="lg"
               icon="card"
               onPress={() => setPaymentModalVisible(true)}
+              disabled={order.status === "paid"}
             />
+          </View>
+
+          <View className="mt-4 flex-row gap-3">
+            <View className="flex-1">
+              <Button
+                label={t("seats.print")}
+                variant="outline"
+                icon="print"
+                onPress={() => handlePrint("receipt")}
+              />
+            </View>
+            <View className="flex-1">
+              <Button
+                label={t("seats.splitBill")}
+                variant="outline"
+                icon="git-branch"
+                onPress={() => {}}
+              />
+            </View>
+          </View>
+          <View className="mt-3">
+            <Button
+              label={t("seats.shareOrder")}
+              variant="secondary"
+              icon="share-social"
+              className="bg-slate-800 text-white dark:bg-slate-700"
+              onPress={() => {}}
+            />
+          </View>
+
+          <View className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+            <View className="mb-3 flex-row items-center gap-3">
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                <Ionicons name="person" size={20} color="#3b82f6" />
+              </View>
+              <View>
+                <Text className="text-xs font-bold text-blue-900 dark:text-blue-100">
+                  {t("seats.customerLoyalty")}
+                </Text>
+                <Text className="text-xs text-blue-600 dark:text-blue-300">
+                  {t("seats.addPhoneOrScanCard")}
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row items-center justify-between rounded-lg border border-blue-200 bg-white p-3 dark:border-blue-800 dark:bg-slate-900">
+              <Text className="text-slate-400">{t("seats.phoneNumber")}</Text>
+              <Ionicons name="checkmark-circle" size={20} color="#3b82f6" />
+            </View>
           </View>
         </View>
       </View>
@@ -282,7 +295,6 @@ export default function SeatScreen() {
         onSelect={handleAddItem}
       />
 
-      {/* Modals */}
       {priceEditItem && (
         <PriceEditModal
           visible={!!priceEditItem}

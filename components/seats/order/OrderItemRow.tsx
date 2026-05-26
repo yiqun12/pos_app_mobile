@@ -3,6 +3,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, TouchableOpacity, View } from "react-native";
 import { OrderItem } from "../types";
 
@@ -22,13 +23,17 @@ export function OrderItemRow({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => onPress(item)}
-      className="mb-2 flex-row items-start justify-between rounded-lg border border-slate-100 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="mb-3 flex-row items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800"
     >
+      {/* Food Image Placeholder */}
+      <View className="mr-3 h-12 w-12 rounded-lg bg-slate-200 dark:bg-slate-700" />
+
       <View className="flex-1">
         <Text
           style={{ fontSize: responsive.baseFontSize }}
@@ -71,7 +76,7 @@ export function OrderItemRow({
               style={{ fontSize: responsive.captionFontSize }}
               className="font-medium text-slate-600 dark:text-slate-400"
             >
-              Add-ons:{" "}
+              {t("revenue.addOns")}:{" "}
               <Text className="font-normal">
                 {item.selectedIngredients
                   .map((i) => i.name)

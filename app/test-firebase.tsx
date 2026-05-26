@@ -4,6 +4,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -30,6 +31,7 @@ interface RestaurantData {
 export default function TestFirebaseScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
   const [data, setData] = useState<RestaurantData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function TestFirebaseScreen() {
           // @ts-ignore
           setData(docSnap.data() as RestaurantData);
         } else {
-          setError("No such document found (ID: 23-sf-90011-960)");
+          setError(t("testFirebase.documentNotFound"));
         }
       } catch (err: any) {
         console.error("Firestore Error:", err);
@@ -75,7 +77,11 @@ export default function TestFirebaseScreen() {
         </View>
       );
     } catch (e) {
-      return <Text className="text-red-500">Invalid JSON: {jsonString}</Text>;
+      return (
+        <Text className="text-red-500">
+          {t("testFirebase.invalidJson")}: {jsonString}
+        </Text>
+      );
     }
   };
 
@@ -84,13 +90,13 @@ export default function TestFirebaseScreen() {
       className="flex-1 bg-white dark:bg-slate-950"
       edges={["top", "left", "right", "bottom"]}
     >
-      <ScreenHeader title="Firebase Test" />
+      <ScreenHeader title={t("testFirebase.title")} />
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.tint} />
           <Text className="mt-4 text-slate-500">
-            Fetching restaurant data...
+            {t("testFirebase.fetchingData")}
           </Text>
         </View>
       ) : error ? (
@@ -121,19 +127,19 @@ export default function TestFirebaseScreen() {
           {/* Details Card */}
           <View className="mb-6 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
             <Text className="mb-2 font-semibold text-slate-900 dark:text-white">
-              Contact & Location
+              {t("testFirebase.contactLocation")}
             </Text>
             <Text className="text-slate-600 dark:text-slate-400">
-              Phone: {data.Phone}
+              {t("testFirebase.phone")}: {data.Phone}
             </Text>
             <Text className="text-slate-600 dark:text-slate-400">
-              Address: {data.Address}
+              {t("testFirebase.address")}: {data.Address}
             </Text>
             <Text className="text-slate-600 dark:text-slate-400">
               {data.physical_address}, {data.State} {data.ZipCode}
             </Text>
             <Text className="text-slate-600 dark:text-slate-400">
-              Tax Rate: {data.TaxRate}%
+              {t("testFirebase.taxRate")}: {data.TaxRate}%
             </Text>
           </View>
 
@@ -141,14 +147,14 @@ export default function TestFirebaseScreen() {
           <View className="gap-4 pb-10">
             <View>
               <Text className="font-semibold text-slate-900 dark:text-white">
-                Opening Times
+                {t("testFirebase.openingTimes")}
               </Text>
               {renderJsonField("Open_time", data.Open_time)}
             </View>
 
             <View>
               <Text className="font-semibold text-slate-900 dark:text-white">
-                Menu Items (Key)
+                {t("testFirebase.menuItemsKey")}
               </Text>
               {/* This one might be huge, maybe truncate? */}
               {renderJsonField("key", data.key)}
@@ -156,14 +162,14 @@ export default function TestFirebaseScreen() {
 
             <View>
               <Text className="font-semibold text-slate-900 dark:text-white">
-                Global Modifications
+                {t("testFirebase.globalModifications")}
               </Text>
               {renderJsonField("globalModification", data.globalModification)}
             </View>
 
             <View>
               <Text className="font-semibold text-slate-900 dark:text-white">
-                Seat Arrangement
+                {t("testFirebase.seatArrangement")}
               </Text>
               {renderJsonField(
                 "restaurant_seat_arrangement",

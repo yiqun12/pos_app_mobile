@@ -1,11 +1,13 @@
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 
 export function SeatsLegend() {
   const responsive = useResponsiveLayout();
-  const indicatorSize = responsive.isTablet ? 5 : 3.5;
-  const textSize = responsive.isTablet ? 14 : 12;
+  const { t } = useTranslation();
+  const indicatorSize = responsive.isTablet ? 6 : 3.5;
+  const textSize = responsive.isTablet ? 16 : 12;
   const verticalPadding = responsive.isTablet ? responsive.baseSpacing : 12;
   const horizontalPadding = responsive.isTablet ? responsive.mediumSpacing : 16;
 
@@ -20,7 +22,7 @@ export function SeatsLegend() {
       <View className="flex-row justify-around">
         <View className="flex-row items-center">
           <View
-            className="rounded bg-slate-300"
+            className="rounded border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-600"
             style={{
               width: indicatorSize * 2,
               height: indicatorSize * 2,
@@ -31,14 +33,15 @@ export function SeatsLegend() {
             style={{
               fontSize: textSize,
             }}
-            className="text-slate-900 dark:text-white"
+            className="text-slate-600 dark:text-slate-400"
           >
-            Vacant
+            {t("seats.legend.available")}
           </Text>
         </View>
+
         <View className="flex-row items-center">
           <View
-            className="rounded bg-yellow-400"
+            className="rounded bg-orange-600"
             style={{
               width: indicatorSize * 2,
               height: indicatorSize * 2,
@@ -49,14 +52,15 @@ export function SeatsLegend() {
             style={{
               fontSize: textSize,
             }}
-            className="text-slate-900 dark:text-white"
+            className="text-slate-600 dark:text-slate-400"
           >
-            Reserved
+            {t("seats.legend.occupied")}
           </Text>
         </View>
+
         <View className="flex-row items-center">
           <View
-            className="rounded bg-red-500"
+            className="rounded bg-orange-200"
             style={{
               width: indicatorSize * 2,
               height: indicatorSize * 2,
@@ -67,9 +71,9 @@ export function SeatsLegend() {
             style={{
               fontSize: textSize,
             }}
-            className="text-slate-900 dark:text-white"
+            className="text-slate-600 dark:text-slate-400"
           >
-            Occupied
+            {t("seats.legend.reserved")}
           </Text>
         </View>
       </View>

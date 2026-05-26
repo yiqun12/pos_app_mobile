@@ -2,21 +2,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
 import { usePathname, useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Animated,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    PanResponder,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useWindowDimensions,
+    View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // API 地址（推荐）：
 // - 开发环境：自动从 Expo host 推断你电脑的局域网 IP（无需每次手改）
@@ -45,6 +50,8 @@ const VOICE_API_URL = API_URL.replace('/api/chat', '/api/voice-to-text');
 type ChatSender = 'ai' | 'user';
 type ChatMessage = { id: string; text: string; sender: ChatSender };
 type AutoNavMatch = { path: string; reason: string };
+const FAB_SIZE = 56;
+const FAB_MARGIN = 20;
 
 // --- 替换从这里开始 ---
 
@@ -166,11 +173,19 @@ function matchAutoNavigation(rawText: string): AutoNavMatch | null {
 export default function AIChat() {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isTabRoute = /^\/(seats|menu|revenue|notifications|profile)(\/|$)/.test(
+    pathname
+  );
+  // Reserve extra space above tab bar to avoid overlap.
+  const fabBottomInset = isTabRoute ? insets.bottom + 112 : insets.bottom + 24;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', text: '你好！我是你的点餐助手。有什么我可以帮你的吗？', sender: 'ai' }
+    { id: '1', text: t('aiChat.greeting'), sender: 'ai' },
   ]);
   const [loading, setLoading] = useState(false);
   const [lastAutoNavAt, setLastAutoNavAt] = useState<number>(0);
@@ -178,10 +193,100 @@ export default function AIChat() {
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const fabPosition = useRef(
+    new Animated.ValueXY({
+      x: Math.max(FAB_MARGIN, screenWidth - FAB_SIZE - FAB_MARGIN),
+      y: Math.max(insets.top + FAB_MARGIN, screenHeight - fabBottomInset - FAB_SIZE),
+    })
+  ).current;
+  const fabCurrent = useRef({
+    x: Math.max(FAB_MARGIN, screenWidth - FAB_SIZE - FAB_MARGIN),
+    y: Math.max(insets.top + FAB_MARGIN, screenHeight - fabBottomInset - FAB_SIZE),
+  });
+  const dragStart = useRef({ x: 0, y: 0 });
+  const dragging = useRef(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const isPressing = useRef(false); 
   const recordStartTime = useRef<number>(0);
+
+  useEffect(() => {
+    const id = fabPosition.addListener((value) => {
+      fabCurrent.current = value;
+    });
+    return () => {
+      fabPosition.removeListener(id);
+    };
+  }, [fabPosition]);
+
+  const clampFabX = (x: number) => {
+    const minX = FAB_MARGIN;
+    const maxX = Math.max(minX, screenWidth - FAB_SIZE - FAB_MARGIN);
+    return Math.min(Math.max(x, minX), maxX);
+  };
+
+  const clampFabY = (y: number) => {
+    const minY = insets.top + FAB_MARGIN;
+    const maxY = Math.max(minY, screenHeight - fabBottomInset - FAB_SIZE);
+    return Math.min(Math.max(y, minY), maxY);
+  };
+
+  useEffect(() => {
+    // Keep FAB visible when orientation/safe-area changes.
+    const nextX =
+      fabCurrent.current.x + FAB_SIZE / 2 < screenWidth / 2
+        ? FAB_MARGIN
+        : Math.max(FAB_MARGIN, screenWidth - FAB_SIZE - FAB_MARGIN);
+    const nextY = clampFabY(fabCurrent.current.y);
+    fabPosition.setValue({ x: nextX, y: nextY });
+  }, [screenWidth, screenHeight, insets.top, insets.bottom, fabBottomInset]);
+
+  const snapFabToEdge = () => {
+    const currentX = fabCurrent.current.x;
+    const currentY = fabCurrent.current.y;
+    const snappedX =
+      currentX + FAB_SIZE / 2 < screenWidth / 2
+        ? FAB_MARGIN
+        : Math.max(FAB_MARGIN, screenWidth - FAB_SIZE - FAB_MARGIN);
+    const snappedY = clampFabY(currentY);
+
+    Animated.spring(fabPosition, {
+      toValue: { x: snappedX, y: snappedY },
+      useNativeDriver: false,
+      speed: 20,
+      bounciness: 6,
+    }).start();
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3,
+      onPanResponderGrant: () => {
+        dragging.current = false;
+        dragStart.current = { ...fabCurrent.current };
+      },
+      onPanResponderMove: (_, gesture) => {
+        const nextX = clampFabX(dragStart.current.x + gesture.dx);
+        const nextY = clampFabY(dragStart.current.y + gesture.dy);
+        dragging.current = Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2;
+        fabPosition.setValue({ x: nextX, y: nextY });
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const isTap = Math.abs(gesture.dx) < 3 && Math.abs(gesture.dy) < 3;
+        if (isTap && !dragging.current) {
+          setModalVisible(true);
+          return;
+        }
+        snapFabToEdge();
+      },
+      onPanResponderTerminate: () => {
+        snapFabToEdge();
+      },
+      onPanResponderTerminationRequest: () => false,
+    })
+  ).current;
 
   async function startRecording() {
     isPressing.current = true;
@@ -191,7 +296,7 @@ export default function AIChat() {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') {
-        alert('请授权录音权限');
+        alert(t('aiChat.micPermissionRequired'));
         setIsRecording(false);
         return;
       }
@@ -256,7 +361,7 @@ export default function AIChat() {
 
     } catch (error) {
       console.error('上传语音报错:', error);
-      alert('网络请求失败');
+      alert(t('aiChat.networkRequestFailed'));
     } finally {
       setLoading(false);
     }
@@ -391,8 +496,8 @@ export default function AIChat() {
         id: (Date.now() + 1).toString(), 
         text:
           (error as any)?.name === 'AbortError'
-            ? '请求超时：请检查后端是否启动、电脑 IP 是否正确、手机和电脑是否在同一个 WiFi。'
-            : '连接失败: 请检查电脑IP是否填写正确，或者手机和电脑是否在同一个WiFi下。', 
+            ? t('aiChat.requestTimeout')
+            : t('aiChat.connectionFailed'),
         sender: 'ai' 
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -403,12 +508,17 @@ export default function AIChat() {
 
   return (
     <>
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setModalVisible(true)}
+      <Animated.View
+        style={[
+          styles.fab,
+          {
+            transform: fabPosition.getTranslateTransform(),
+          },
+        ]}
+        {...panResponder.panHandlers}
       >
         <Ionicons name="chatbubble-ellipses-outline" size={28} color="white" />
-      </TouchableOpacity>
+      </Animated.View>
 
       <Modal
         animationType="slide"
@@ -429,7 +539,7 @@ export default function AIChat() {
               
               {/* 1. 头部 */}
               <View style={styles.header}>
-                <Text style={styles.headerTitle}>AI 点餐助手</Text>
+                <Text style={styles.headerTitle}>{t('aiChat.title')}</Text>
                 <TouchableOpacity onPress={() => setModalVisible(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -503,7 +613,7 @@ export default function AIChat() {
                   style={styles.input}
                   value={message}
                   onChangeText={setMessage}
-                  placeholder="长按左侧麦克风，或输入..."
+                  placeholder={t('aiChat.inputPlaceholder')}
                   returnKeyType="send"
                   onSubmitEditing={sendMessage}
                 />
@@ -534,12 +644,12 @@ export default function AIChat() {
 const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: 40,
-    right: 20,
+    left: 0,
+    top: 0,
     backgroundColor: '#FF6B00',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,

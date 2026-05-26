@@ -39,11 +39,12 @@ export function Input({
         </Text>
       )}
       <View
-        className={`flex-row items-center rounded-xl border bg-slate-50 px-4 dark:bg-slate-900 ${
-          error
-            ? "border-red-500"
-            : "border-slate-200 dark:border-slate-700 focus:border-blue-500"
-        }`}
+          style={{ minHeight: responsive.minTouchTargetSize }}
+          className={`flex-row items-center rounded-xl border bg-slate-50 px-4 dark:bg-slate-900 ${
+            error
+              ? "border-red-500"
+              : "border-slate-200 dark:border-slate-700 focus:border-orange-500"
+          }`}
       >
         {icon && (
           <Ionicons
@@ -56,7 +57,7 @@ export function Input({
         <TextInput
           style={{
             fontSize: responsive.baseFontSize,
-            paddingVertical: responsive.isTablet ? 14 : 12,
+            height: "100%", // Fill container height
           }}
           className="flex-1 text-slate-900 dark:text-white"
           placeholderTextColor={colors.tabIconDefault}

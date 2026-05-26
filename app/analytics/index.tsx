@@ -5,6 +5,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -50,6 +51,7 @@ export default function AnalyticsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
   const stats = useMemo(() => {
     const totalItems = ITEM_ANALYTICS.length;
@@ -72,7 +74,7 @@ export default function AnalyticsScreen() {
     >
       <View className="flex-1">
         <ScreenHeader
-          title="Sales Analytics"
+          title={t("analytics.title")}
           rightElement={
             <TouchableOpacity
               onPress={() => router.back()}
@@ -93,7 +95,7 @@ export default function AnalyticsScreen() {
           <View className="mb-4 gap-3">
             <View className="flex-row gap-3">
               <StatCard
-                title="Total Items"
+                title={t("analytics.totalItems")}
                 value={stats.totalItems.toString()}
                 icon="cube"
                 bgColor="bg-blue-100"
@@ -102,7 +104,7 @@ export default function AnalyticsScreen() {
                 darkText="dark:text-blue-400"
               />
               <StatCard
-                title="Total Qty"
+                title={t("analytics.totalQty")}
                 value={stats.totalQuantity.toString()}
                 icon="layers"
                 bgColor="bg-green-100"
@@ -113,7 +115,7 @@ export default function AnalyticsScreen() {
             </View>
 
             <StatCard
-              title="Total Revenue"
+              title={t("analytics.totalRevenue")}
               value={`$${stats.totalRevenue.toFixed(2)}`}
               icon="cash"
               bgColor="bg-purple-100"

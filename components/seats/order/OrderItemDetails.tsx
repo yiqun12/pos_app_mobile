@@ -1,6 +1,7 @@
 import { SelectedOption } from "@/components/seats/types";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 
 interface OrderItemDetailsProps {
@@ -23,6 +24,7 @@ export function OrderItemDetails({
   compact = false,
 }: OrderItemDetailsProps) {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   if (!selectedOptions?.length && !selectedIngredients?.length) {
     return null;
@@ -60,7 +62,7 @@ export function OrderItemDetails({
           }}
           className="text-slate-600 dark:text-slate-400"
         >
-          <Text className="font-medium">Add-ons:</Text>{" "}
+          <Text className="font-medium">{t("seats.orderItemDetails.addOns")}:</Text>{" "}
           {selectedIngredients.map((i) => i.name).join(", ")}
         </Text>
       )}

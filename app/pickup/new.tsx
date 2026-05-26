@@ -1,4 +1,4 @@
-import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
+﻿import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
 import { PriceEditModal } from "@/components/seats/modals/PriceEditModal";
@@ -12,6 +12,7 @@ import { useModalAction } from "@/hooks/useModalAction";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   ScrollView,
@@ -26,33 +27,29 @@ export default function NewPickupScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
-// ✅ 加上这个 Hook 调用
-useModalAction((modalName) => {
-  if (modalName === "menu") {
-    setMenuModalVisible(true);
-  } else if (modalName === "adjustment") {
-    setAdjustmentModalVisible(true);
-  } else if (modalName === "payment") {
-    setPaymentModalVisible(true);
-  }
-});
+  useModalAction((modalName) => {
+    if (modalName === "menu") {
+      setMenuModalVisible(true);
+    } else if (modalName === "adjustment") {
+      setAdjustmentModalVisible(true);
+    } else if (modalName === "payment") {
+      setPaymentModalVisible(true);
+    }
+  });
 
-  // --- State ---
   const [customerName, setCustomerName] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
-  const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
+  const [serviceFeeEnabled] = useState(false);
   const [manualAdjustment, setManualAdjustment] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
 
-  // Modals
   const [menuModalVisible, setMenuModalVisible] = useState(false);
   const [priceEditItem, setPriceEditItem] = useState<OrderItem | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
 
-
-  // --- Calculations ---
   const order = useMemo<Order>(() => {
     const subtotal = items.reduce(
       (sum, item) => sum + item.price * item.quantity,
@@ -64,8 +61,8 @@ useModalAction((modalName) => {
     const total = subtotal + taxAmount + serviceFee + manualAdjustment;
 
     return {
-      id: `PU-${Date.now()}`, // PU for Pickup
-      seatId: "pickup", // Placeholder
+      id: `PU-${Date.now()}`,
+      seatId: "pickup",
       items,
       subtotal,
       taxRate,
@@ -79,7 +76,6 @@ useModalAction((modalName) => {
     };
   }, [items, serviceFeeEnabled, manualAdjustment, paidAmount]);
 
-  // --- Handlers ---
   const handleAddItem = (menuItem: any) => {
     const newItem: OrderItem = {
       id: Date.now().toString(),
@@ -114,7 +110,13 @@ useModalAction((modalName) => {
 
   const handlePayment = (method: string, amount: number) => {
     setPaidAmount((prev) => prev + amount);
-    Alert.alert("Success", `Received $${amount.toFixed(2)} via ${method}`);
+    Alert.alert(
+      t("common.success"),
+      t("pickup.paymentReceived", {
+        amount: amount.toFixed(2),
+        method,
+      })
+    );
   };
 
   return (
@@ -123,7 +125,6 @@ useModalAction((modalName) => {
       edges={["top", "left", "right", "bottom"]}
     >
       <View className="flex-1">
-        {/* Helper Modals */}
         <MenuSelectionModal
           visible={menuModalVisible}
           onClose={() => setMenuModalVisible(false)}
@@ -135,8 +136,6 @@ useModalAction((modalName) => {
         <AdjustmentModal
           visible={adjustmentModalVisible}
           onClose={() => setAdjustmentModalVisible(false)}
-          // currentAdjustment={manualAdjustment}
-          // serviceFeeEnabled={serviceFeeEnabled}
           onConfirm={(adjustment) => {
             setManualAdjustment(adjustment);
             setAdjustmentModalVisible(false);
@@ -166,7 +165,6 @@ useModalAction((modalName) => {
           }}
         />
 
-        {/* Header */}
         <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <TouchableOpacity
             onPress={() => router.back()}
@@ -175,35 +173,32 @@ useModalAction((modalName) => {
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text className="text-xl font-bold text-slate-900 dark:text-white">
-            DoorDash Pickup
+            {t("pickup.doordashPickup")}
           </Text>
           <View className="w-10" />
         </View>
 
-        {/* Content */}
         <ScrollView className="flex-1 px-4 py-4">
-          {/* Customer Info Input */}
           <View className="mb-4">
             <Text className="mb-2 font-medium text-slate-700 dark:text-slate-300">
-              Customer Name / ID
+              {t("pickup.customerNameOrId")}
             </Text>
             <TextInput
               className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-              placeholder="e.g. John D. or #4492"
+              placeholder={t("pickup.customerNamePlaceholder")}
               placeholderTextColor="#94a3b8"
               value={customerName}
               onChangeText={setCustomerName}
             />
           </View>
 
-          {/* Items List */}
           <View className="mb-6">
-            <View className="flex-row items-center justify-between mb-4">
+            <View className="mb-4 flex-row items-center justify-between">
               <Text className="text-lg font-bold text-slate-900 dark:text-white">
-                Items
+                {t("pickup.items")}
               </Text>
               <Button
-                label="Add Item"
+                label={t("pickup.addItem")}
                 size="sm"
                 onPress={() => setMenuModalVisible(true)}
                 icon="add"
@@ -212,7 +207,7 @@ useModalAction((modalName) => {
 
             {items.length === 0 ? (
               <View className="items-center justify-center rounded-xl border border-dashed border-slate-300 py-8 dark:border-slate-700">
-                <Text className="text-slate-500">No items added yet</Text>
+                <Text className="text-slate-500">{t("pickup.noItemsAdded")}</Text>
               </View>
             ) : (
               items.map((item) => (
@@ -227,7 +222,6 @@ useModalAction((modalName) => {
             )}
           </View>
 
-          {/* Summary & Adjustments */}
           <View className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
             <OrderSummary order={order} />
             <TouchableOpacity
@@ -236,26 +230,30 @@ useModalAction((modalName) => {
             >
               <Ionicons name="options" size={20} color={colors.tint} />
               <Text className="ml-2 font-medium text-blue-600 dark:text-blue-400">
-                Adjustments & Fees
+                {t("pickup.adjustmentsAndFees")}
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
 
-        {/* Bottom Actions */}
         <View className="border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-950">
           <View className="flex-row gap-3">
             <Button
-              label="Complete Order"
+              label={t("pickup.completeOrder")}
               variant="outline"
               className="flex-1"
               onPress={() => {
-                Alert.alert("Order Completed", "Pickup order saved.");
+                Alert.alert(
+                  t("pickup.orderCompletedTitle"),
+                  t("pickup.orderCompletedMessage")
+                );
                 router.back();
               }}
             />
             <Button
-              label={`Pay $${(order.total - paidAmount).toFixed(2)}`}
+              label={t("pickup.payAmount", {
+                amount: (order.total - paidAmount).toFixed(2),
+              })}
               className="flex-[2]"
               onPress={() => setPaymentModalVisible(true)}
             />

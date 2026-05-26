@@ -12,6 +12,7 @@ import {
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   restaurantName?: string;
@@ -34,6 +35,7 @@ export function ChangeRestaurant({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const options = useMemo(
     () => restaurants ?? DEFAULT_RESTAURANTS,
     [restaurants]
@@ -52,7 +54,7 @@ export function ChangeRestaurant({
     <>
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel="Change restaurant"
+        accessibilityLabel={t("common.changeRestaurant")}
         onPress={() => setVisible(true)}
         style={[
           styles.iconButton,
@@ -72,11 +74,11 @@ export function ChangeRestaurant({
           <Pressable
             style={[styles.sheet, { backgroundColor: colors.background }]}
             // accessibilityRole="dialog"
-            accessibilityLabel="Select restaurant"
+            accessibilityLabel={t("common.selectRestaurant")}
           >
             <View style={styles.sheetHeader}>
               <Text style={[styles.sheetTitle, { color: colors.text, fontSize: responsive.subheadingFontSize }]}>
-                Select Restaurant
+                {t("common.selectRestaurant")}
               </Text>
               <TouchableOpacity onPress={() => setVisible(false)}>
                 <Ionicons name="close" size={20} color={colors.icon} />

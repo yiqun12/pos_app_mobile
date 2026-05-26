@@ -1,5 +1,6 @@
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -28,7 +29,14 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
   containerHeight,
 }) => {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const SEAT_SIZE = responsive.seatSize;
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), max);
+  const nameFontSize = Math.round(clamp(SEAT_SIZE * 0.34, 12, responsive.isTablet ? 20 : 18));
+  const statusFontSize = Math.round(clamp(SEAT_SIZE * 0.19, 9, responsive.isTablet ? 12 : 10));
+  const showStatusText = SEAT_SIZE >= 62;
+  const nameLineHeight = Math.round(nameFontSize * 1.12);
 
   const translateX = useSharedValue(seat.x);
   const translateY = useSharedValue(seat.y);
@@ -104,6 +112,11 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
   };
 
   const statusColor = getStatusColor(seat.status);
+  const statusLabelMap: Record<Seat["status"], string> = {
+    vacant: t("seats.legend.available"),
+    reserved: t("seats.legend.reserved"),
+    occupied: t("seats.legend.occupied"),
+  };
 
   return (
     <GestureDetector gesture={pan}>
@@ -133,33 +146,46 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
         >
           <Text
             style={{
-              fontSize: responsive.isTablet ? 20 : 18,
+              fontSize: nameFontSize,
+              lineHeight: nameLineHeight,
+              textAlign: "center",
+              paddingHorizontal: 2,
             }}
             className="font-bold text-slate-700 dark:text-slate-100"
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            ellipsizeMode="tail"
           >
             {seat.name}
           </Text>
-          {seat.itemCount ? (
+          {showStatusText && seat.itemCount ? (
             <Text
               style={{
-                fontSize: responsive.isTablet ? 12 : 10,
-                marginTop: responsive.isTablet ? 6 : 4,
+                fontSize: statusFontSize,
+                marginTop: SEAT_SIZE < 72 ? 2 : responsive.isTablet ? 6 : 4,
               }}
               className="text-slate-500 dark:text-slate-400"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
-              {seat.itemCount} items
+              {t("seats.itemsCount", { count: seat.itemCount })}
             </Text>
-          ) : (
+          ) : showStatusText ? (
             <Text
               style={{
-                fontSize: responsive.isTablet ? 12 : 10,
-                marginTop: responsive.isTablet ? 6 : 4,
+                fontSize: statusFontSize,
+                marginTop: SEAT_SIZE < 72 ? 2 : responsive.isTablet ? 6 : 4,
               }}
               className="text-slate-400 dark:text-slate-500 font-medium uppercase"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
-              {seat.status}
+              {statusLabelMap[seat.status]}
             </Text>
-          )}
+          ) : null}
         </TouchableOpacity>
       </Animated.View>
     </GestureDetector>

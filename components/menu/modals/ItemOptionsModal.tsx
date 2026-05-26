@@ -7,6 +7,7 @@ import { GlobalCustomization, GlobalCustomizationGroup, MenuItem, OptionGroup } 
 import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     ActivityIndicator,
     Modal,
@@ -16,20 +17,37 @@ import {
     View
 } from "react-native";
 
+const ADD_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求添加";
+const REMOVE_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求减少";
+
 // Fallback global customizations
 const FALLBACK_GLOBAL_CUSTOMIZATIONS: GlobalCustomization[] = [
-  { id: "gc-1", type: "外卖", price: 0, typeCategory: "要求添加" },
-  { id: "gc-2", type: "加酱料", price: 0, typeCategory: "要求添加" },
-  { id: "gc-3", type: "加辣", price: 0, typeCategory: "要求添加" },
-  { id: "gc-4", type: "加葱", price: 0, typeCategory: "要求添加" },
-  { id: "gc-5", type: "堂食", price: 0, typeCategory: "要求减少" },
-  { id: "gc-6", type: "不要辣", price: 0, typeCategory: "要求减少" },
-  { id: "gc-7", type: "不要葱", price: 0, typeCategory: "要求减少" },
+  { id: "gc-1", type: "Takeout", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
+  { id: "gc-2", type: "Extra sauce", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
+  { id: "gc-3", type: "Extra spice", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
+  { id: "gc-4", type: "Extra scallion", price: 0, typeCategory: ADD_REQUEST_CATEGORY },
+  { id: "gc-5", type: "Dine in", price: 0, typeCategory: REMOVE_REQUEST_CATEGORY },
+  { id: "gc-6", type: "No spice", price: 0, typeCategory: REMOVE_REQUEST_CATEGORY },
+  { id: "gc-7", type: "No scallion", price: 0, typeCategory: REMOVE_REQUEST_CATEGORY },
 ];
+
+function normalizeTypeCategory(raw: unknown): GlobalCustomization["typeCategory"] {
+  const value = String(raw ?? "").trim().toLowerCase();
+  if (
+    value === REMOVE_REQUEST_CATEGORY ||
+    value.includes("减少") ||
+    value.includes("remove") ||
+    value.includes("minus") ||
+    value.includes("less")
+  ) {
+    return REMOVE_REQUEST_CATEGORY;
+  }
+  return ADD_REQUEST_CATEGORY;
+}
 
 /**
  * Parse global customizations from Firebase JSON string
- * Expected format: [{ type: "外卖", price: 0, typeCategory: "要求添加" }, ...]
+ * Expected format: [{ type: "Takeout", price: 0, typeCategory: "要求添加" }, ...]
  */
 function parseGlobalCustomizations(jsonString: string): GlobalCustomization[] {
   try {
@@ -42,7 +60,7 @@ function parseGlobalCustomizations(jsonString: string): GlobalCustomization[] {
       id: `gc-${index}`,
       type: item.type || "",
       price: item.price || 0,
-      typeCategory: item.typeCategory || "要求添加",
+      typeCategory: normalizeTypeCategory(item.typeCategory),
     }));
   } catch (error) {
     console.error("Error parsing global customizations:", error);
@@ -54,23 +72,23 @@ function parseGlobalCustomizations(jsonString: string): GlobalCustomization[] {
  * Group global customizations by category
  */
 function groupCustomizations(customizations: GlobalCustomization[]): GlobalCustomizationGroup[] {
-  const addItems = customizations.filter((c) => c.typeCategory === "要求添加");
-  const removeItems = customizations.filter((c) => c.typeCategory === "要求减少");
+  const addItems = customizations.filter((c) => c.typeCategory === ADD_REQUEST_CATEGORY);
+  const removeItems = customizations.filter((c) => c.typeCategory === REMOVE_REQUEST_CATEGORY);
 
   const groups: GlobalCustomizationGroup[] = [];
 
   if (addItems.length > 0) {
     groups.push({
-      category: "要求添加",
-      categoryLabel: "Add Requests / 要求添加",
+      category: ADD_REQUEST_CATEGORY,
+      categoryLabel: "menu.options.groupAddRequests",
       items: addItems,
     });
   }
 
   if (removeItems.length > 0) {
     groups.push({
-      category: "要求减少",
-      categoryLabel: "Remove Requests / 要求减少",
+      category: REMOVE_REQUEST_CATEGORY,
+      categoryLabel: "menu.options.groupRemoveRequests",
       items: removeItems,
     });
   }
@@ -92,7 +110,7 @@ interface SelectedGlobalCustomization {
   id: string;
   type: string;
   price: number;
-  typeCategory: "要求添加" | "要求减少";
+  typeCategory: GlobalCustomization["typeCategory"];
 }
 
 interface ItemOptionsModalProps {
@@ -119,6 +137,7 @@ export function ItemOptionsModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<
@@ -368,9 +387,7 @@ export function ItemOptionsModal({
               <Text
                 style={{ fontSize: responsive.subheadingFontSize }}
                 className="mb-3 font-bold text-slate-900 dark:text-white"
-              >
-                Customization
-              </Text>
+              >{t("menu.options.customization")}</Text>
 
               {item.optionGroups.map((group: OptionGroup) => (
                 <View key={group.id} className="mb-6">
@@ -451,9 +468,7 @@ export function ItemOptionsModal({
               <Text
                 style={{ fontSize: responsive.subheadingFontSize }}
                 className="mb-3 font-bold text-slate-900 dark:text-white"
-              >
-                Add-ons
-              </Text>
+              >{t("menu.options.addOns")}</Text>
               <View className="gap-2">
                 {item.ingredients.map((ingredient) => (
                   <TouchableOpacity
@@ -515,14 +530,12 @@ export function ItemOptionsModal({
             <Text
               style={{ fontSize: responsive.subheadingFontSize }}
               className="mb-3 font-bold text-slate-900 dark:text-white"
-            >
-              Special Requests / 特殊要求
-            </Text>
+            >{t("menu.options.specialRequests")}</Text>
 
             {loadingCustomizations ? (
               <View className="items-center py-4">
                 <ActivityIndicator size="small" color={colors.tint} />
-                <Text className="mt-2 text-slate-500">Loading options...</Text>
+                <Text className="mt-2 text-slate-500">{t("menu.options.loadingOptions")}</Text>
               </View>
             ) : globalCustomizationGroups.length > 0 ? (
               globalCustomizationGroups.map((group) => (
@@ -531,7 +544,7 @@ export function ItemOptionsModal({
                     style={{ fontSize: responsive.baseFontSize }}
                     className="mb-2 font-semibold text-slate-700 dark:text-slate-300"
                   >
-                    {group.categoryLabel}
+                    {t(group.categoryLabel)}
                   </Text>
                   <View className="flex-row flex-wrap gap-2">
                     {group.items.map((customization) => (
@@ -540,7 +553,7 @@ export function ItemOptionsModal({
                         onPress={() => handleGlobalCustomizationToggle(customization)}
                         className={`rounded-full px-4 py-2 ${
                           isGlobalCustomizationSelected(customization.id)
-                            ? group.category === "要求添加"
+                            ? group.category === ADD_REQUEST_CATEGORY
                               ? "bg-green-500"
                               : "bg-orange-500"
                             : "bg-slate-100 dark:bg-slate-800"
@@ -563,7 +576,7 @@ export function ItemOptionsModal({
                 </View>
               ))
             ) : (
-              <Text className="text-slate-500">No customization options available</Text>
+              <Text className="text-slate-500">{t("menu.options.noCustomizationOptions")}</Text>
             )}
           </View>
         </ScrollView>
@@ -572,11 +585,11 @@ export function ItemOptionsModal({
         <View className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <View className="flex-row gap-3">
             <View className="flex-1">
-              <Button label="Cancel" variant="outline" onPress={onClose} />
+              <Button label={t("common.cancel")} variant="outline" onPress={onClose} />
             </View>
             <View className="flex-1">
               <Button
-                label="Add to Order"
+                label={t("menu.options.addToOrder")}
                 onPress={() => {
                   onConfirm(selectedOptions, selectedIngredients, selectedGlobalCustomizations);
                   onClose();

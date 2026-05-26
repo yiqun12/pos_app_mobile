@@ -1,9 +1,8 @@
 import { DemoModeBanner } from "@/components/license";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useLanguage } from "@/context/language";
 import { auth } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import * as Google from "expo-auth-session/providers/google";
@@ -12,72 +11,31 @@ import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 WebBrowser.maybeCompleteAuthSession();
 
-type Language = "en" | "zh";
-
-const translations = {
-  en: {
-    signIn: "Sign In",
-    email: "Email Address",
-    password: "Password",
-    signInButton: "Sign In",
-    googleSignIn: "Continue with Google",
-    guestSignIn: "Guest Sign In",
-    forgotPassword: "Forgot password?",
-    noAccount: "Don't have an account?",
-    signUp: "Sign Up",
-    welcomeBack: "Welcome Back (TEST APP)",
-    subtitle: "Sign in to manage your restaurant",
-    emailPlaceholder: "Enter your email",
-    passwordPlaceholder: "Enter your password",
-    invalidEmail: "Please enter a valid email",
-    passwordRequired: "Password is required",
-  },
-  zh: {
-    signIn: "登录",
-    email: "电子邮箱",
-    password: "密码",
-    signInButton: "登录",
-    googleSignIn: "使用 Google 登录",
-    guestSignIn: "访客登录",
-    forgotPassword: "忘记密码？",
-    noAccount: "还没有账号？",
-    signUp: "注册",
-    welcomeBack: "欢迎回来 (TEST APP)",
-    subtitle: "登录以管理您的餐厅",
-    emailPlaceholder: "请输入邮箱",
-    passwordPlaceholder: "请输入密码",
-    invalidEmail: "请输入有效的邮箱地址",
-    passwordRequired: "请输入密码",
-  },
-};
-
 export default function LoginScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
+  const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
   const { login } = useAuth();
 
-  const [language, setLanguage] = useState<Language>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-
-  const t = translations[language];
 
   const googleAuthConfig =
     (Constants.expoConfig?.extra as
@@ -98,24 +56,24 @@ export default function LoginScreen() {
     if (googleResponse?.type === "success") {
       const idToken = googleResponse.params?.id_token;
       if (!idToken) {
-        setError("Google sign in failed: no token returned.");
+        setError(t("auth.googleSignInFailed"));
         setLoading(false);
         return;
       }
       const credential = GoogleAuthProvider.credential(idToken);
       signInWithCredential(auth, credential)
         .then(() => router.replace("/(tabs)/seats"))
-        .catch((err: any) => setError(err?.message ?? "Google sign in failed."))
+        .catch((err: any) => setError(err?.message ?? t("auth.googleSignInFailed")))
         .finally(() => setLoading(false));
     } else if (googleResponse?.type === "error") {
-      setError("Google sign in cancelled or failed.");
+      setError(t("auth.googleSignInFailed"));
       setLoading(false);
     }
-  }, [googleResponse, router]);
+  }, [googleResponse, router, t]);
 
-  const validateEmail = (email: string) => {
+  const validateEmail = (emailValue: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return emailRegex.test(emailValue);
   };
 
   const handleSignIn = async () => {
@@ -125,11 +83,11 @@ export default function LoginScreen() {
 
     let hasError = false;
     if (!email || !validateEmail(email)) {
-      setEmailError(t.invalidEmail);
+      setEmailError(t("auth.invalidEmail"));
       hasError = true;
     }
     if (!password) {
-      setPasswordError(t.passwordRequired);
+      setPasswordError(t("auth.passwordRequired"));
       hasError = true;
     }
     if (hasError) return;
@@ -140,12 +98,16 @@ export default function LoginScreen() {
       router.replace("/(tabs)/seats");
     } catch (err: any) {
       const code = err?.code as string | undefined;
-      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
-        setError("Invalid email or password.");
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/wrong-password" ||
+        code === "auth/user-not-found"
+      ) {
+        setError(t("auth.invalidCredentials"));
       } else if (code === "auth/network-request-failed") {
-        setError("Network error. Check your connection.");
+        setError(t("auth.networkError"));
       } else {
-        setError(err?.message ?? "Login failed. Please try again.");
+        setError(err?.message ?? t("auth.loginFailed"));
       }
     } finally {
       setLoading(false);
@@ -154,9 +116,7 @@ export default function LoginScreen() {
 
   const handleGoogleSignIn = async () => {
     if (!googleClientIdConfigured) {
-      setError(
-        "Google sign-in is not configured. Set googleAuth.webClientId in app.json."
-      );
+      setError(t("auth.googleNotConfigured"));
       return;
     }
     setError("");
@@ -165,7 +125,7 @@ export default function LoginScreen() {
       await promptGoogleAsync();
       // Result is handled in the useEffect above
     } catch (err: any) {
-      setError(err?.message ?? "Google sign in failed.");
+      setError(err?.message ?? t("auth.googleSignInFailed"));
       setLoading(false);
     }
   };
@@ -173,11 +133,11 @@ export default function LoginScreen() {
   const handleGuestSignIn = async () => {
     setLoading(true);
     try {
-      // TODO: 实现访客登录
+      // TODO: implement guest sign in
       await new Promise((resolve) => setTimeout(resolve, 800));
       router.replace("/(tabs)/seats");
-    } catch (err) {
-      setError("Guest sign in failed.");
+    } catch (_err) {
+      setError(t("auth.guestSignInFailed"));
     } finally {
       setLoading(false);
     }
@@ -198,58 +158,59 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Language Toggle */}
           <View className="mb-8 flex-row justify-end">
             <View className="flex-row">
               <TouchableOpacity
                 onPress={() => setLanguage("en")}
                 className={`rounded-l-lg px-3 py-1.5 ${
                   language === "en"
-                    ? "bg-blue-600"
+                    ? "bg-orange-500"
                     : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
                 <Text
                   className={`text-sm font-semibold ${
-                    language === "en" ? "text-white" : "text-slate-600 dark:text-slate-400"
+                    language === "en"
+                      ? "text-white"
+                      : "text-slate-600 dark:text-slate-400"
                   }`}
                 >
-                  EN
+                  {t("common.english")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setLanguage("zh")}
                 className={`rounded-r-lg px-3 py-1.5 ${
                   language === "zh"
-                    ? "bg-blue-600"
+                    ? "bg-orange-500"
                     : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
                 <Text
                   className={`text-sm font-semibold ${
-                    language === "zh" ? "text-white" : "text-slate-600 dark:text-slate-400"
+                    language === "zh"
+                      ? "text-white"
+                      : "text-slate-600 dark:text-slate-400"
                   }`}
                 >
-                  中文
+                  {t("common.chinese")}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Logo & Title */}
           <View className="mb-8 items-center">
-            <View className="mb-4 h-20 w-20 items-center justify-center rounded-2xl bg-blue-600">
+            <View className="mb-4 h-20 w-20 items-center justify-center rounded-2xl bg-orange-500 shadow-lg shadow-orange-500/30">
               <Ionicons name="restaurant" size={40} color="white" />
             </View>
             <Text className="text-2xl font-bold text-slate-900 dark:text-white">
-              {t.welcomeBack}
+              {t("auth.welcomeBack")}
             </Text>
             <Text className="mt-2 text-center text-slate-500 dark:text-slate-400">
-              {t.subtitle}
+              {t("auth.subtitle")}
             </Text>
           </View>
 
-          {/* Error Message */}
           {error ? (
             <View className="mb-4 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
               <Text className="text-center text-sm text-red-600 dark:text-red-400">
@@ -258,12 +219,11 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {/* Form */}
           <View className="mb-6">
             <Input
-              label={t.email}
+              label={t("auth.email")}
               icon="mail"
-              placeholder={t.emailPlaceholder}
+              placeholder={t("auth.emailPlaceholder")}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -276,9 +236,9 @@ export default function LoginScreen() {
             />
 
             <Input
-              label={t.password}
+              label={t("auth.password")}
               icon="lock-closed"
-              placeholder={t.passwordPlaceholder}
+              placeholder={t("auth.passwordPlaceholder")}
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
@@ -288,16 +248,14 @@ export default function LoginScreen() {
               isPassword
             />
 
-            {/* Forgot Password */}
             <TouchableOpacity className="mb-6 self-end">
-              <Text className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                {t.forgotPassword}
+              <Text className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                {t("auth.forgotPassword")}
               </Text>
             </TouchableOpacity>
 
-            {/* Sign In Button */}
             <Button
-              label={t.signInButton}
+              label={t("auth.signInButton")}
               onPress={handleSignIn}
               loading={loading}
               disabled={loading}
@@ -305,16 +263,14 @@ export default function LoginScreen() {
               size="lg"
             />
 
-            {/* Divider */}
             <View className="my-6 flex-row items-center">
               <View className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-              <Text className="mx-4 text-sm text-slate-400">or</Text>
+              <Text className="mx-4 text-sm text-slate-400">{t("common.or")}</Text>
               <View className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
             </View>
 
-            {/* Google Sign In */}
             <Button
-              label={t.googleSignIn}
+              label={t("auth.googleSignIn")}
               onPress={handleGoogleSignIn}
               variant="outline"
               icon="logo-google"
@@ -323,9 +279,8 @@ export default function LoginScreen() {
               disabled={loading}
             />
 
-            {/* Guest Sign In */}
             <Button
-              label={t.guestSignIn}
+              label={t("auth.guestSignIn")}
               onPress={handleGuestSignIn}
               variant="secondary"
               icon="person"
@@ -334,14 +289,13 @@ export default function LoginScreen() {
             />
           </View>
 
-          {/* Sign Up Link */}
           <View className="flex-row items-center justify-center">
             <Text className="text-slate-500 dark:text-slate-400">
-              {t.noAccount}{" "}
+              {t("auth.noAccount")} {" "}
             </Text>
             <TouchableOpacity>
-              <Text className="font-semibold text-blue-600 dark:text-blue-400">
-                {t.signUp}
+              <Text className="font-semibold text-orange-600 dark:text-orange-400">
+                {t("auth.signUp")}
               </Text>
             </TouchableOpacity>
           </View>

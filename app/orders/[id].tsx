@@ -6,6 +6,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -56,6 +57,7 @@ export default function OrderDetailsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
   const [order, setOrder] = useState<Order | null>(null);
 
   useEffect(() => {
@@ -66,9 +68,9 @@ export default function OrderDetailsScreen() {
   }, [id]);
 
   const handlePay = () => {
-    Alert.alert("Success", "Payment processed successfully", [
+    Alert.alert(t("common.success"), t("orders.paymentProcessed"), [
       {
-        text: "OK",
+        text: t("common.ok"),
         onPress: () => router.back(),
       },
     ]);

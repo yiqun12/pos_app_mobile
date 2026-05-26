@@ -27,12 +27,12 @@ export function Button({
   ...props
 }: ButtonProps) {
   const responsive = useResponsiveLayout();
-  const baseStyle = "flex-row items-center justify-center rounded-lg";
+  const baseStyle = "flex-row items-center justify-center rounded-xl";
 
   const variants = {
-    primary: "bg-blue-600 border-2 border-transparent",
+    primary: "bg-orange-500 border-2 border-transparent active:bg-orange-600",
     secondary: "bg-slate-100 dark:bg-slate-800 border-2 border-transparent",
-    outline: "border-2 border-blue-500 bg-transparent",
+    outline: "border-2 border-orange-500 bg-transparent",
     ghost: "bg-transparent border-2 border-transparent",
     danger: "bg-red-500 border-2 border-transparent",
   };
@@ -68,8 +68,8 @@ export function Button({
   const textStyles = {
     primary: "text-white",
     secondary: "text-slate-900 dark:text-white",
-    outline: "text-blue-500 dark:text-blue-400 font-semibold",
-    ghost: "text-blue-500 dark:text-blue-400 font-semibold",
+    outline: "text-orange-500 dark:text-orange-400 font-semibold",
+    ghost: "text-orange-500 dark:text-orange-400 font-semibold",
     danger: "text-white",
   };
 
@@ -77,8 +77,8 @@ export function Button({
   const iconColors = {
     primary: "white",
     secondary: undefined,
-    outline: "#3b82f6",
-    ghost: "#3b82f6",
+    outline: "#F97316", // orange-500
+    ghost: "#F97316", // orange-500
     danger: "white",
   };
 

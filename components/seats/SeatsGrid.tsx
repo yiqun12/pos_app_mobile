@@ -1,5 +1,6 @@
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, TouchableOpacity, View } from "react-native";
 import { Seat, SeatStatus } from "./types";
 
@@ -10,6 +11,7 @@ interface SeatsGridProps {
 
 export function SeatsGrid({ seats, onSeatPress }: SeatsGridProps) {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const getStatusColor = (status: SeatStatus) => {
     switch (status) {
       case "vacant":
@@ -36,7 +38,7 @@ export function SeatsGrid({ seats, onSeatPress }: SeatsGridProps) {
           <Text style={{ fontSize: responsive.subheadingFontSize }} className="font-bold text-black">{seat.name}</Text>
           {seat.itemCount !== undefined && (
             <Text style={{ fontSize: responsive.captionFontSize }} className="mt-1 text-black">
-              {seat.itemCount} items
+              {t("seats.itemsCount", { count: seat.itemCount })}
             </Text>
           )}
         </TouchableOpacity>

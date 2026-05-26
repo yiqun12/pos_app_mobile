@@ -3,6 +3,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -30,6 +31,7 @@ export function CategoryEditorModal({
 }: CategoryEditorModalProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
   const [name, setName] = useState(initialName);
 
@@ -59,7 +61,9 @@ export function CategoryEditorModal({
           <View className="rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
             <View className="mb-4 flex-row items-center justify-between">
               <Text className="text-xl font-bold text-slate-900 dark:text-white">
-                {mode === "add" ? "Add Category" : "Edit Category"}
+                {mode === "add"
+                  ? t("menu.category.addCategory")
+                  : t("menu.category.editCategory")}
               </Text>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color={colors.text} />
@@ -69,13 +73,13 @@ export function CategoryEditorModal({
             <View className="gap-4">
               <View>
                 <Text className="mb-2 font-medium text-slate-700 dark:text-slate-300">
-                  Category Name
+                  {t("menu.category.categoryName")}
                 </Text>
                 <TextInput
                   value={name}
                   onChangeText={setName}
                   className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base dark:border-slate-800 dark:bg-slate-800 dark:text-white"
-                  placeholder="e.g. Appetizers"
+                  placeholder={t("menu.category.categoryNamePlaceholder")}
                   placeholderTextColor="#94a3b8"
                   autoFocus
                 />
@@ -83,11 +87,11 @@ export function CategoryEditorModal({
 
               <View className="mt-2 flex-row gap-3">
                 <View className="flex-1">
-                  <Button label="Cancel" variant="outline" onPress={onClose} />
+                  <Button label={t("common.cancel")} variant="outline" onPress={onClose} />
                 </View>
                 <View className="flex-1">
                   <Button
-                    label="Save"
+                    label={t("common.save")}
                     onPress={handleSave}
                     disabled={!name.trim()}
                   />

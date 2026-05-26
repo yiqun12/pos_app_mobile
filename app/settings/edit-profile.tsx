@@ -1,10 +1,9 @@
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -16,8 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
   const [name, setName] = useState("John Smith");
   const [email, setEmail] = useState("john@restaurant.com");
@@ -29,14 +27,17 @@ export default function EditProfileScreen() {
     // Simulate API call
     setTimeout(() => {
       setSaving(false);
-      Alert.alert("Success", "Profile updated successfully");
+      Alert.alert(
+        t("common.success"),
+        t("settings.editProfile.alertSaved")
+      );
       router.back();
     }, 1000);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Edit Profile" showBackButton />
+      <ScreenHeader title={t("settings.editProfile.title")} showBackButton />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -45,26 +46,26 @@ export default function EditProfileScreen() {
         <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
           <View className="gap-4">
             <Input
-              label="Full Name"
+              label={t("settings.editProfile.fullName")}
               value={name}
               onChangeText={setName}
-              placeholder="Enter your name"
+              placeholder={t("settings.editProfile.fullNamePlaceholder")}
             />
 
             <Input
-              label="Email Address"
+              label={t("settings.editProfile.email")}
               value={email}
               onChangeText={setEmail}
-              placeholder="Enter your email"
+              placeholder={t("settings.editProfile.emailPlaceholder")}
               keyboardType="email-address"
               autoCapitalize="none"
             />
 
             <Input
-              label="Phone Number"
+              label={t("settings.editProfile.phone")}
               value={phone}
               onChangeText={setPhone}
-              placeholder="Enter phone number"
+              placeholder={t("settings.editProfile.phonePlaceholder")}
               keyboardType="phone-pad"
             />
           </View>
@@ -72,7 +73,7 @@ export default function EditProfileScreen() {
 
         <View className="border-t border-slate-200 p-4 dark:border-slate-800">
           <Button
-            label="Save Changes"
+            label={t("common.saveChanges")}
             onPress={handleSave}
             loading={saving}
             disabled={!name || !email}

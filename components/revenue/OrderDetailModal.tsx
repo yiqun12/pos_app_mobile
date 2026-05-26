@@ -1,6 +1,7 @@
-import { Colors } from "@/constants/theme";
+﻿import { Colors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -52,11 +53,7 @@ export function OrderDetailModal({
       <View style={{ flex: 1, paddingTop: insets.top }}>
         <View className="flex-1 pb-4">
           <View className="mt-auto flex-1 rounded-t-2xl bg-white dark:bg-slate-900">
-            <OrderDetailContent
-              order={order}
-              colors={colors}
-              onClose={onClose}
-            />
+            <OrderDetailContent order={order} colors={colors} onClose={onClose} />
           </View>
         </View>
       </View>
@@ -75,16 +72,17 @@ export function OrderDetailContent({
   onClose: () => void;
   onPay?: () => void;
 }) {
+  const { t } = useTranslation();
+
   if (!order) return null;
 
   return (
     <View className="flex-1">
-      {/* Header */}
       <View className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
         <View className="flex-row items-center justify-between">
           <View className="flex-1">
             <Text className="text-lg font-bold text-slate-900 dark:text-white">
-              Order Details
+              {t("revenue.orderDetails")}
             </Text>
             <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               {order.id}
@@ -99,13 +97,11 @@ export function OrderDetailContent({
         </View>
       </View>
 
-      {/* Content */}
       <ScrollView className="flex-1 px-4 py-4">
-        {/* Order Meta */}
         <View className="mb-4 rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
           <View className="flex-row justify-between">
             <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Guest
+              {t("revenue.guest")}
             </Text>
             <Text className="text-sm font-bold text-slate-900 dark:text-white">
               {order.guest}
@@ -113,7 +109,7 @@ export function OrderDetailContent({
           </View>
           <View className="mt-2 flex-row justify-between">
             <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Time
+              {t("revenue.time")}
             </Text>
             <Text className="text-sm font-bold text-slate-900 dark:text-white">
               {order.time}
@@ -121,7 +117,7 @@ export function OrderDetailContent({
           </View>
           <View className="mt-2 flex-row justify-between">
             <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Channel
+              {t("revenue.channel")}
             </Text>
             <Text className="text-sm font-bold text-slate-900 dark:text-white">
               {order.channel}
@@ -129,11 +125,10 @@ export function OrderDetailContent({
           </View>
         </View>
 
-        {/* Items */}
         {order.items && order.items.length > 0 && (
           <View className="mb-4">
             <Text className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
-              Items
+              {t("revenue.items")}
             </Text>
             {order.items.map((item, idx) => (
               <View
@@ -146,10 +141,12 @@ export function OrderDetailContent({
                       {item.name}
                     </Text>
                     <Text className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {item.quantity}x @ ${item.price.toFixed(2)}
+                      {t("revenue.itemQtyPrice", {
+                        quantity: item.quantity,
+                        price: item.price.toFixed(2),
+                      })}
                     </Text>
 
-                    {/* Display selected options if available */}
                     {(item as any).selectedOptions &&
                       (item as any).selectedOptions.length > 0 && (
                         <View className="mt-2">
@@ -159,8 +156,7 @@ export function OrderDetailContent({
                                 key={optIdx}
                                 className="text-xs text-slate-600 dark:text-slate-400"
                               >
-                                {option.groupName}:{" "}
-                                {option.selectedChoices
+                                {option.groupName}: {option.selectedChoices
                                   .map((c: any) => c.name)
                                   .join(", ")}
                               </Text>
@@ -169,12 +165,10 @@ export function OrderDetailContent({
                         </View>
                       )}
 
-                    {/* Display selected ingredients if available */}
                     {(item as any).selectedIngredients &&
                       (item as any).selectedIngredients.length > 0 && (
                         <Text className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                          Add-ons:{" "}
-                          {(item as any).selectedIngredients
+                          {t("revenue.addOns")}: {(item as any).selectedIngredients
                             .map((i: any) => i.name)
                             .join(", ")}
                         </Text>
@@ -189,12 +183,11 @@ export function OrderDetailContent({
           </View>
         )}
 
-        {/* Breakdown */}
         {order.subtotal && (
           <View className="mb-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
             <View className="flex-row justify-between py-2">
               <Text className="text-sm text-slate-600 dark:text-slate-400">
-                Subtotal
+                {t("revenue.subtotal")}
               </Text>
               <Text className="font-semibold text-slate-900 dark:text-white">
                 ${order.subtotal.toFixed(2)}
@@ -203,7 +196,7 @@ export function OrderDetailContent({
             {order.serviceFee !== undefined && (
               <View className="flex-row justify-between py-2">
                 <Text className="text-sm text-slate-600 dark:text-slate-400">
-                  Service fee
+                  {t("revenue.serviceFee")}
                 </Text>
                 <Text className="font-semibold text-slate-900 dark:text-white">
                   ${order.serviceFee.toFixed(2)}
@@ -213,7 +206,7 @@ export function OrderDetailContent({
             {order.tax !== undefined && (
               <View className="flex-row justify-between py-2">
                 <Text className="text-sm text-slate-600 dark:text-slate-400">
-                  Tax
+                  {t("revenue.tax")}
                 </Text>
                 <Text className="font-semibold text-slate-900 dark:text-white">
                   ${order.tax.toFixed(2)}
@@ -223,7 +216,7 @@ export function OrderDetailContent({
             {order.gratuity !== undefined && (
               <View className="flex-row justify-between py-2">
                 <Text className="text-sm text-slate-600 dark:text-slate-400">
-                  Gratuity
+                  {t("revenue.gratuity")}
                 </Text>
                 <Text className="font-semibold text-slate-900 dark:text-white">
                   ${order.gratuity.toFixed(2)}
@@ -231,9 +224,9 @@ export function OrderDetailContent({
               </View>
             )}
             {order.total && (
-              <View className="mt-2 border-t border-slate-200 flex-row justify-between py-2 dark:border-slate-700">
+              <View className="mt-2 flex-row justify-between border-t border-slate-200 py-2 dark:border-slate-700">
                 <Text className="font-bold text-slate-900 dark:text-white">
-                  Total
+                  {t("revenue.total")}
                 </Text>
                 <Text className="text-lg font-bold text-green-600 dark:text-green-400">
                   ${order.total.toFixed(2)}
@@ -243,24 +236,22 @@ export function OrderDetailContent({
           </View>
         )}
 
-        {/* Simple Display */}
         {(!order.items || order.items.length === 0) && !order.subtotal && (
           <View className="rounded-lg bg-slate-100 p-4 dark:bg-slate-800">
             <Text className="text-center text-sm text-slate-500 dark:text-slate-400">
-              Detailed order information not available
+              {t("revenue.detailUnavailable")}
             </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Footer */}
-      <View className="border-t border-slate-200 px-4 py-3 dark:border-slate-800 flex-row gap-3">
+      <View className="flex-row gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
         <TouchableOpacity
           onPress={onClose}
           className="flex-1 rounded-lg bg-slate-100 py-3 dark:bg-slate-800"
         >
           <Text className="text-center font-bold text-slate-900 dark:text-white">
-            Close
+            {t("common.close")}
           </Text>
         </TouchableOpacity>
 
@@ -270,7 +261,9 @@ export function OrderDetailContent({
             className="flex-1 rounded-lg bg-blue-600 py-3"
           >
             <Text className="text-center font-bold text-white">
-              Pay ${(order.total || order.amount || 0).toFixed(2)}
+              {t("revenue.payAmount", {
+                amount: (order.total || order.amount || 0).toFixed(2),
+              })}
             </Text>
           </TouchableOpacity>
         )}

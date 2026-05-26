@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +24,7 @@ const RESTAURANT_DOC_ID = "23-sf-90011-960";
 
 export default function QRManagementScreen() {
   const colorScheme = useColorScheme();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,7 +48,7 @@ export default function QRManagementScreen() {
       }
     } catch (error) {
       console.error("Error fetching QR data:", error);
-      Alert.alert("Error", "Failed to load store QR code");
+      Alert.alert(t("common.error"), t("settings.qr.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -57,10 +59,10 @@ export default function QRManagementScreen() {
       setSaving(true);
       const docRef = doc(db, "TitleLogoNameContent", RESTAURANT_DOC_ID);
       await updateDoc(docRef, { MenuUrl: menuUrl });
-      Alert.alert("Success", "Store QR Code URL updated");
+      Alert.alert(t("common.success"), t("settings.qr.updateSuccess"));
     } catch (error) {
       console.error("Error updating QR data:", error);
-      Alert.alert("Error", "Failed to update URL");
+      Alert.alert(t("common.error"), t("settings.qr.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -81,7 +83,7 @@ export default function QRManagementScreen() {
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="QR Management" showBackButton />
+      <ScreenHeader title={t("settings.qr.title")} showBackButton />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -109,7 +111,7 @@ export default function QRManagementScreen() {
               )}
             </View>
             <Text className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
-              Scan to view menu
+              {t("settings.qr.scanHint")}
             </Text>
           </View>
 
@@ -117,23 +119,27 @@ export default function QRManagementScreen() {
           <View className="gap-4">
             <View>
               <Text className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-                Menu URL / QR Payload
+                {t("settings.qr.menuUrlLabel")}
               </Text>
               <Input
                 value={menuUrl}
                 onChangeText={setMenuUrl}
-                placeholder="https://..."
+                placeholder={t("settings.qr.menuUrlPlaceholder")}
                 autoCapitalize="none"
                 keyboardType="url"
               />
               <Text className="mt-1 text-xs text-slate-400">
-                This URL is encoded into the stores QR code.
+                {t("settings.qr.menuUrlHelp")}
               </Text>
             </View>
 
             <View className="mt-4">
               <Button
-                label={saving ? "Saving..." : "Save QR Code"}
+                label={
+                  saving
+                    ? t("settings.qr.saving")
+                    : t("settings.qr.saveButton")
+                }
                 onPress={handleSave}
                 disabled={saving}
               />
