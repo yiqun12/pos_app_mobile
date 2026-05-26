@@ -1,10 +1,8 @@
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { db } from "@/lib/firebase";
+import { useStore } from "@/hooks/firestore/useStore";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -19,50 +17,27 @@ import {
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Initial restaurant ID - reusing the same test ID
-const RESTAURANT_DOC_ID = "23-sf-90011-960";
-
 export default function QRManagementScreen() {
-  const colorScheme = useColorScheme();
   const { t } = useTranslation();
+  const { data: store, loading, error } = useStore();
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [menuUrl, setMenuUrl] = useState("");
 
   useEffect(() => {
-    fetchStoreQRData();
-  }, []);
-
-  const fetchStoreQRData = async () => {
-    try {
-      setLoading(true);
-      const docRef = doc(db, "TitleLogoNameContent", RESTAURANT_DOC_ID);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setMenuUrl(
-          data.MenuUrl || `https://eatify.app/menu/${RESTAURANT_DOC_ID}`
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching QR data:", error);
-      Alert.alert(t("common.error"), t("settings.qr.loadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (!store) return;
+    setMenuUrl(`https://eatify.app/menu/${store.id}`);
+  }, [store]);
 
   const handleSave = async () => {
+    setSaving(true);
     try {
-      setSaving(true);
-      const docRef = doc(db, "TitleLogoNameContent", RESTAURANT_DOC_ID);
-      await updateDoc(docRef, { MenuUrl: menuUrl });
-      Alert.alert(t("common.success"), t("settings.qr.updateSuccess"));
-    } catch (error) {
-      console.error("Error updating QR data:", error);
-      Alert.alert(t("common.error"), t("settings.qr.updateFailed"));
+      await new Promise((r) => setTimeout(r, 300));
+      Alert.alert(
+        "Not implemented",
+        "Saving QR configuration will be added in P1.",
+        [{ text: "OK" }]
+      );
     } finally {
       setSaving(false);
     }
@@ -76,6 +51,28 @@ export default function QRManagementScreen() {
       >
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !store) {
+    return (
+      <SafeAreaView
+        edges={["top"]}
+        className="flex-1 bg-white dark:bg-slate-950"
+      >
+        <ScreenHeader title={t("settings.qr.title")} showBackButton />
+        <View className="flex-1 items-center justify-center px-4">
+          <Ionicons name="alert-circle-outline" size={48} color="#f97316" />
+          <Text className="mt-4 text-center font-semibold text-slate-900 dark:text-white">
+            {t("settings.qr.loadFailed")}
+          </Text>
+          {error ? (
+            <Text className="mt-2 text-center text-slate-600 dark:text-slate-400">
+              {error.message}
+            </Text>
+          ) : null}
         </View>
       </SafeAreaView>
     );
@@ -112,6 +109,9 @@ export default function QRManagementScreen() {
             </View>
             <Text className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
               {t("settings.qr.scanHint")}
+            </Text>
+            <Text className="mt-2 text-center text-xs text-slate-400">
+              {store.name}
             </Text>
           </View>
 
