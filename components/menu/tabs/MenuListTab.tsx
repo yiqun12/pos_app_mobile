@@ -3,12 +3,11 @@ import { MenuEditorModal } from "@/components/menu/modals/MenuEditorModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Colors } from "@/constants/theme";
+import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
-import { db } from "@/lib/firebase";
-import { MenuCategory, MenuItem } from "@/types/menu";
+import { MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,204 +25,6 @@ interface MenuListTabProps {
   onScanPress?: () => void;
 }
 
-// Mock data for development/testing
-const MOCK_MENU_DATA = [
-  {
-    name: "Filet Mignon",
-    category: "Steak Cuts",
-    price: 45.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      {
-        id: "opt1",
-        name: "Doneness",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-      {
-        id: "opt2",
-        name: "Sauce",
-        type: "single",
-        required: false,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Extra Butter" },
-      { id: "add2", name: "Garlic" },
-      { id: "add3", name: "Truffle Oil" },
-    ],
-  },
-  {
-    name: "Rib Eye Steak",
-    category: "Steak Cuts",
-    price: 52.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      {
-        id: "opt1",
-        name: "Doneness",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Chimichurri" },
-      { id: "add2", name: "Sea Salt Crust" },
-    ],
-  },
-  {
-    name: "Margherita Pizza",
-    category: "Pizza",
-    price: 16.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      { id: "opt1", name: "Size", type: "single", required: true, choices: [] },
-      {
-        id: "opt2",
-        name: "Crust Type",
-        type: "single",
-        required: false,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Extra Cheese" },
-      { id: "add2", name: "Pepperoni" },
-      { id: "add3", name: "Basil" },
-    ],
-  },
-  {
-    name: "Caesar Salad",
-    category: "Salads",
-    price: 14.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [],
-    attributes2: [
-      { id: "add1", name: "Grilled Chicken" },
-      { id: "add2", name: "Shrimp" },
-      { id: "add3", name: "Bacon" },
-      { id: "add4", name: "Croutons" },
-    ],
-  },
-  {
-    name: "Grilled Salmon",
-    category: "Seafood",
-    price: 38.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      {
-        id: "opt1",
-        name: "Temperature",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Lemon Butter" },
-      { id: "add2", name: "Dill" },
-    ],
-  },
-  {
-    name: "Lobster Tail",
-    category: "Seafood",
-    price: 65.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      { id: "opt1", name: "Size", type: "single", required: true, choices: [] },
-      {
-        id: "opt2",
-        name: "Cooking Style",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Drawn Butter" },
-      { id: "add2", name: "Garlic" },
-    ],
-  },
-  {
-    name: "Chocolate Lava Cake",
-    category: "Desserts",
-    price: 9.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [],
-    attributes2: [
-      { id: "add1", name: "Vanilla Ice Cream" },
-      { id: "add2", name: "Whipped Cream" },
-      { id: "add3", name: "Berries" },
-    ],
-  },
-  {
-    name: "Tiramisu",
-    category: "Desserts",
-    price: 8.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [],
-    attributes2: [],
-  },
-];
-
-/**
- * Parses menu items from Firestore's "key" field (JSON string)
- * Expected format: [{ name, category, price, image, ... }, ...]
- */
-function parseMenuData(jsonString: string): {
-  categories: MenuCategory[];
-  items: MenuItem[];
-} {
-  try {
-    if (!jsonString) {
-      return { categories: [], items: [] };
-    }
-
-    const parsed = JSON.parse(jsonString);
-    const categoriesMap = new Map<string, MenuCategory>();
-    const items: MenuItem[] = [];
-    let itemId = 1;
-    let categoryCount = 0;
-
-    if (Array.isArray(parsed)) {
-      parsed.forEach((item: any) => {
-        const categoryName = item.category || "Uncategorized";
-
-        if (!categoriesMap.has(categoryName)) {
-          categoriesMap.set(categoryName, {
-            id: `cat-${categoryCount + 1}`,
-            name: categoryName,
-          });
-          categoryCount++;
-        }
-
-        const categoryId = categoriesMap.get(categoryName)!.id;
-
-        items.push({
-          id: `item-${itemId++}`,
-          categoryId,
-          name: item.name || "Unknown Item",
-          price: parseFloat(item.price || 0),
-          description: item.description,
-          imageUrl: item.image,
-          optionGroups: item.attributes || item.optionGroups,
-          ingredients:
-            item.attributes2 || item.attributesArr || item.ingredients,
-        });
-      });
-    }
-
-    const categories = Array.from(categoriesMap.values());
-    return { categories, items };
-  } catch (error) {
-    console.error("Error parsing menu data:", error);
-    return { categories: [], items: [] };
-  }
-}
-
 export function MenuListTab({ onScanPress }: MenuListTabProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
@@ -233,12 +34,20 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   const insets = useSafeAreaInsets();
   const floatingBottomOffset = (responsive.isTablet ? 124 : 116) + insets.bottom;
 
-  // Menu state
-  const [categories, setCategories] = useState<MenuCategory[]>([]);
-  const [items, setItems] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dataNotice, setDataNotice] = useState<string | null>(null);
+  // Menu state from context
+  const {
+    categories,
+    items,
+    loading,
+    error,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    addItem,
+    updateItem,
+    deleteItem,
+  } = useMenu();
+
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -258,55 +67,12 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   // Responsive columns
   const numColumns = responsive.isTablet ? 3 : 1;
 
-  // Fetch menu data from Firestore
+  // Auto-select the first category once data arrives.
   useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setDataNotice(null);
-
-        const docRef = doc(db, "TitleLogoNameContent", "aapp-sf-90011-38");
-        const docSnap = await getDoc(docRef);
-
-        const data = docSnap.exists()
-          ? (docSnap.data() as { key?: string })
-          : null;
-        const jsonData = data?.key || JSON.stringify(MOCK_MENU_DATA);
-        const usingMock = !docSnap.exists() || !data?.key;
-
-        console.log("jsonData: ", data);
-        const { categories: parsedCategories, items: parsedItems } =
-          parseMenuData(jsonData);
-
-        setCategories(parsedCategories);
-        setItems(parsedItems);
-        setDataNotice(
-          usingMock ? t("menu.menuCloudMissing") : null
-        );
-
-        if (parsedCategories.length > 0) {
-          setSelectedCategory(parsedCategories[0].id);
-        }
-      } catch (err: any) {
-        console.log("Error fetching menu (using mock):", err);
-        const { categories: parsedCategories, items: parsedItems } =
-          parseMenuData(JSON.stringify(MOCK_MENU_DATA));
-
-        setCategories(parsedCategories);
-        setItems(parsedItems);
-        setDataNotice(t("menu.menuDbFailed"));
-
-        if (parsedCategories.length > 0) {
-          setSelectedCategory(parsedCategories[0].id);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchMenu();
-  }, [t]);
+    if (!selectedCategory && categories.length > 0) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories, selectedCategory]);
 
   // Memoize filtered items to avoid recalculation
   const filteredItems = items.filter((item) => {
@@ -331,19 +97,9 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
 
   const handleSaveItem = (name: string, price: number) => {
     if (itemModal.mode === "add" && selectedCategory) {
-      const newItem: MenuItem = {
-        id: `item-${Date.now()}`,
-        categoryId: selectedCategory,
-        name,
-        price,
-      };
-      setItems((prev) => [...prev, newItem]);
+      addItem({ categoryId: selectedCategory, name, price });
     } else if (itemModal.mode === "edit" && itemModal.item) {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemModal.item!.id ? { ...item, name, price } : item,
-        ),
-      );
+      updateItem(itemModal.item.id, { name, price });
     }
     setItemModal({ visible: false, mode: "add", item: null });
   };
@@ -358,17 +114,9 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
 
   const handleSaveCategory = (name: string) => {
     if (categoryModal.mode === "add") {
-      const newCategory: MenuCategory = {
-        id: `cat-${Date.now()}`,
-        name,
-      };
-      setCategories((prev) => [...prev, newCategory]);
+      addCategory(name);
     } else if (categoryModal.mode === "edit" && categoryModal.category) {
-      setCategories((prev) =>
-        prev.map((cat) =>
-          cat.id === categoryModal.category!.id ? { ...cat, name } : cat,
-        ),
-      );
+      updateCategory(categoryModal.category.id, name);
     }
     setCategoryModal({ visible: false, mode: "add", category: null });
   };
@@ -379,8 +127,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: () =>
-          setItems((prev) => prev.filter((item) => item.id !== id)),
+        onPress: () => deleteItem(id),
       },
     ]);
   };
@@ -392,9 +139,8 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         text: t("common.delete"),
         style: "destructive",
         onPress: () => {
-          setCategories((prev) => prev.filter((cat) => cat.id !== id));
-          setItems((prev) => prev.filter((item) => item.categoryId !== id));
-          // Auto-select first category if available
+          deleteCategory(id);
+          // Auto-select first remaining category if available
           const remaining = categories.filter((c) => c.id !== id);
           setSelectedCategory(remaining[0]?.id || "");
         },
@@ -427,14 +173,6 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      {dataNotice ? (
-        <View className="border-b border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/30">
-          <Text className="text-sm font-medium text-amber-700 dark:text-amber-300">
-            {dataNotice}
-          </Text>
-        </View>
-      ) : null}
-
       {/* Search Bar */}
       <View 
         className="py-2 border-b border-slate-100 dark:border-slate-800"
