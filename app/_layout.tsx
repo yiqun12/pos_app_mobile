@@ -29,11 +29,17 @@ import { LanguageProvider } from "@/context/language";
 import { LicenseProvider } from "@/context/license";
 import { MenuProvider } from "@/context/menu";
 import { StoreProvider } from "@/context/store";
+import { useAuthRedirect } from "@/hooks/use-auth-redirect";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+function RouteGuard() {
+  useAuthRedirect();
+  return null;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -61,6 +67,7 @@ export default function RootLayout() {
               <ThemeProvider
                 value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
               >
+                <RouteGuard />
                 {/* 这里的 Stack 负责页面跳转 */}
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(auth)" />
