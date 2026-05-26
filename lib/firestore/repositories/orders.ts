@@ -41,8 +41,19 @@ export function subscribePendingOrders(
   );
 }
 
-export async function getListOrder(uid: string, storeId: string) {
+export function subscribeListOrders(
+  uid: string,
+  storeId: string,
+  onUpdate: (orders: any[]) => void,
+  onError: (err: Error) => void
+): Unsubscribe {
   const colRef = collection(db, ...storeSubPath(uid, storeId, "listOrder"));
-  const snap = await getDocs(colRef);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      onUpdate(orders);
+    },
+    (err) => onError(err)
+  );
 }

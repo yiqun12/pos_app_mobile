@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/auth";
-import { getStoreList } from "@/lib/firestore/repositories/store";
+import { subscribeStoreList } from "@/lib/firestore/repositories/store";
 import type { StoreSummary } from "@/lib/firestore/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
@@ -39,38 +39,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     else await AsyncStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const loadStores = useCallback(async () => {
-    if (!user) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const list = await getStoreList(user.uid);
-      setStoreList(list);
-
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored && list.some((s) => s.id === stored)) {
-        setCurrentStoreIdState(stored);
-      } else if (list.length === 1) {
-        await setCurrentStoreId(list[0].id);
-      } else {
-        setCurrentStoreIdState(null);
-      }
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, setCurrentStoreId]);
-
   useEffect(() => {
     if (isAuthenticated && user) {
-      loadStores();
+      setIsLoading(true);
+      setError(null);
+      
+      const unsub = subscribeStoreList(
+        user.uid,
+        (list) => {
+          setStoreList(list);
+          setIsLoading(false);
+          
+          // Auto select logic based on updated store list
+          AsyncStorage.getItem(STORAGE_KEY)
+            .then((stored) => {
+              if (stored && list.some((s) => s.id === stored)) {
+                setCurrentStoreIdState(stored);
+              } else if (list.length === 1) {
+                setCurrentStoreId(list[0].id);
+              } else {
+                setCurrentStoreIdState(null);
+              }
+            })
+            .catch(() => {
+              if (list.length === 1) {
+                setCurrentStoreId(list[0].id);
+              }
+            });
+        },
+        (err) => {
+          setError(err);
+          setIsLoading(false);
+        }
+      );
+      
+      return unsub;
     } else {
       setStoreList([]);
       setCurrentStoreIdState(null);
       AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
     }
-  }, [isAuthenticated, user, loadStores]);
+  }, [isAuthenticated, user, setCurrentStoreId]);
+
+  const reloadStoreList = useCallback(async () => {
+    // Dummy implementation as updates are realtime
+  }, []);
 
   return (
     <StoreSelectionContext.Provider
@@ -78,7 +91,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         storeList,
         currentStoreId,
         setCurrentStoreId,
-        reloadStoreList: loadStores,
+        reloadStoreList,
         isLoading,
         error,
       }}

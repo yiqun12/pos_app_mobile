@@ -1,11 +1,11 @@
 import { useAuth } from "@/context/auth";
 import { useStoreSelection } from "@/context/store";
-import { getStore } from "@/lib/firestore/repositories/store";
+import { subscribeStore } from "@/lib/firestore/repositories/store";
 import type { AsyncResult, Store } from "@/lib/firestore/types";
 import { useEffect, useState } from "react";
 
 /**
- * Fetch the current store's full document. One-shot (not realtime).
+ * Fetch the current store's full document. Real-time subscription.
  */
 export function useStore(): AsyncResult<Store> {
   const { user } = useAuth();
@@ -21,18 +21,18 @@ export function useStore(): AsyncResult<Store> {
       setState({ data: null, loading: false, error: null });
       return;
     }
-    let cancelled = false;
     setState((s) => ({ ...s, loading: true }));
-    getStore(user.uid, currentStoreId)
-      .then((data) => {
-        if (!cancelled) setState({ data, loading: false, error: null });
-      })
-      .catch((err) => {
-        if (!cancelled) setState({ data: null, loading: false, error: err as Error });
-      });
-    return () => {
-      cancelled = true;
-    };
+    const unsub = subscribeStore(
+      user.uid,
+      currentStoreId,
+      (data) => {
+        setState({ data, loading: false, error: null });
+      },
+      (err) => {
+        setState({ data: null, loading: false, error: err });
+      }
+    );
+    return unsub;
   }, [user, currentStoreId]);
 
   return state;

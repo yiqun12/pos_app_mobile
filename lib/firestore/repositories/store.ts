@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import { collection, doc, onSnapshot, type Unsubscribe } from "firebase/firestore";
 import { storeListPath, storePath } from "../paths";
 import type {
   RawGlobalModItem,
@@ -25,25 +25,48 @@ import type {
   StoreSummary,
 } from "../types";
 
-export async function getStoreList(uid: string): Promise<StoreSummary[]> {
+export function subscribeStoreList(
+  uid: string,
+  onUpdate: (list: StoreSummary[]) => void,
+  onError: (err: Error) => void
+): Unsubscribe {
   const colRef = collection(db, ...storeListPath(uid));
-  const snap = await getDocs(colRef);
-  return snap.docs.map((d) => {
-    const raw = d.data() as RawStoreDoc;
-    return {
-      id: d.id,
-      name: raw.Name ?? d.id,
-      nameCN: raw.storeNameCHI,
-      image: raw.Image,
-    } satisfies StoreSummary;
-  });
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const list = snap.docs.map((d) => {
+        const raw = d.data() as RawStoreDoc;
+        return {
+          id: d.id,
+          name: raw.Name ?? d.id,
+          nameCN: raw.storeNameCHI,
+          image: raw.Image,
+        } satisfies StoreSummary;
+      });
+      onUpdate(list);
+    },
+    (err) => onError(err)
+  );
 }
 
-export async function getStore(uid: string, storeId: string): Promise<Store | null> {
+export function subscribeStore(
+  uid: string,
+  storeId: string,
+  onUpdate: (store: Store | null) => void,
+  onError: (err: Error) => void
+): Unsubscribe {
   const ref = doc(db, ...storePath(uid, storeId));
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return null;
-  return transformStore(snap.id, snap.data() as RawStoreDoc);
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (!snap.exists()) {
+        onUpdate(null);
+      } else {
+        onUpdate(transformStore(snap.id, snap.data() as RawStoreDoc));
+      }
+    },
+    (err) => onError(err)
+  );
 }
 
 function transformStore(id: string, raw: RawStoreDoc): Store {
