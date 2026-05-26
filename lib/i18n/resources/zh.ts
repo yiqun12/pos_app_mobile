@@ -257,6 +257,7 @@ const zh = {
     "language": "Language",
     "languageSubtitle": "中文 / English",
     "noStoresFound": "No Stores Found",
+    "noStoreSelected": "未选择门店",
     "paymentSettings": "Payment Settings",
     "paymentSettingsSubtitle": "Stripe connection & terminals",
     "profile": "Profile",

@@ -257,6 +257,7 @@ const en = {
     "language": "Language",
     "languageSubtitle": "中文 / English",
     "noStoresFound": "No Stores Found",
+    "noStoreSelected": "No store selected",
     "paymentSettings": "Payment Settings",
     "paymentSettingsSubtitle": "Stripe connection & terminals",
     "profile": "Profile",

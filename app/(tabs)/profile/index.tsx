@@ -1,7 +1,9 @@
 import { SettingsItem, Store, StoreSelector } from "@/components/profile";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
 import { useLanguage } from "@/context/language";
+import { useStoreSelection } from "@/context/store";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -15,27 +17,6 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-
-const MOCK_USER = {
-  name: "John Smith",
-  email: "john@restaurant.com",
-  avatar: null,
-};
-
-const MOCK_STORES: Store[] = [
-  {
-    id: "1",
-    name: "Golden Dragon",
-    nameCHI: "金龙餐厅",
-    address: "123 Main St, San Francisco, CA",
-  },
-  {
-    id: "2",
-    name: "Lucky Star",
-    nameCHI: "幸运星",
-    address: "456 Oak Ave, Oakland, CA",
-  },
-];
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -53,8 +34,17 @@ export default function ProfileScreen() {
   const versionFontSize = isTablet ? 15 : 14;
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
+  const { user, logout } = useAuth();
+  const { storeList, currentStoreId, setCurrentStoreId } = useStoreSelection();
 
-  const [currentStore, setCurrentStore] = useState<Store>(MOCK_STORES[0]);
+  const currentStore = storeList.find((s) => s.id === currentStoreId) ?? null;
+  const storesForSelector: Store[] = storeList.map((s) => ({
+    id: s.id,
+    name: s.name,
+    nameCHI: s.nameCN,
+    address: "",
+  }));
+
   const [storeSelectorVisible, setStoreSelectorVisible] = useState(false);
 
   const handleLogout = () => {
@@ -63,15 +53,20 @@ export default function ProfileScreen() {
       {
         text: t("profile.signOut"),
         style: "destructive",
-        onPress: () => {
-          router.replace("/(auth)");
+        onPress: async () => {
+          try {
+            await logout();
+            // Route guard will redirect to (auth)
+          } catch (err) {
+            console.error("Logout failed:", err);
+          }
         },
       },
     ]);
   };
 
-  const handleStoreSelect = (store: Store) => {
-    setCurrentStore(store);
+  const handleStoreSelect = async (store: Store) => {
+    await setCurrentStoreId(store.id);
     setStoreSelectorVisible(false);
   };
 
@@ -106,13 +101,13 @@ export default function ProfileScreen() {
             </View>
             <View className="flex-1">
               <Text className="font-bold text-white" style={{ fontSize: userNameFontSize }}>
-                {MOCK_USER.name}
+                {user?.email?.split("@")[0] ?? "User"}
               </Text>
               <Text
                 className="mt-1 text-orange-100"
                 style={{ fontSize: userEmailFontSize }}
               >
-                {MOCK_USER.email}
+                {user?.email ?? "—"}
               </Text>
             </View>
             <TouchableOpacity
@@ -144,14 +139,14 @@ export default function ProfileScreen() {
                 className="mt-0.5 font-semibold text-slate-900 dark:text-white"
                 style={{ fontSize: storeNameFontSize }}
               >
-                {currentStore.name}
+                {currentStore?.name ?? t("profile.noStoreSelected")}
               </Text>
-              {currentStore.nameCHI && (
+              {currentStore?.nameCN && (
                 <Text
                   className="text-slate-500 dark:text-slate-400"
                   style={{ fontSize: storeNameChiFontSize }}
                 >
-                  {currentStore.nameCHI}
+                  {currentStore.nameCN}
                 </Text>
               )}
             </View>
@@ -282,8 +277,8 @@ export default function ProfileScreen() {
 
       <StoreSelector
         visible={storeSelectorVisible}
-        stores={MOCK_STORES}
-        currentStoreId={currentStore.id}
+        stores={storesForSelector}
+        currentStoreId={currentStoreId ?? ""}
         onSelect={handleStoreSelect}
         onClose={() => setStoreSelectorVisible(false)}
         onCreateStore={handleCreateStore}
