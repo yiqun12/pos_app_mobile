@@ -5,10 +5,13 @@ import { useAuth } from "@/context/auth";
 import { useLanguage } from "@/context/language";
 import { auth } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
-import * as Google from "expo-auth-session/providers/google";
+import {
+  GoogleSignin,
+  statusCodes,
+  isErrorWithCode,
+} from "@react-native-google-signin/google-signin";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,7 +25,22 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-WebBrowser.maybeCompleteAuthSession();
+const googleAuthConfig =
+  (Constants.expoConfig?.extra as
+    | { googleAuth?: { webClientId?: string; iosClientId?: string } }
+    | undefined)?.googleAuth ?? {};
+
+const googleClientIdConfigured =
+  !!googleAuthConfig.webClientId &&
+  !googleAuthConfig.webClientId.startsWith("REPLACE_WITH_");
+
+if (googleClientIdConfigured) {
+  GoogleSignin.configure({
+    webClientId: googleAuthConfig.webClientId!,
+    iosClientId: googleAuthConfig.iosClientId || undefined,
+    offlineAccess: false,
+  });
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -37,39 +55,11 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-  const googleAuthConfig =
-    (Constants.expoConfig?.extra as
-      | { googleAuth?: { webClientId?: string; iosClientId?: string; androidClientId?: string } }
-      | undefined)?.googleAuth ?? {};
-
-  const googleClientIdConfigured =
-    !!googleAuthConfig.webClientId &&
-    !googleAuthConfig.webClientId.startsWith("REPLACE_WITH_");
-
-  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
-    clientId: googleAuthConfig.webClientId,
-    iosClientId: googleAuthConfig.iosClientId || undefined,
-    androidClientId: googleAuthConfig.androidClientId || undefined,
-  });
-
+  // Suppress unused import warnings if Google flow isn't taken (kept for clarity).
   useEffect(() => {
-    if (googleResponse?.type === "success") {
-      const idToken = googleResponse.params?.id_token;
-      if (!idToken) {
-        setError(t("auth.googleSignInFailed"));
-        setLoading(false);
-        return;
-      }
-      const credential = GoogleAuthProvider.credential(idToken);
-      signInWithCredential(auth, credential)
-        .then(() => router.replace("/(tabs)/seats"))
-        .catch((err: any) => setError(err?.message ?? t("auth.googleSignInFailed")))
-        .finally(() => setLoading(false));
-    } else if (googleResponse?.type === "error") {
-      setError(t("auth.googleSignInFailed"));
-      setLoading(false);
-    }
-  }, [googleResponse, router, t]);
+    void statusCodes;
+    void isErrorWithCode;
+  }, []);
 
   const validateEmail = (emailValue: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -122,10 +112,47 @@ export default function LoginScreen() {
     setError("");
     setLoading(true);
     try {
-      await promptGoogleAsync();
-      // Result is handled in the useEffect above
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const result = await GoogleSignin.signIn();
+
+      // google-signin v13+: result is { type: "success", data: {...} } | { type: "cancelled" }
+      // older: returns userInfo directly
+      const idToken =
+        (result as any)?.data?.idToken ??
+        (result as any)?.idToken ??
+        null;
+
+      if (!idToken) {
+        const cancelled =
+          (result as any)?.type === "cancelled" ||
+          (result as any)?.type === "noSavedCredentialFound";
+        if (cancelled) {
+          setError("");
+        } else {
+          setError(t("auth.googleSignInFailed"));
+        }
+        return;
+      }
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
+      router.replace("/(tabs)/seats");
     } catch (err: any) {
+      if (isErrorWithCode(err)) {
+        if (err.code === statusCodes.SIGN_IN_CANCELLED) {
+          // User cancelled — silent.
+          return;
+        }
+        if (err.code === statusCodes.IN_PROGRESS) {
+          return;
+        }
+        if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          setError("Google Play Services not available.");
+          return;
+        }
+      }
       setError(err?.message ?? t("auth.googleSignInFailed"));
+    } finally {
       setLoading(false);
     }
   };
