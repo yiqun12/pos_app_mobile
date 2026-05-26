@@ -1,37 +1,9 @@
 
+import { useStore } from "@/hooks/firestore/useStore";
+import { useMenu as useFirestoreMenu } from "@/hooks/firestore/useMenu";
+import { MOCK_GLOBAL_MODIFICATIONS, MOCK_MENU } from "@/lib/firestore/mocks";
 import { GlobalCustomization, GlobalCustomizationGroup, MenuCategory, MenuItem } from "@/types/menu";
-import React, { createContext, useContext, useState } from "react";
-
-/* ---------- Fallback Data ---------- */
-const FALLBACK_CATEGORIES: MenuCategory[] = [
-  { id: "c1", name: "Appetizers" },
-  { id: "c2", name: "Main Courses" },
-  { id: "c3", name: "Dim Sum" },
-  { id: "c4", name: "Beverages" },
-];
-
-const FALLBACK_ITEMS: MenuItem[] = [
-  { id: "m1", categoryId: "c1", name: "Spring Rolls", price: 5 },
-  { id: "m2", categoryId: "c1", name: "Garlic Romaine Lettuce", price: 15 },
-  { id: "m3", categoryId: "c2", name: "Sichuan Style Chicken", price: 16.95 },
-  { id: "m4", categoryId: "c2", name: "Eel Claypot Crispy Rice", price: 15.8 },
-  { id: "m5", categoryId: "c3", name: "Beef Rice Noodle Rolls", price: 6.8 },
-  { id: "m6", categoryId: "c3", name: "Pork Dumplings (3pc)", price: 7.2 },
-  { id: "m7", categoryId: "c3", name: "Scallop Congee", price: 8.5 },
-];
-
-/* ---------- Fallback Global Customizations ---------- */
-const FALLBACK_GLOBAL_CUSTOMIZATIONS: GlobalCustomization[] = [
-  { id: "gc-1", type: "外卖", price: 0, typeCategory: "要求添加" },
-  { id: "gc-2", type: "加酱料", price: 0, typeCategory: "要求添加" },
-  { id: "gc-3", type: "加饭", price: 0, typeCategory: "要求添加" },
-  { id: "gc-4", type: "加辣", price: 0, typeCategory: "要求添加" },
-  { id: "gc-5", type: "加葱", price: 0, typeCategory: "要求添加" },
-  { id: "gc-6", type: "堂食", price: 0, typeCategory: "要求减少" },
-  { id: "gc-7", type: "不要酱料", price: 0, typeCategory: "要求减少" },
-  { id: "gc-8", type: "不要辣", price: 0, typeCategory: "要求减少" },
-  { id: "gc-9", type: "不要葱", price: 0, typeCategory: "要求减少" },
-];
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 /* ---------- Types ---------- */
 interface MenuContextType {
@@ -86,9 +58,49 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
 
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
-  const [globalCustomizations, setGlobalCustomizationsState] = useState<GlobalCustomization[]>(FALLBACK_GLOBAL_CUSTOMIZATIONS);
+  const [globalCustomizations, setGlobalCustomizationsState] = useState<GlobalCustomization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: firestoreMenu, loading: fsLoading, error: fsError } = useFirestoreMenu();
+  const { data: store } = useStore();
+
+  useEffect(() => {
+    if (firestoreMenu && (firestoreMenu.categories.length > 0 || firestoreMenu.items.length > 0)) {
+      setCategories(firestoreMenu.categories);
+      setItems(firestoreMenu.items);
+    } else if (fsError && __DEV__) {
+      setCategories(MOCK_MENU.categories);
+      setItems(MOCK_MENU.items);
+    }
+  }, [firestoreMenu, fsError]);
+
+  useEffect(() => {
+    if (store?.globalModifications && store.globalModifications.length > 0) {
+      setGlobalCustomizationsState(
+        store.globalModifications.map((m) => ({
+          id: m.id,
+          type: m.type,
+          price: m.price,
+          typeCategory: m.typeCategory,
+        }))
+      );
+    } else if (fsError && __DEV__) {
+      setGlobalCustomizationsState(
+        MOCK_GLOBAL_MODIFICATIONS.map((m) => ({
+          id: m.id,
+          type: m.type,
+          price: m.price,
+          typeCategory: m.typeCategory,
+        }))
+      );
+    }
+  }, [store, fsError]);
+
+  useEffect(() => {
+    setLoading(fsLoading);
+    setError(fsError ? fsError.message : null);
+  }, [fsLoading, fsError]);
 
   // Computed grouped customizations
   const globalCustomizationGroups = React.useMemo(
@@ -100,7 +112,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     setGlobalCustomizationsState(customizations);
   };
 
- 
+
 
   /* ---------- Category Actions ---------- */
   const addCategory = (name: string) => {
