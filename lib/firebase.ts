@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeApp } from "firebase/app";
 import {
+  // @ts-expect-error - getReactNativePersistence exists in the RN build but is not exported from the default `firebase/auth` types
   getReactNativePersistence,
   initializeAuth,
   type Auth,
