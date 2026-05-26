@@ -1,11 +1,13 @@
-﻿import { Seat, SeatsLegend, ViewOnlySeat } from "@/components/seats";
+﻿import { SeatsLegend, ViewOnlySeat } from "@/components/seats";
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
-import { db } from "@/lib/firebase";
+import { useSeats } from "@/hooks/firestore/useSeats";
+import { useTableStatus } from "@/hooks/firestore/useTableStatus";
+import { MOCK_SEATS } from "@/lib/firestore/mocks";
+import type { Seat as FsSeat } from "@/lib/firestore/types";
 import { useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Text, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -15,48 +17,30 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-const MOCK_SEATS: Seat[] = [
-  { id: "1", name: "A1", status: "vacant", x: 20, y: 20 },
-  { id: "2", name: "A2", status: "reserved", x: 120, y: 20 },
-  { id: "3", name: "A3", status: "occupied", itemCount: 3, x: 220, y: 20 },
-  { id: "4", name: "B1", status: "vacant", x: 20, y: 120 },
-  { id: "5", name: "B2", status: "occupied", itemCount: 1, x: 120, y: 120 },
-  { id: "6", name: "B3", status: "vacant", x: 220, y: 120 },
-  { id: "7", name: "C1", status: "reserved", x: 20, y: 220 },
-  { id: "8", name: "C2", status: "occupied", itemCount: 2, x: 120, y: 220 },
-];
-
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 
-function parseSeatArrangement(jsonString: string): Seat[] {
-  try {
-    if (!jsonString) return MOCK_SEATS;
-
-    const parsed = JSON.parse(jsonString);
-    if (!parsed.table || !Array.isArray(parsed.table)) {
-      return MOCK_SEATS;
-    }
-
-    return parsed.table.map((table: any, index: number) => ({
-      id: table.id || `seat-${index}`,
-      name: table.tableName || `T${index + 1}`,
-      status: "vacant" as const,
-      x: table.left || 0,
-      y: table.top || 0,
-      width: table.width || 60,
-      height: table.height || 60,
-    }));
-  } catch (error) {
-    console.error("Error parsing seat arrangement:", error);
-    return MOCK_SEATS;
-  }
-}
-
 export default function SeatsScreen() {
-  const [seats, setSeats] = useState<Seat[]>(MOCK_SEATS);
-  const [loading, setLoading] = useState(true);
-  const [dataNotice, setDataNotice] = useState<string | null>(null);
+  const { data: layout, loading: layoutLoading, error: layoutError } = useSeats();
+  const { data: liveStatus } = useTableStatus();
+
+  const seats: FsSeat[] = useMemo(() => {
+    const base =
+      layout?.tables && layout.tables.length > 0
+        ? layout.tables
+        : layoutError && __DEV__
+          ? MOCK_SEATS
+          : [];
+    if (!liveStatus) return base;
+    const statusByName = new Map(liveStatus.map((s) => [s.name, s]));
+    return base.map((seat) => {
+      const live = statusByName.get(seat.name);
+      return live
+        ? { ...seat, status: live.status, itemCount: live.itemCount }
+        : seat;
+    });
+  }, [layout, layoutError, liveStatus]);
+
   const [containerLayout, setContainerLayout] = useState({
     width: 0,
     height: 0,
@@ -77,42 +61,6 @@ export default function SeatsScreen() {
 
   const focalX = useSharedValue(0);
   const focalY = useSharedValue(0);
-
-  useEffect(() => {
-    const fetchSeats = async () => {
-      try {
-        setLoading(true);
-        setDataNotice(null);
-        const docRef = doc(db, "TitleLogoNameContent", "aapp-sf-90011-38");
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data() as {
-            restaurant_seat_arrangement?: string;
-          };
-          if (data.restaurant_seat_arrangement) {
-            const parsedSeats = parseSeatArrangement(data.restaurant_seat_arrangement);
-            setSeats(parsedSeats);
-            setDataNotice(null);
-          } else {
-            setSeats(MOCK_SEATS);
-            setDataNotice(t("seats.cloudSeatMapMissing"));
-          }
-        } else {
-          setSeats(MOCK_SEATS);
-          setDataNotice(t("seats.cloudSeatConfigMissing"));
-        }
-      } catch (error) {
-        console.log("Error fetching seats (using mock):", error);
-        setSeats(MOCK_SEATS);
-        setDataNotice(t("seats.databaseConnectionFailed"));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchSeats();
-  }, [t]);
 
   const handleSeatPress = (nextSeatId: string) => {
     router.push(`/(tabs)/seats/${nextSeatId}`);
@@ -240,15 +188,7 @@ export default function SeatsScreen() {
         className="relative m-4 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
         onLayout={(e) => setContainerLayout(e.nativeEvent.layout)}
       >
-        {dataNotice ? (
-          <View className="border-b border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/30">
-            <Text className="text-sm font-medium text-amber-700 dark:text-amber-300">
-              {dataNotice}
-            </Text>
-          </View>
-        ) : null}
-
-        {loading ? (
+        {layoutLoading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color="#2563eb" />
             <Text className="mt-4 text-slate-500">{t("seats.loadingSeats")}</Text>
@@ -269,7 +209,7 @@ export default function SeatsScreen() {
                 seats.map((seat) => (
                   <ViewOnlySeat
                     key={seat.id}
-                    seat={seat}
+                    seat={{ ...seat, status: seat.status ?? "vacant" }}
                     onPress={handleSeatPress}
                   />
                 ))}
