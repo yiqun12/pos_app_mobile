@@ -41,7 +41,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -51,6 +52,11 @@
       "router": {},
       "eas": {
         "projectId": "22d0b918-97fd-441b-b7da-329ff353cb58"
+      },
+      "googleAuth": {
+        "webClientId": "REPLACE_WITH_WEB_CLIENT_ID.apps.googleusercontent.com",
+        "iosClientId": "",
+        "androidClientId": ""
       }
     }
   }

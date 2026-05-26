@@ -4,9 +4,14 @@ import { Input } from "@/components/ui/Input";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { auth } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
+import * as Google from "expo-auth-session/providers/google";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -16,6 +21,8 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type Language = "en" | "zh";
 
@@ -72,6 +79,40 @@ export default function LoginScreen() {
 
   const t = translations[language];
 
+  const googleAuthConfig =
+    (Constants.expoConfig?.extra as
+      | { googleAuth?: { webClientId?: string; iosClientId?: string; androidClientId?: string } }
+      | undefined)?.googleAuth ?? {};
+
+  const googleClientIdConfigured =
+    !!googleAuthConfig.webClientId &&
+    !googleAuthConfig.webClientId.startsWith("REPLACE_WITH_");
+
+  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+    clientId: googleAuthConfig.webClientId,
+    iosClientId: googleAuthConfig.iosClientId || undefined,
+    androidClientId: googleAuthConfig.androidClientId || undefined,
+  });
+
+  useEffect(() => {
+    if (googleResponse?.type === "success") {
+      const idToken = googleResponse.params?.id_token;
+      if (!idToken) {
+        setError("Google sign in failed: no token returned.");
+        setLoading(false);
+        return;
+      }
+      const credential = GoogleAuthProvider.credential(idToken);
+      signInWithCredential(auth, credential)
+        .then(() => router.replace("/(tabs)/seats"))
+        .catch((err: any) => setError(err?.message ?? "Google sign in failed."))
+        .finally(() => setLoading(false));
+    } else if (googleResponse?.type === "error") {
+      setError("Google sign in cancelled or failed.");
+      setLoading(false);
+    }
+  }, [googleResponse, router]);
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -112,14 +153,19 @@ export default function LoginScreen() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (!googleClientIdConfigured) {
+      setError(
+        "Google sign-in is not configured. Set googleAuth.webClientId in app.json."
+      );
+      return;
+    }
+    setError("");
     setLoading(true);
     try {
-      // TODO: 实现 Google 登录
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      router.replace("/(tabs)/seats");
-    } catch (err) {
-      setError("Google sign in failed.");
-    } finally {
+      await promptGoogleAsync();
+      // Result is handled in the useEffect above
+    } catch (err: any) {
+      setError(err?.message ?? "Google sign in failed.");
       setLoading(false);
     }
   };
