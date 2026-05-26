@@ -3,6 +3,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface PriceEditModalProps {
@@ -23,6 +24,7 @@ export function PriceEditModal({
   const [price, setPrice] = useState(initialPrice.toString());
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
   const handleSave = () => {
     const numPrice = parseFloat(price);
@@ -43,7 +45,7 @@ export function PriceEditModal({
         <View className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-slate-900">
           <View className="flex-row items-center justify-between mb-4">
             <Text className="text-xl font-bold text-slate-900 dark:text-white">
-              Edit Price
+              {t("seats.priceEdit.title")}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -51,12 +53,13 @@ export function PriceEditModal({
           </View>
 
           <Text className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-            Adjusting price for: <Text className="font-bold">{itemName}</Text>
+            {t("seats.priceEdit.adjustingFor")}{" "}
+            <Text className="font-bold">{itemName}</Text>
           </Text>
 
           <View className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800">
             <Text className="mb-1 text-xs font-semibold text-slate-500">
-              Price ($)
+              {t("seats.priceEdit.priceLabel")}
             </Text>
             <TextInput
               value={price}
@@ -70,10 +73,10 @@ export function PriceEditModal({
 
           <View className="flex-row gap-3">
             <View className="flex-1">
-              <Button label="Cancel" variant="ghost" onPress={onClose} />
+              <Button label={t("common.cancel")} variant="ghost" onPress={onClose} />
             </View>
             <View className="flex-1">
-              <Button label="Save" onPress={handleSave} />
+              <Button label={t("common.save")} onPress={handleSave} />
             </View>
           </View>
         </View>

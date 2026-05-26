@@ -6,6 +6,7 @@ import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Modal,
@@ -29,6 +30,7 @@ export function MenuSelectionModal({
   onSelect,
 }: MenuSelectionModalProps) {
   const { categories: ctxCategories, items: ctxItems, error } = useMenu();
+  const { t } = useTranslation();
   
   // 🌟 强行植入的假数据
   const mockCategories = [
@@ -148,7 +150,7 @@ export function MenuSelectionModal({
               style={{ fontSize: responsive.headingFontSize }}
               className="font-bold text-slate-900 dark:text-white"
             >
-              Select Item
+              {t("menu.selection.selectItem")}
             </Text>
             <TouchableOpacity
               onPress={onClose}
@@ -169,7 +171,7 @@ export function MenuSelectionModal({
                 style={{ fontSize: responsive.baseFontSize }}
                 className="mt-4 text-slate-500"
               >
-                Loading menu...
+                {t("menu.loadingMenu")}
               </Text>
             </View>
           )}
@@ -186,7 +188,7 @@ export function MenuSelectionModal({
                 style={{ fontSize: responsive.baseFontSize }}
                 className="mt-4 text-center font-semibold text-slate-900 dark:text-white"
               >
-                Unable to Load Menu
+                {t("menu.unableLoadMenu")}
               </Text>
               <Text
                 style={{ fontSize: responsive.baseFontSize - 2 }}
@@ -199,7 +201,7 @@ export function MenuSelectionModal({
                 className="mt-6 rounded-lg bg-blue-600 px-6 py-2"
               >
                 <Text className="text-center font-semibold text-white">
-                  Close
+                  {t("common.close")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -219,7 +221,7 @@ export function MenuSelectionModal({
                   <TextInput
                     style={{ fontSize: responsive.baseFontSize }}
                     className="ml-2 flex-1 text-slate-900 dark:text-white"
-                    placeholder="Search items..."
+                    placeholder={t("menu.selection.searchItems")}
                     placeholderTextColor="#94a3b8"
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -250,7 +252,7 @@ export function MenuSelectionModal({
                           : "text-slate-700 dark:text-slate-300"
                       }`}
                     >
-                      All
+                      {t("menu.selection.all")}
                     </Text>
                   </TouchableOpacity>
                   {categories.map((cat) => (
@@ -321,7 +323,7 @@ export function MenuSelectionModal({
                             style={{ fontSize: responsive.captionFontSize }}
                             className="ml-1 text-slate-500"
                           >
-                            Customizable
+                            {t("menu.selection.customizable")}
                           </Text>
                         </View>
                       )}
@@ -335,7 +337,7 @@ export function MenuSelectionModal({
                       style={{ fontSize: responsive.baseFontSize }}
                       className="text-slate-500"
                     >
-                      No items found
+                      {t("menu.selection.noItemsFound")}
                     </Text>
                   </View>
                 )}

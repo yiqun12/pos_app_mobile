@@ -1,4 +1,4 @@
-import { WorkingHoursEditor } from "@/components/profile/WorkingHoursEditor";
+﻿import { WorkingHoursEditor } from "@/components/profile/WorkingHoursEditor";
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -52,11 +53,12 @@ export default function StoreScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [workingHours, setWorkingHours] = useState<WorkingHours | null>(null);
+  const [, setWorkingHours] = useState<WorkingHours | null>(null);
 
   const [data, setData] = useState<RestaurantData>({
     Name: "",
@@ -72,7 +74,6 @@ export default function StoreScreen() {
     storeNameCHI: "",
   });
 
-  // Fetch restaurant data from Firestore if in edit mode
   useEffect(() => {
     if (!isEditMode) {
       setLoading(false);
@@ -91,43 +92,50 @@ export default function StoreScreen() {
           const restaurantData = docSnap.data() as RestaurantData;
           setData(restaurantData);
 
-          // Parse working hours from Open_time JSON string
           if (restaurantData.Open_time) {
             try {
               const parsedHours = JSON.parse(restaurantData.Open_time);
               setWorkingHours(parsedHours);
-            } catch (e) {
-              console.error("Error parsing working hours:", e);
+            } catch (parseError) {
+              console.error("Error parsing working hours:", parseError);
             }
           }
         } else {
-          setError("Restaurant not found");
+          setError(t("settings.store.restaurantNotFound"));
         }
-      } catch (err: any) {
-        console.error("Error fetching restaurant data:", err);
-        setError(err.message || "Failed to fetch data");
+      } catch (fetchError: any) {
+        console.error("Error fetching restaurant data:", fetchError);
+        setError(fetchError.message || t("settings.store.fetchDataFailed"));
       } finally {
         setLoading(false);
       }
     };
 
-    fetchRestaurantData();
-  }, [storeId, isEditMode]);
+    void fetchRestaurantData();
+  }, [isEditMode, storeId, t]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      // TODO: Implement Firebase update/create
       setTimeout(() => {
         setSaving(false);
-        const action = isEditMode ? "updated" : "created";
-        Alert.alert("Success", `Store ${action} successfully`, [
-          { text: "OK", onPress: () => router.back() },
-        ]);
+        const action = isEditMode
+          ? t("settings.store.updated")
+          : t("settings.store.created");
+        Alert.alert(
+          t("common.success"),
+          t("settings.store.saveSuccess", { action }),
+          [{ text: t("common.ok"), onPress: () => router.back() }]
+        );
       }, 1000);
-    } catch (err) {
+    } catch (_err) {
       setSaving(false);
-      Alert.alert("Error", `Failed to ${isEditMode ? "update" : "create"} store data`);
+      Alert.alert(
+        t("common.error"),
+        isEditMode
+          ? t("settings.store.updateFailed")
+          : t("settings.store.createFailed")
+      );
     }
   };
 
@@ -140,12 +148,14 @@ export default function StoreScreen() {
     try {
       const parsed = JSON.parse(value);
       setWorkingHours(parsed);
-    } catch (e) {
-      console.error("Error parsing working hours", e);
+    } catch (parseError) {
+      console.error("Error parsing working hours", parseError);
     }
   };
 
-  const screenTitle = isEditMode ? "Edit Store" : "Create Store";
+  const screenTitle = isEditMode
+    ? t("settings.store.editStore")
+    : t("settings.store.createStore");
 
   if (loading) {
     return (
@@ -153,7 +163,9 @@ export default function StoreScreen() {
         <ScreenHeader title={screenTitle} showBackButton />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.tint} />
-          <Text className="mt-4 text-slate-500">Loading store data...</Text>
+          <Text className="mt-4 text-slate-500">
+            {t("settings.store.loadingStoreData")}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -164,13 +176,9 @@ export default function StoreScreen() {
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
         <ScreenHeader title={screenTitle} showBackButton />
         <View className="flex-1 items-center justify-center px-4">
-          <Ionicons
-            name="alert-circle-outline"
-            size={48}
-            color={colors.tint}
-          />
+          <Ionicons name="alert-circle-outline" size={48} color={colors.tint} />
           <Text className="mt-4 text-center font-semibold text-slate-900 dark:text-white">
-            Unable to Load Store
+            {t("settings.store.unableToLoadStore")}
           </Text>
           <Text className="mt-2 text-center text-slate-600 dark:text-slate-400">
             {error}
@@ -188,123 +196,170 @@ export default function StoreScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           className="flex-1"
           style={{ padding: responsive.mediumSpacing }}
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-col md:flex-row gap-4">
-            
-            {/* Left Column: Store Info */}
+          <View className="flex-col gap-4 md:flex-row">
             <View className="flex-1 gap-4">
-                {/* Store Information Card */}
-                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
-                    <View className="flex-row justify-between items-center mb-6">
-                        <Text className="text-lg font-bold text-slate-900 dark:text-white">Store Information</Text>
-                        <TouchableOpacity className="border border-slate-200 rounded-lg px-3 py-1 dark:border-slate-700">
-                            <Text className="text-sm font-medium text-slate-600 dark:text-slate-400">Edit</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Logo Placeholder */}
-                    <View className="flex-row items-start mb-6">
-                        <View className="w-24 h-24 bg-orange-100 rounded-xl items-center justify-center mr-4 border-2 border-dashed border-orange-200">
-                            <Ionicons name="image-outline" size={32} color="#f97316" />
-                        </View>
-                        <View className="flex-1 gap-2">
-                            <View>
-                                <Text className="text-xs text-slate-500 uppercase font-bold">STORE NAME</Text>
-                                <Input
-                                    value={data.Name}
-                                    onChangeText={(v) => updateField("Name", v)}
-                                    placeholder="Store Name"
-                                    className="mb-0"
-                                />
-                            </View>
-                            <View className="flex-row gap-4">
-                                <View className="flex-1">
-                                    <Text className="text-xs text-slate-500 uppercase font-bold">TAX RATE</Text>
-                                    <Text className="text-base font-medium text-slate-900 dark:text-white">8.5%</Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-
-                    <View className="gap-4">
-                        <View>
-                            <Text className="text-xs text-slate-500 uppercase font-bold mb-1">ADDRESS</Text>
-                            <Input
-                                value={data.Address}
-                                onChangeText={(v) => updateField("Address", v)}
-                                placeholder="Street Address"
-                                className="mb-0"
-                            />
-                        </View>
-                        <View className="flex-row gap-4">
-                            <View className="flex-1">
-                                <Text className="text-xs text-slate-500 uppercase font-bold mb-1">PHONE</Text>
-                                <Text className="text-base font-medium text-slate-900 dark:text-white">+1 (555) 000-1234</Text>
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-xs text-slate-500 uppercase font-bold mb-1">WEBSITE URL</Text>
-                                <Text className="text-base font-medium text-orange-600">www.demostore.com</Text>
-                            </View>
-                        </View>
-                    </View>
+              <View className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <View className="mb-6 flex-row items-center justify-between">
+                  <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                    {t("settings.store.storeInformation")}
+                  </Text>
+                  <TouchableOpacity className="rounded-lg border border-slate-200 px-3 py-1 dark:border-slate-700">
+                    <Text className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      {t("common.edit")}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Payment Integration Card */}
-                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
-                    <Text className="text-lg font-bold text-slate-900 dark:text-white mb-4">Payment Integration</Text>
-                    <Text className="text-slate-500 mb-4">Receive payments directly through Stripe.</Text>
-                    <Button label="Connect with Stripe" icon="link" className="bg-indigo-600 border-indigo-600" />
+                <View className="mb-6 flex-row items-start">
+                  <View className="mr-4 h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 bg-orange-100">
+                    <Ionicons name="image-outline" size={32} color="#f97316" />
+                  </View>
+                  <View className="flex-1 gap-2">
+                    <View>
+                      <Text className="text-xs font-bold uppercase text-slate-500">
+                        {t("settings.store.storeName")}
+                      </Text>
+                      <Input
+                        value={data.Name}
+                        onChangeText={(v) => updateField("Name", v)}
+                        placeholder={t("settings.store.storeNamePlaceholder")}
+                        className="mb-0"
+                      />
+                    </View>
+                    <View className="flex-row gap-4">
+                      <View className="flex-1">
+                        <Text className="text-xs font-bold uppercase text-slate-500">
+                          {t("settings.store.taxRate")}
+                        </Text>
+                        <Text className="text-base font-medium text-slate-900 dark:text-white">
+                          8.5%
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 </View>
 
-                {/* Store QR Code */}
-                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900 flex-row items-center gap-4">
-                    <View className="w-16 h-16 bg-slate-100 items-center justify-center rounded-lg">
-                        <Ionicons name="qr-code" size={32} color="#334155" />
+                <View className="gap-4">
+                  <View>
+                    <Text className="mb-1 text-xs font-bold uppercase text-slate-500">
+                      {t("settings.store.address")}
+                    </Text>
+                    <Input
+                      value={data.Address}
+                      onChangeText={(v) => updateField("Address", v)}
+                      placeholder={t("settings.store.addressPlaceholder")}
+                      className="mb-0"
+                    />
+                  </View>
+                  <View className="flex-row gap-4">
+                    <View className="flex-1">
+                      <Text className="mb-1 text-xs font-bold uppercase text-slate-500">
+                        {t("settings.store.phone")}
+                      </Text>
+                      <Text className="text-base font-medium text-slate-900 dark:text-white">
+                        +1 (555) 000-1234
+                      </Text>
                     </View>
                     <View className="flex-1">
-                        <Text className="text-lg font-bold text-slate-900 dark:text-white">Store QR Code</Text>
-                        <Text className="text-slate-500 text-sm">Print this code for customers to scan menu.</Text>
+                      <Text className="mb-1 text-xs font-bold uppercase text-slate-500">
+                        {t("settings.store.websiteUrl")}
+                      </Text>
+                      <Text className="text-base font-medium text-orange-600">
+                        {t("settings.store.websiteExample")}
+                      </Text>
                     </View>
-                    <Button label="Print QR" size="sm" variant="secondary" icon="print" />
+                  </View>
                 </View>
+              </View>
+
+              <View className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <Text className="mb-4 text-lg font-bold text-slate-900 dark:text-white">
+                  {t("settings.store.paymentIntegration")}
+                </Text>
+                <Text className="mb-4 text-slate-500">
+                  {t("settings.store.paymentIntegrationSubtitle")}
+                </Text>
+                <Button
+                  label={t("settings.store.connectWithStripe")}
+                  icon="link"
+                  className="border-indigo-600 bg-indigo-600"
+                />
+              </View>
+
+              <View className="flex-row items-center gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <View className="h-16 w-16 items-center justify-center rounded-lg bg-slate-100">
+                  <Ionicons name="qr-code" size={32} color="#334155" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                    {t("settings.store.storeQrCode")}
+                  </Text>
+                  <Text className="text-sm text-slate-500">
+                    {t("settings.store.storeQrCodeSubtitle")}
+                  </Text>
+                </View>
+                <Button
+                  label={t("settings.store.printQr")}
+                  size="sm"
+                  variant="secondary"
+                  icon="print"
+                />
+              </View>
             </View>
 
-            {/* Right Column: Business Hours & Security */}
             <View className="flex-1 gap-4">
-                {/* Business Hours Card */}
-                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
-                    <Text className="text-lg font-bold text-slate-900 dark:text-white mb-2">Business Hours</Text>
-                    <Text className="text-slate-500 mb-6 text-sm">Set your operating schedule for each day.</Text>
-                    
-                    <WorkingHoursEditor
-                        initialValue={data.Open_time || "{}"}
-                        onChange={handleWorkingHoursChange}
-                    />
-                    
-                    <Button label="Apply to all days" variant="secondary" className="mt-4 bg-orange-50 text-orange-600 border-orange-100" />
-                </View>
+              <View className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <Text className="mb-2 text-lg font-bold text-slate-900 dark:text-white">
+                  {t("settings.store.businessHours")}
+                </Text>
+                <Text className="mb-6 text-sm text-slate-500">
+                  {t("settings.store.businessHoursSubtitle")}
+                </Text>
 
-                {/* Security Card */}
-                <View className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
-                    <Text className="text-lg font-bold text-slate-900 dark:text-white mb-4">Security</Text>
-                    <Text className="text-slate-500 mb-4">Update your account access credentials.</Text>
-                    <Button label="Reset Password" variant="outline" className="w-full" />
-                </View>
+                <WorkingHoursEditor
+                  initialValue={data.Open_time || "{}"}
+                  onChange={handleWorkingHoursChange}
+                />
+
+                <Button
+                  label={t("settings.store.applyToAllDays")}
+                  variant="secondary"
+                  className="mt-4 border-orange-100 bg-orange-50 text-orange-600"
+                />
+              </View>
+
+              <View className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <Text className="mb-4 text-lg font-bold text-slate-900 dark:text-white">
+                  {t("settings.store.security")}
+                </Text>
+                <Text className="mb-4 text-slate-500">
+                  {t("settings.store.securitySubtitle")}
+                </Text>
+                <Button
+                  label={t("settings.store.resetPassword")}
+                  variant="outline"
+                  className="w-full"
+                />
+              </View>
             </View>
-
           </View>
         </ScrollView>
 
-        <View 
+        <View
           className="border-t border-slate-200 dark:border-slate-800"
           style={{ padding: responsive.mediumSpacing }}
         >
           <Button
-            label={isEditMode ? "Save Changes" : "Create Store"}
+            label={
+              isEditMode
+                ? t("common.saveChanges")
+                : t("settings.store.createStore")
+            }
             onPress={handleSave}
             loading={saving}
             disabled={!data.Name}

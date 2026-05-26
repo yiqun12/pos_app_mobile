@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "sevendollarposapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sevendollar.pos"
@@ -46,7 +46,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {},

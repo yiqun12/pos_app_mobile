@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, Text, TextInput, TouchableOpacity, View, ScrollView } from "react-native";
 
 interface PaymentModalProps {
@@ -27,7 +27,7 @@ export function PaymentModal({
   
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
-  const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (visible) {
@@ -66,7 +66,9 @@ export function PaymentModal({
           
           {/* Header */}
           <View className="flex-row items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
-            <Text className="text-lg font-bold text-slate-900 dark:text-white">Payment</Text>
+            <Text className="text-lg font-bold text-slate-900 dark:text-white">
+              {t("seats.payment.title")}
+            </Text>
             <TouchableOpacity onPress={onClose} className="p-1 rounded-full bg-slate-100 dark:bg-slate-800">
                 <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -82,7 +84,11 @@ export function PaymentModal({
                         className={`flex-1 py-2 rounded-lg items-center ${splitMode === mode ? "bg-white shadow-sm dark:bg-slate-700" : ""}`}
                     >
                         <Text className={`font-semibold capitalize ${splitMode === mode ? "text-orange-600" : "text-slate-500"}`}>
-                            {mode === "full" ? "Full Pay" : mode === "equal" ? "Split Equally" : "Split by Item"}
+                            {mode === "full"
+                              ? t("seats.payment.fullPay")
+                              : mode === "equal"
+                                ? t("seats.payment.splitEqually")
+                                : t("seats.payment.splitByItem")}
                         </Text>
                     </TouchableOpacity>
                 ))}
@@ -97,7 +103,9 @@ export function PaymentModal({
                     >
                         <Ionicons name="remove" size={24} color={colors.text} />
                     </TouchableOpacity>
-                    <Text className="text-lg font-bold text-slate-900 dark:text-white">{splitCount} People</Text>
+                    <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                      {t("seats.payment.peopleCount", { count: splitCount })}
+                    </Text>
                     <TouchableOpacity 
                         onPress={() => setSplitCount(splitCount + 1)}
                         className="w-10 h-10 rounded-full bg-slate-200 items-center justify-center dark:bg-slate-700"
@@ -109,7 +117,9 @@ export function PaymentModal({
 
             {/* Amount Display */}
             <View className="items-center mb-8">
-                <Text className="text-slate-500 mb-2 font-medium">AMOUNT TO PAY</Text>
+                <Text className="text-slate-500 mb-2 font-medium">
+                  {t("seats.payment.amountToPay")}
+                </Text>
                 <View className="flex-row items-center">
                     <Text className="text-4xl font-bold text-orange-600">$</Text>
                     <TextInput
@@ -121,29 +131,32 @@ export function PaymentModal({
                     />
                 </View>
                 <Text className="text-slate-400 mt-2">
-                    Total Due: ${total.toFixed(2)} | Remaining: ${(remaining - parseFloat(amount || "0")).toFixed(2)}
+                    {t("seats.payment.totalDueRemaining", {
+                      total: total.toFixed(2),
+                      remaining: (remaining - parseFloat(amount || "0")).toFixed(2),
+                    })}
                 </Text>
             </View>
 
             {/* Payment Methods */}
             <View className="gap-3">
-                <Button 
-                    label="Credit Card" 
-                    icon="card" 
-                    size="lg" 
-                    className="bg-blue-600 border-blue-600" 
+                <Button
+                    label={t("seats.payment.creditCard")}
+                    icon="card"
+                    size="lg"
+                    className="bg-blue-600 border-blue-600"
                     onPress={() => handlePay("card")}
                 />
-                <Button 
-                    label="Cash" 
-                    icon="cash" 
-                    size="lg" 
-                    className="bg-green-600 border-green-600" 
+                <Button
+                    label={t("seats.payment.cash")}
+                    icon="cash"
+                    size="lg"
+                    className="bg-green-600 border-green-600"
                     onPress={() => handlePay("cash")}
                 />
-                <Button 
-                    label="Other Methods" 
-                    variant="outline" 
+                <Button
+                    label={t("seats.payment.otherMethods")}
+                    variant="outline"
                     size="lg"
                     className="border-slate-300 text-slate-600 dark:border-slate-600 dark:text-slate-300"
                 />

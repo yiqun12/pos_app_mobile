@@ -7,6 +7,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useModalAction } from "@/hooks/useModalAction";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
 /**
  * Menu Screen
@@ -19,6 +20,7 @@ export default function MenuScreen() {
   const [isScannerVisible, setScannerVisible] = useState(false);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
   // Memoize callbacks to prevent unnecessary re-renders
   const handleOpenScanner = useCallback(() => setScannerVisible(true), []);
@@ -33,9 +35,15 @@ export default function MenuScreen() {
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
       <ScreenHeader 
-        title="Menu Management" 
+        title={t("menu.managementTitle")}
         rightElement={
-            <Button label="Save Changes" size="sm" variant="primary" icon="save" onPress={() => {}} />
+            <Button
+              label={t("common.saveChanges")}
+              size="sm"
+              variant="primary"
+              icon="save"
+              onPress={() => {}}
+            />
         }
       />
 
@@ -53,7 +61,7 @@ export default function MenuScreen() {
         <View className="flex-1 bg-white dark:bg-slate-950">
           <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-slate-800">
             <Text className="text-xl font-bold text-slate-900 dark:text-white">
-              AI Menu Scanner
+              {t("menu.aiScannerTitle")}
             </Text>
             <TouchableOpacity
               onPress={handleCloseScanner}

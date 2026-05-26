@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import i18n from "@/lib/i18n";
 import React, {
   createContext,
   ReactNode,
@@ -36,6 +37,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
         if (stored === "en" || stored === "zh") {
           setLanguageState(stored);
+          await i18n.changeLanguage(stored);
+        } else {
+          await i18n.changeLanguage("en");
         }
       } catch (error) {
         console.warn("Failed to load app language:", error);
@@ -55,8 +59,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLanguage = (nextLanguage: AppLanguage) => {
     setLanguageState(nextLanguage);
-    void AsyncStorage.setItem(STORAGE_KEY, nextLanguage).catch((error) => {
-      console.warn("Failed to persist app language:", error);
+    void Promise.all([
+      i18n.changeLanguage(nextLanguage),
+      AsyncStorage.setItem(STORAGE_KEY, nextLanguage),
+    ]).catch((error) => {
+      console.warn("Failed to update app language:", error);
     });
   };
 

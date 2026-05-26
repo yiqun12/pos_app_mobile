@@ -1,5 +1,6 @@
 import "react-native-reanimated";
 import "../global.css";
+import "@/lib/i18n";
 
 import {
   DarkTheme,

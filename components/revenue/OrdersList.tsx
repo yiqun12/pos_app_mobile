@@ -1,7 +1,8 @@
-import { Colors } from "@/constants/theme";
+﻿import { Colors } from "@/constants/theme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 type ColorMode = (typeof Colors)["light"];
@@ -41,6 +42,7 @@ export function OrdersList({
   onOrderPress,
 }: OrdersListProps) {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const isTablet = responsive.isTablet;
   const tableMinWidth = isTablet ? 0 : 760;
   const headerFontSize = isTablet ? 16 : 12;
@@ -49,18 +51,18 @@ export function OrdersList({
   const actionFontSize = isTablet ? 15 : 12;
 
   return (
-    <View className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-      <View className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex-row justify-between items-center">
+    <View className="flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <View className="flex-row items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
         <Text
           className="font-bold text-slate-900 dark:text-white"
           style={{ fontSize: isTablet ? 30 : 18 }}
         >
-          Recent Transactions
+          {t("revenue.recentTransactions")}
         </Text>
-        <View className="bg-slate-100 rounded-lg px-3 py-1 dark:bg-slate-800">
-            <Text className="text-slate-500" style={{ fontSize: isTablet ? 17 : 14 }}>
-              Search orders...
-            </Text>
+        <View className="rounded-lg bg-slate-100 px-3 py-1 dark:bg-slate-800">
+          <Text className="text-slate-500" style={{ fontSize: isTablet ? 17 : 14 }}>
+            {t("revenue.searchOrders")}
+          </Text>
         </View>
       </View>
 
@@ -70,75 +72,74 @@ export function OrdersList({
         bounces={false}
       >
         <View style={isTablet ? { flex: 1 } : { minWidth: tableMinWidth }}>
-          {/* Table Header */}
-          <View className="flex-row px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+          <View className="flex-row border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
             <Text
-              className="font-bold text-slate-500 uppercase"
+              className="font-bold uppercase text-slate-500"
               style={[
                 isTablet ? { width: 56 } : { width: 64 },
                 { fontSize: headerFontSize },
               ]}
             >
-              Number
+              {t("revenue.column.number")}
             </Text>
             <Text
-              className="font-bold text-slate-500 uppercase"
+              className="font-bold uppercase text-slate-500"
               style={[
                 isTablet ? { width: 96 } : { width: 96 },
                 { fontSize: headerFontSize },
               ]}
             >
-              Order ID
+              {t("revenue.column.orderId")}
             </Text>
             <Text
-              className="font-bold text-slate-500 uppercase"
+              className="font-bold uppercase text-slate-500"
               style={[
                 isTablet ? { flex: 1.3, paddingRight: 12 } : { width: 180 },
                 { fontSize: headerFontSize },
               ]}
             >
-              Table/Type
+              {t("revenue.column.tableType")}
             </Text>
             <Text
-              className="font-bold text-slate-500 uppercase"
+              className="font-bold uppercase text-slate-500"
               style={[
                 isTablet ? { flex: 1 } : { width: 120 },
                 { fontSize: headerFontSize },
               ]}
             >
-              Payment
+              {t("revenue.column.payment")}
             </Text>
             <Text
-              className="text-right font-bold text-slate-500 uppercase"
+              className="text-right font-bold uppercase text-slate-500"
               style={{ width: 88, fontSize: headerFontSize }}
             >
-              Price
+              {t("revenue.column.price")}
             </Text>
             <Text
-              className="text-right font-bold text-slate-500 uppercase"
+              className="text-right font-bold uppercase text-slate-500"
               style={{ width: isTablet ? 110 : 96, fontSize: headerFontSize }}
             >
-              Date
+              {t("revenue.column.date")}
             </Text>
             <Text
-              className="text-center font-bold text-slate-500 uppercase"
+              className="text-center font-bold uppercase text-slate-500"
               style={{ width: isTablet ? 140 : 116, fontSize: headerFontSize }}
             >
-              Actions
+              {t("revenue.column.actions")}
             </Text>
           </View>
 
           {orders.map((order, index) => (
             <View
               key={order.id}
-              className={`flex-row items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 ${
+              className={`flex-row items-center border-b border-slate-100 px-4 py-3 dark:border-slate-800 ${
                 index % 2 === 0
                   ? "bg-white dark:bg-slate-900"
                   : "bg-slate-50/50 dark:bg-slate-900/50"
               }`}
             >
               <Text
-                className="text-slate-900 dark:text-white font-medium"
+                className="font-medium text-slate-900 dark:text-white"
                 style={[
                   isTablet ? { width: 56 } : { width: 64 },
                   { fontSize: bodyFontSize },
@@ -147,13 +148,10 @@ export function OrdersList({
                 {index + 1}
               </Text>
 
-              <TouchableOpacity
-                onPress={() => onOrderPress(order)}
-                style={{ width: 96 }}
-              >
+              <TouchableOpacity onPress={() => onOrderPress(order)} style={{ width: 96 }}>
                 <Text
                   numberOfLines={1}
-                  className="text-orange-600 font-bold"
+                  className="font-bold text-orange-600"
                   style={{ fontSize: bodyFontSize }}
                 >
                   #{order.id}
@@ -193,7 +191,7 @@ export function OrdersList({
                   className="text-slate-600 dark:text-slate-400"
                   style={{ fontSize: bodyFontSize }}
                 >
-                  Credit Card
+                  {t("revenue.creditCard")}
                 </Text>
               </View>
 
@@ -216,20 +214,20 @@ export function OrdersList({
                 className="flex-row justify-center"
                 style={{ width: isTablet ? 140 : 116, gap: 8 }}
               >
-                <TouchableOpacity className="bg-slate-100 p-1.5 rounded dark:bg-slate-800">
+                <TouchableOpacity className="rounded bg-slate-100 p-1.5 dark:bg-slate-800">
                   <Text
                     className="font-medium text-slate-600 dark:text-slate-400"
                     style={{ fontSize: actionFontSize }}
                   >
-                    Print
+                    {t("revenue.print")}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className="bg-orange-500 p-1.5 rounded"
+                  className="rounded bg-orange-500 p-1.5"
                   onPress={() => onOrderPress(order)}
                 >
                   <Text className="font-medium text-white" style={{ fontSize: actionFontSize }}>
-                    Details
+                    {t("revenue.details")}
                   </Text>
                 </TouchableOpacity>
               </View>

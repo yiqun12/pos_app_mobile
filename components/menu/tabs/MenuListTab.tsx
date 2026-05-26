@@ -10,6 +10,7 @@ import { MenuCategory, MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
@@ -227,6 +228,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const isTablet = responsive.isTablet;
   const insets = useSafeAreaInsets();
   const floatingBottomOffset = (responsive.isTablet ? 124 : 116) + insets.bottom;
@@ -280,7 +282,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         setCategories(parsedCategories);
         setItems(parsedItems);
         setDataNotice(
-          usingMock ? "未读取到云端菜单数据，当前显示演示数据" : null
+          usingMock ? t("menu.menuCloudMissing") : null
         );
 
         if (parsedCategories.length > 0) {
@@ -293,7 +295,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
 
         setCategories(parsedCategories);
         setItems(parsedItems);
-        setDataNotice("数据库连接失败，当前显示演示数据");
+        setDataNotice(t("menu.menuDbFailed"));
 
         if (parsedCategories.length > 0) {
           setSelectedCategory(parsedCategories[0].id);
@@ -303,8 +305,8 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
       }
     };
 
-    fetchMenu();
-  }, []);
+    void fetchMenu();
+  }, [t]);
 
   // Memoize filtered items to avoid recalculation
   const filteredItems = items.filter((item) => {
@@ -372,10 +374,10 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   };
 
   const handleDeleteItem = (id: string, name: string) => {
-    Alert.alert("Delete Item", `Are you sure you want to delete "${name}"?`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("menu.deleteItemTitle"), t("menu.deleteItemMessage", { name }), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("common.delete"),
         style: "destructive",
         onPress: () =>
           setItems((prev) => prev.filter((item) => item.id !== id)),
@@ -384,10 +386,10 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   };
 
   const handleDeleteCategory = (id: string, name: string) => {
-    Alert.alert("Delete Category", `Delete "${name}" and all its items?`, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("menu.deleteCategoryTitle"), t("menu.deleteCategoryMessage", { name }), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("common.delete"),
         style: "destructive",
         onPress: () => {
           setCategories((prev) => prev.filter((cat) => cat.id !== id));
@@ -404,7 +406,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-slate-950">
         <ActivityIndicator size="large" color={colors.tint} />
-        <Text className="mt-4 text-slate-500">Loading menu...</Text>
+        <Text className="mt-4 text-slate-500">{t("menu.loadingMenu")}</Text>
       </View>
     );
   }
@@ -414,7 +416,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
       <View className="flex-1 items-center justify-center bg-white px-4 dark:bg-slate-950">
         <Ionicons name="alert-circle-outline" size={48} color={colors.tint} />
         <Text className="mt-4 text-center font-semibold text-slate-900 dark:text-white">
-          Unable to Load Menu
+          {t("menu.unableLoadMenu")}
         </Text>
         <Text className="mt-2 text-center text-slate-600 dark:text-slate-400">
           {error}
@@ -439,7 +441,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         style={{ paddingHorizontal: responsive.mediumSpacing }}
       >
         <Input 
-            placeholder="Search menu items (English or Chinese)..." 
+            placeholder={t("menu.searchPlaceholder")}
             icon="search"
             className="mb-0"
             value={searchQuery}
@@ -506,10 +508,10 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
               style={{ fontSize: responsive.baseFontSize }}
               className="text-slate-500"
             >
-              No items in this category.
+              {t("menu.noItemsInCategory")}
             </Text>
             <Button
-              label="Add First Item"
+              label={t("menu.addFirstItem")}
               variant="outline"
               className="mt-4"
               onPress={handleAddItemPress}
@@ -558,7 +560,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
                         className="text-white font-bold"
                         style={{ fontSize: isTablet ? 13 : 12 }}
                       >
-                        OUT OF STOCK
+                        {t("menu.outOfStock")}
                       </Text>
                   </View>
               )}
@@ -586,9 +588,9 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
                  <Text
                    className="text-slate-500"
                    style={{ fontSize: isTablet ? 14 : 12 }}
-                 >
-                   Stock Status
-                 </Text>
+                  >
+                    {t("menu.stockStatus")}
+                  </Text>
                  <View className="flex-row items-center gap-2">
                     <View className="w-8 h-4 bg-green-100 rounded-full items-end px-1 justify-center">
                         <View className="w-2 h-2 bg-green-500 rounded-full" />
@@ -597,7 +599,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
                       className="text-green-600 font-medium"
                       style={{ fontSize: isTablet ? 14 : 12 }}
                     >
-                      In Stock
+                      {t("menu.inStock")}
                     </Text>
                  </View>
               </View>
@@ -617,7 +619,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
           className="flex-row items-center rounded-full bg-indigo-600 px-4 py-3 shadow-lg"
         >
           <Ionicons name="scan" size={20} color="white" />
-          <Text className="ml-2 font-semibold text-white">AI Scan</Text>
+          <Text className="ml-2 font-semibold text-white">{t("menu.aiScan")}</Text>
         </TouchableOpacity>
 
         {/* Add Item FAB */}

@@ -8,6 +8,12 @@ interface StatCardProps {
   value: string;
   trend?: string; // e.g. "+12.5%"
   trendUp?: boolean;
+  icon?: string;
+  bgColor?: string;
+  textColor?: string;
+  darkBg?: string;
+  darkText?: string;
+  fullWidth?: boolean;
 }
 
 export function StatCard({
@@ -15,13 +21,14 @@ export function StatCard({
   value,
   trend,
   trendUp,
+  fullWidth,
 }: StatCardProps) {
   const responsive = useResponsiveLayout();
   const valueFontSize = responsive.isTablet ? responsive.headingFontSize : 20;
 
   return (
     <View
-      className="rounded-xl bg-white p-4 shadow-sm border border-slate-100 dark:border-slate-800 dark:bg-slate-900"
+      className={`rounded-xl border border-slate-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${fullWidth ? "w-full" : "flex-1"}`}
     >
       <View className="mb-2">
         <Text

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Modal, Platform, Text, TouchableOpacity, View } from "react-native";
 
 type ColorMode = (typeof Colors)["light"];
@@ -40,6 +41,7 @@ export function DateRangeSelector({
   onDateChange,
 }: DateRangeSelectorProps) {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const isTablet = responsive.isTablet;
   const presetFontSize = isTablet ? 16 : 14;
   const dateRangeFontSize = isTablet ? 16 : 14;
@@ -143,7 +145,7 @@ export function DateRangeSelector({
                 color: !selectedPreset ? "#ea580c" : colors.tabIconDefault,
               }}
             >
-              Custom
+              {t("revenue.custom")}
             </Text>
         </TouchableOpacity>
       </View>
@@ -161,14 +163,20 @@ export function DateRangeSelector({
                 {dateRange.startDate} - {dateRange.endDate}
             </Text>
          </View>
-         <Button label="Export Report" icon="download" size="sm" variant="primary" onPress={() => {}} />
-      </View>
+         <Button
+           label={t("revenue.exportReport")}
+           icon="download"
+           size="sm"
+           variant="primary"
+           onPress={() => {}}
+         />
+       </View>
 
-      {!DateTimePicker && (
-        <Text className="text-sm text-amber-600 dark:text-amber-400">
-          Native date picker is unavailable in the current app container.
-        </Text>
-      )}
+       {!DateTimePicker && (
+         <Text className="text-sm text-amber-600 dark:text-amber-400">
+           {t("revenue.datePickerUnavailable")}
+         </Text>
+       )}
 
       {/* ... Pickers ... */}
       {DateTimePicker && Platform.OS === "ios" && (
@@ -177,7 +185,12 @@ export function DateRangeSelector({
             <View className="w-full max-w-sm rounded-xl bg-white p-4 dark:bg-slate-900">
               <View className="mb-4 flex-row justify-between">
                 <Text className="text-lg font-semibold dark:text-white">
-                  Select {pickerMode === "start" ? "Start" : "End"} Date
+                  {t("revenue.selectDate", {
+                    type:
+                      pickerMode === "start"
+                        ? t("revenue.start")
+                        : t("revenue.end"),
+                  })}
                 </Text>
                 <TouchableOpacity onPress={() => setShowPicker(false)}>
                   <Ionicons name="close" size={24} color={colors.text} />
@@ -198,7 +211,7 @@ export function DateRangeSelector({
                 }}
               >
                 <Text className="text-center font-bold text-white">
-                  Confirm
+                  {t("common.confirm")}
                 </Text>
               </TouchableOpacity>
             </View>

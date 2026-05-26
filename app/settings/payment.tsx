@@ -5,12 +5,14 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PaymentSettingsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
   const [isStripeConnected, setIsStripeConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -30,18 +32,21 @@ export default function PaymentSettingsScreen() {
     setTimeout(() => {
       setIsStripeConnected(true);
       setConnecting(false);
-      Alert.alert("Success", "Stripe account connected successfully");
+      Alert.alert(
+        t("common.success"),
+        t("settings.payment.stripeConnected")
+      );
     }, 2000);
   };
 
   const handleDisconnectStripe = () => {
     Alert.alert(
-      "Disconnect Stripe",
-      "Are you sure? You will not be able to process payments.",
+      t("settings.payment.disconnectTitle"),
+      t("settings.payment.disconnectMessage"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Disconnect",
+          text: t("settings.payment.disconnectButton"),
           style: "destructive",
           onPress: () => {
             setIsStripeConnected(false);
@@ -53,7 +58,7 @@ export default function PaymentSettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Payment Settings" showBackButton />
+      <ScreenHeader title={t("settings.payment.title")} showBackButton />
 
       <ScrollView className="flex-1" contentContainerClassName="pb-10">
         {/* Stripe Connection Status */}
@@ -75,10 +80,12 @@ export default function PaymentSettingsScreen() {
               </View>
               <View>
                 <Text className="text-lg font-bold text-slate-900 dark:text-white">
-                  Stripe
+                  {t("settings.payment.providerName")}
                 </Text>
                 <Text className="text-sm text-slate-500 dark:text-slate-400">
-                  {isStripeConnected ? "Connected" : "Not connected"}
+                  {isStripeConnected
+                    ? t("settings.payment.connected")
+                    : t("settings.payment.notConnected")}
                 </Text>
               </View>
             </View>
@@ -86,7 +93,7 @@ export default function PaymentSettingsScreen() {
               <View className="flex-row items-center gap-1 rounded-full bg-green-100 px-2 py-1 dark:bg-green-900/30">
                 <View className="h-2 w-2 rounded-full bg-green-500" />
                 <Text className="text-xs font-semibold text-green-700 dark:text-green-300">
-                  Active
+                  {t("settings.payment.active")}
                 </Text>
               </View>
             )}
@@ -95,14 +102,18 @@ export default function PaymentSettingsScreen() {
           <View className="mt-5">
             {isStripeConnected ? (
               <Button
-                label="Disconnect Account"
+                label={t("settings.payment.disconnectAccount")}
                 variant="outline"
                 onPress={handleDisconnectStripe}
                 className="border-red-200"
               />
             ) : (
               <Button
-                label={connecting ? "Connecting..." : "Connect with Stripe"}
+                label={
+                  connecting
+                    ? t("settings.payment.connecting")
+                    : t("settings.payment.connectWithStripe")
+                }
                 onPress={handleConnectStripe}
                 loading={connecting}
                 className="bg-indigo-600"
@@ -116,7 +127,7 @@ export default function PaymentSettingsScreen() {
             {/* Terminals Section */}
             <View className="mx-4 mt-2">
               <Text className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Terminals
+                {t("settings.payment.terminals")}
               </Text>
               <View className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 {terminals.map((terminal, index) => (
@@ -141,7 +152,7 @@ export default function PaymentSettingsScreen() {
                           {terminal.name}
                         </Text>
                         <Text className="text-xs text-slate-500 dark:text-slate-400">
-                          ID: {terminal.id}
+                          {t("settings.payment.idPrefix")} {terminal.id}
                         </Text>
                       </View>
                     </View>
@@ -154,14 +165,16 @@ export default function PaymentSettingsScreen() {
                         }`}
                       />
                       <Text className="text-sm text-slate-500 dark:text-slate-400">
-                        {terminal.status === "online" ? "Online" : "Offline"}
+                        {terminal.status === "online"
+                          ? t("settings.payment.online")
+                          : t("settings.payment.offline")}
                       </Text>
                     </View>
                   </View>
                 ))}
                 <TouchableOpacity className="border-t border-slate-100 bg-slate-50 p-3 items-center dark:border-slate-800 dark:bg-slate-800/50">
                   <Text className="font-semibold text-blue-600 dark:text-blue-400">
-                    + Add New Terminal
+                    {t("settings.payment.addNewTerminal")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -170,13 +183,13 @@ export default function PaymentSettingsScreen() {
             {/* Payment Preferences */}
             <View className="mx-4 mt-6">
               <Text className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Preferences
+                {t("settings.payment.preferences")}
               </Text>
               <View className="gap-3">
                 <SettingsItem
                   icon="cash"
-                  title="Allow Tipping"
-                  subtitle="Enable tip options at checkout"
+                  title={t("settings.payment.allowTipping")}
+                  subtitle={t("settings.payment.allowTippingSubtitle")}
                   isSwitch
                   switchValue={allowTipping}
                   onSwitchChange={setAllowTipping}
@@ -184,8 +197,8 @@ export default function PaymentSettingsScreen() {
                 />
                 <SettingsItem
                   icon="receipt"
-                  title="Auto-Print Receipts"
-                  subtitle="Print receipt after successful payment"
+                  title={t("settings.payment.autoPrintReceipts")}
+                  subtitle={t("settings.payment.autoPrintReceiptsSubtitle")}
                   isSwitch
                   switchValue={printReceipts}
                   onSwitchChange={setPrintReceipts}
@@ -193,8 +206,8 @@ export default function PaymentSettingsScreen() {
                 />
                 <SettingsItem
                   icon="people"
-                  title="Split Payments"
-                  subtitle="Allow splitting bill among guests"
+                  title={t("settings.payment.splitPayments")}
+                  subtitle={t("settings.payment.splitPaymentsSubtitle")}
                   isSwitch
                   switchValue={splitPayments}
                   onSwitchChange={setSplitPayments}

@@ -3,6 +3,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,24 +19,25 @@ import {
 export function ActivationModal() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
   const { showActivationModal, setShowActivationModal, activateLicense, isActivating } =
     useLicense();
   const [licenseKey, setLicenseKey] = useState("");
 
   const handleActivate = async () => {
     if (!licenseKey.trim()) {
-      Alert.alert("Error", "Please enter a license key");
+      Alert.alert(t("common.error"), t("license.enterLicenseKey"));
       return;
     }
 
     const success = await activateLicense(licenseKey);
     if (success) {
-      Alert.alert("Success", "License activated successfully!");
+      Alert.alert(t("common.success"), t("license.activatedSuccess"));
       setLicenseKey("");
     } else {
       Alert.alert(
-        "Invalid Key",
-        "The license key you entered is invalid. Please try again."
+        t("license.invalidKeyTitle"),
+        t("license.invalidKeyMessage")
       );
     }
   };
@@ -67,10 +69,10 @@ export function ActivationModal() {
                     <Ionicons name="key" size={32} color="#f59e0b" />
                   </View>
                   <Text className="text-xl font-bold text-slate-900 dark:text-white">
-                    Activate License
+                    {t("license.activateLicense")}
                   </Text>
                   <Text className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
-                    Enter your license key to unlock the full version of 7Dollar POS.
+                    {t("license.activateSubtitle")}
                   </Text>
                 </View>
 
@@ -78,20 +80,20 @@ export function ActivationModal() {
                 <View className="mb-4 flex-row items-center justify-center rounded-lg bg-amber-50 py-2 dark:bg-amber-900/20">
                   <Ionicons name="information-circle" size={16} color="#d97706" />
                   <Text className="ml-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                    Demo Mode Active - Limited Features
+                    {t("license.demoModeLimited")}
                   </Text>
                 </View>
 
                 {/* License Key Input */}
                 <View className="mb-4">
                   <Text className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-                    License Key
+                    {t("license.licenseKey")}
                   </Text>
                   <View className="flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-4 dark:border-slate-700 dark:bg-slate-800">
                     <Ionicons name="key-outline" size={18} color={colors.tabIconDefault} />
                     <TextInput
                       className="ml-3 flex-1 py-3.5 text-base text-slate-900 dark:text-white"
-                      placeholder="XXXX-XXXX-XXXX-XXXX"
+                      placeholder={t("license.licenseKeyPlaceholder")}
                       placeholderTextColor={colors.tabIconDefault}
                       value={licenseKey}
                       onChangeText={setLicenseKey}
@@ -113,12 +115,14 @@ export function ActivationModal() {
                     }`}
                   >
                     {isActivating ? (
-                      <Text className="font-semibold text-white">Activating...</Text>
+                      <Text className="font-semibold text-white">
+                        {t("license.activating")}
+                      </Text>
                     ) : (
                       <>
                         <Ionicons name="checkmark-circle" size={20} color="white" />
                         <Text className="ml-2 font-semibold text-white">
-                          Activate License
+                          {t("license.activateLicense")}
                         </Text>
                       </>
                     )}
@@ -131,7 +135,7 @@ export function ActivationModal() {
                     className="flex-row items-center justify-center rounded-xl bg-slate-100 py-3.5 dark:bg-slate-800"
                   >
                     <Text className="font-semibold text-slate-600 dark:text-slate-400">
-                      Continue in Demo Mode
+                      {t("license.continueDemoMode")}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -139,7 +143,7 @@ export function ActivationModal() {
                 {/* Help Link */}
                 <TouchableOpacity className="mt-4 items-center">
                   <Text className="text-sm text-blue-600 dark:text-blue-400">
-                    Where do I find my license key?
+                    {t("license.whereIsMyKey")}
                   </Text>
                 </TouchableOpacity>
               </View>

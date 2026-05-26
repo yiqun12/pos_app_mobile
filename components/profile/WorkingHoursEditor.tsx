@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Modal,
   Platform,
@@ -46,6 +47,7 @@ export function WorkingHoursEditor({
 }: WorkingHoursEditorProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
   const DateTimePicker = getDateTimePicker();
 
   const [hours, setHours] = useState<Record<string, string>>({});
@@ -71,8 +73,12 @@ export function WorkingHoursEditor({
   }, [initialValue]);
 
   /* ---------- Helpers ---------- */
-  const parseDay = (value?: string) => {
-    if (!value || value === "Closed")
+   const parseDay = (value?: string) => {
+    if (
+      !value ||
+      value === "Closed" ||
+      value === t("workingHours.closed")
+    )
       return { isOpen: false, open: "", close: "" };
 
     const [open = DEFAULT_OPEN, close = DEFAULT_CLOSE] = value
@@ -106,7 +112,7 @@ export function WorkingHoursEditor({
         ...prev,
         [day]:
           prev[day] && prev[day] !== "Closed"
-            ? "Closed"
+            ? t("workingHours.closed")
             : `${DEFAULT_OPEN}-${DEFAULT_CLOSE}`,
       };
       onChange(JSON.stringify(newHours)); // Auto-save on change
@@ -149,7 +155,9 @@ export function WorkingHoursEditor({
                             </TouchableOpacity>
                         </View>
                     ) : (
-                        <Text className="text-slate-400 text-sm italic mr-4">Closed</Text>
+                        <Text className="text-slate-400 text-sm italic mr-4">
+                          {t("workingHours.closed")}
+                        </Text>
                     )}
                 </View>
             );
@@ -158,7 +166,7 @@ export function WorkingHoursEditor({
         {/* ---------- Time Picker ---------- */}
         {!DateTimePicker && (
             <Text className="py-3 text-sm text-amber-600 dark:text-amber-400">
-                Native time picker is unavailable in the current app container.
+                {t("workingHours.pickerUnavailable")}
             </Text>
         )}
 
@@ -168,12 +176,14 @@ export function WorkingHoursEditor({
                     <View className="w-full max-w-sm bg-white rounded-xl p-4 dark:bg-slate-900">
                         <DateTimePicker
                             value={selectedDate}
-                            onChange={(_, date) => setSelectedDate(date || selectedDate)}
+                            onChange={(_event: unknown, date?: Date) =>
+                              setSelectedDate(date || selectedDate)
+                            }
                             mode="time"
                             display="spinner"
                             textColor={colors.text}
                         />
-                        <Button label="Done" onPress={() => {
+                        <Button label={t("common.done")} onPress={() => {
                             const h = String(selectedDate.getHours()).padStart(2, "0");
                             const m = String(selectedDate.getMinutes()).padStart(2, "0");
                             picker.day && picker.mode && updateDay(picker.day, picker.mode, `${h}:${m}`);
@@ -189,7 +199,7 @@ export function WorkingHoursEditor({
                 value={selectedDate}
                 mode="time"
                 display="default"
-                onChange={(event, date) => {
+                onChange={(_event: unknown, date?: Date) => {
                     setPicker({ visible: false });
                     if (date) {
                         const h = String(date.getHours()).padStart(2, "0");

@@ -1,4 +1,4 @@
-import {
+﻿import {
   Notification,
   NotificationCard,
   NotificationType,
@@ -9,7 +9,8 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   FlatList,
@@ -19,88 +20,93 @@ import {
   View,
 } from "react-native";
 
-// Mock notifications data
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: "1",
-    type: "order",
-    title: "New Order Received",
-    message: "Table 5 placed a new order with 4 items. Total: $48.50",
-    timestamp: "2 min ago",
-    isRead: false,
-    orderId: "A1023",
-    amount: 48.5,
-  },
-  {
-    id: "2",
-    type: "order",
-    title: "New DoorDash Order",
-    message: "DoorDash pickup order received. Ready in 15 minutes.",
-    timestamp: "15 min ago",
-    isRead: false,
-    orderId: "D4521",
-    amount: 32.0,
-  },
-  {
-    id: "3",
-    type: "payment",
-    title: "Payment Received",
-    message: "Table 12 payment completed via credit card.",
-    timestamp: "1 hour ago",
-    isRead: true,
-    orderId: "A1019",
-    amount: 86.75,
-  },
-  {
-    id: "4",
-    type: "alert",
-    title: "Low Inventory Alert",
-    message: "Chicken Rice is running low. Only 5 portions remaining.",
-    timestamp: "2 hours ago",
-    isRead: true,
-  },
-  {
-    id: "5",
-    type: "system",
-    title: "System Update",
-    message:
-      "New features are available. Update your app to access the latest improvements.",
-    timestamp: "Yesterday",
-    isRead: true,
-  },
-  {
-    id: "6",
-    type: "order",
-    title: "Order Completed",
-    message: "Order #A1015 has been marked as completed.",
-    timestamp: "Yesterday",
-    isRead: true,
-    orderId: "A1015",
-  },
-];
-
 type FilterType = "all" | NotificationType;
-
-const filters: { key: FilterType; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "order", label: "Orders" },
-  { key: "payment", label: "Payments" },
-  { key: "alert", label: "Alerts" },
-  { key: "system", label: "System" },
-];
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const isTablet = responsive.isTablet;
   const filterLabelSize = isTablet ? 17 : 14;
   const filterCountSize = isTablet ? 15 : 12;
   const markAllFontSize = isTablet ? 16 : 12;
 
+  const initialNotifications = useMemo<Notification[]>(
+    () => [
+      {
+        id: "1",
+        type: "order",
+        title: t("notifications.mock.newOrderReceived.title"),
+        message: t("notifications.mock.newOrderReceived.message"),
+        timestamp: t("notifications.mock.time.2MinAgo"),
+        isRead: false,
+        orderId: "A1023",
+        amount: 48.5,
+      },
+      {
+        id: "2",
+        type: "order",
+        title: t("notifications.mock.newDoorDashOrder.title"),
+        message: t("notifications.mock.newDoorDashOrder.message"),
+        timestamp: t("notifications.mock.time.15MinAgo"),
+        isRead: false,
+        orderId: "D4521",
+        amount: 32.0,
+      },
+      {
+        id: "3",
+        type: "payment",
+        title: t("notifications.mock.paymentReceived.title"),
+        message: t("notifications.mock.paymentReceived.message"),
+        timestamp: t("notifications.mock.time.1HourAgo"),
+        isRead: true,
+        orderId: "A1019",
+        amount: 86.75,
+      },
+      {
+        id: "4",
+        type: "alert",
+        title: t("notifications.mock.lowInventoryAlert.title"),
+        message: t("notifications.mock.lowInventoryAlert.message"),
+        timestamp: t("notifications.mock.time.2HoursAgo"),
+        isRead: true,
+      },
+      {
+        id: "5",
+        type: "system",
+        title: t("notifications.mock.systemUpdate.title"),
+        message: t("notifications.mock.systemUpdate.message"),
+        timestamp: t("notifications.mock.time.yesterday"),
+        isRead: true,
+      },
+      {
+        id: "6",
+        type: "order",
+        title: t("notifications.mock.orderCompleted.title"),
+        message: t("notifications.mock.orderCompleted.message"),
+        timestamp: t("notifications.mock.time.yesterday"),
+        isRead: true,
+        orderId: "A1015",
+      },
+    ],
+    [t]
+  );
+
+  const filters: { key: FilterType; label: string }[] = useMemo(
+    () => [
+      { key: "all", label: t("notifications.filterAll") },
+      { key: "order", label: t("notifications.filterOrders") },
+      { key: "payment", label: t("notifications.filterPayments") },
+      { key: "alert", label: t("notifications.filterAlerts") },
+      { key: "system", label: t("notifications.filterSystem") },
+    ],
+    [t]
+  );
+
   const [notifications, setNotifications] =
-    useState<Notification[]>(MOCK_NOTIFICATIONS);
+    useState<Notification[]>(initialNotifications);
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -113,18 +119,16 @@ export default function NotificationsScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    // TODO: 实际刷新逻辑
     setTimeout(() => {
       setRefreshing(false);
     }, 1000);
   };
+
   const handleNotificationPress = (notification: Notification) => {
-    // Mark as read
     setNotifications((prev) =>
       prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
     );
 
-    // Navigate to order details if it's an order notification
     if (notification.type === "order" && notification.orderId) {
       router.push(`/orders/${notification.orderId}`);
     }
@@ -136,12 +140,12 @@ export default function NotificationsScreen() {
 
   const handleClearAll = () => {
     Alert.alert(
-      "Clear All Notifications",
-      "Are you sure you want to clear all notifications?",
+      t("notifications.clearAllTitle"),
+      t("notifications.clearAllMessage"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Clear All",
+          text: t("notifications.clearAllButton"),
           style: "destructive",
           onPress: () => setNotifications([]),
         },
@@ -152,7 +156,7 @@ export default function NotificationsScreen() {
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
       <ScreenHeader
-        title="Notifications"
+        title={t("notifications.title")}
         rightElement={
           unreadCount > 0 ? (
             <TouchableOpacity
@@ -163,20 +167,22 @@ export default function NotificationsScreen() {
                 className="font-semibold text-orange-600 dark:text-orange-400"
                 style={{ fontSize: markAllFontSize }}
               >
-                Mark all read
+                {t("notifications.markAllRead")}
               </Text>
             </TouchableOpacity>
           ) : undefined
         }
       />
 
-      {/* Filter Tabs */}
       <View className="border-b border-slate-200 dark:border-slate-800">
         <FlatList
           horizontal
           data={filters}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: responsive.mediumSpacing, paddingVertical: 12 }}
+          contentContainerStyle={{
+            paddingHorizontal: responsive.mediumSpacing,
+            paddingVertical: 12,
+          }}
           keyExtractor={(item) => item.key}
           renderItem={({ item }) => {
             const isActive = activeFilter === item.key;
@@ -203,9 +209,7 @@ export default function NotificationsScreen() {
                 {count > 0 && (
                   <View
                     className={`ml-2 h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 ${
-                      isActive
-                        ? "bg-white/20"
-                        : "bg-slate-200 dark:bg-slate-700"
+                      isActive ? "bg-white/20" : "bg-slate-200 dark:bg-slate-700"
                     }`}
                   >
                     <Text
@@ -224,17 +228,16 @@ export default function NotificationsScreen() {
         />
       </View>
 
-      {/* Notifications List */}
       <FlatList
         data={filteredNotifications}
         renderItem={({ item }) => (
-          <NotificationCard
-            notification={item}
-            onPress={handleNotificationPress}
-          />
+          <NotificationCard notification={item} onPress={handleNotificationPress} />
         )}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: responsive.mediumSpacing, paddingBottom: 100 }}
+        contentContainerStyle={{
+          padding: responsive.mediumSpacing,
+          paddingBottom: 100,
+        }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -253,10 +256,10 @@ export default function NotificationsScreen() {
               />
             </View>
             <Text className="text-lg font-semibold text-slate-900 dark:text-white">
-              No Notifications
+              {t("notifications.emptyTitle")}
             </Text>
             <Text className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
-              Youre all caught up! New notifications will appear here.
+              {t("notifications.emptySubtitle")}
             </Text>
           </View>
         }
@@ -269,7 +272,7 @@ export default function NotificationsScreen() {
                   className="font-medium text-slate-600 dark:text-slate-400"
                   style={{ fontSize: isTablet ? 16 : 14 }}
                 >
-                  {unreadCount} unread notification{unreadCount > 1 ? "s" : ""}
+                  {t("notifications.unreadCount", { count: unreadCount })}
                 </Text>
               </View>
             </View>
@@ -277,11 +280,13 @@ export default function NotificationsScreen() {
         }
       />
 
-      {/* Clear All Button (when there are notifications) */}
       {notifications.length > 0 && (
-        <View 
+        <View
           className="absolute bottom-8"
-          style={{ left: responsive.mediumSpacing, right: responsive.mediumSpacing }}
+          style={{
+            left: responsive.mediumSpacing,
+            right: responsive.mediumSpacing,
+          }}
         >
           <TouchableOpacity
             onPress={handleClearAll}
@@ -297,7 +302,7 @@ export default function NotificationsScreen() {
               className="ml-2 font-medium text-slate-600 dark:text-slate-400"
               style={{ fontSize: isTablet ? 16 : 14 }}
             >
-              Clear All Notifications
+              {t("notifications.clearAllCta")}
             </Text>
           </TouchableOpacity>
         </View>

@@ -1,5 +1,6 @@
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -28,6 +29,7 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
   containerHeight,
 }) => {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const SEAT_SIZE = responsive.seatSize;
   const clamp = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
@@ -110,6 +112,11 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
   };
 
   const statusColor = getStatusColor(seat.status);
+  const statusLabelMap: Record<Seat["status"], string> = {
+    vacant: t("seats.legend.available"),
+    reserved: t("seats.legend.reserved"),
+    occupied: t("seats.legend.occupied"),
+  };
 
   return (
     <GestureDetector gesture={pan}>
@@ -163,7 +170,7 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {seat.itemCount} items
+              {t("seats.itemsCount", { count: seat.itemCount })}
             </Text>
           ) : showStatusText ? (
             <Text
@@ -176,7 +183,7 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {seat.status}
+              {statusLabelMap[seat.status]}
             </Text>
           ) : null}
         </TouchableOpacity>

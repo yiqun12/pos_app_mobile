@@ -453,6 +453,7 @@ const en = {
       "offline": "Offline",
       "online": "Online",
       "preferences": "Preferences",
+      "providerName": "Stripe",
       "splitPayments": "Split Payments",
       "splitPaymentsSubtitle": "Split Payments Subtitle",
       "stripeConnected": "Stripe Connected",
@@ -502,6 +503,7 @@ const en = {
       "unableToLoadStore": "Unable To Load Store",
       "updated": "Updated",
       "updateFailed": "Update Failed",
+      "websiteExample": "www.demostore.com",
       "websiteUrl": "Website URL"
     }
   },

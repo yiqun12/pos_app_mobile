@@ -5,6 +5,7 @@ import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ingredient, OptionChoice, OptionGroup } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     KeyboardAvoidingView,
     Modal,
@@ -45,6 +46,7 @@ export function MenuEditorModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   const [name, setName] = useState(initialName);
   const [price, setPrice] = useState(
@@ -79,7 +81,7 @@ export function MenuEditorModal({
   const addOptionGroup = () => {
     const newGroup: OptionGroup = {
       id: `group-${Date.now()}`,
-      name: "New Option",
+      name: t("menu.item.newOption"),
       type: "single",
       required: false,
       choices: [],
@@ -106,7 +108,7 @@ export function MenuEditorModal({
   const addChoiceToGroup = (groupId: string) => {
     const newChoice: OptionChoice = {
       id: `choice-${Date.now()}`,
-      name: "New Choice",
+      name: t("menu.item.newChoice"),
     };
     setOptionGroups(
       optionGroups.map((g) =>
@@ -150,7 +152,7 @@ export function MenuEditorModal({
   const addIngredient = () => {
     const newIngredient: Ingredient = {
       id: `ingredient-${Date.now()}`,
-      name: "New Ingredient",
+      name: t("menu.item.newIngredient"),
     };
     setIngredients([...ingredients, newIngredient]);
   };
@@ -192,7 +194,7 @@ export function MenuEditorModal({
                 style={{ fontSize: responsive.subheadingFontSize }}
                 className="font-bold text-slate-900 dark:text-white"
               >
-                {mode === "add" ? "Add Item" : "Edit Item"}
+                {mode === "add" ? t("menu.item.addItem") : t("menu.item.editItem")}
               </Text>
               <TouchableOpacity onPress={onClose}>
                 <Ionicons name="close" size={24} color={colors.text} />
@@ -206,13 +208,13 @@ export function MenuEditorModal({
                   style={{ fontSize: responsive.baseFontSize - 2 }}
                   className="mb-2 font-medium text-slate-700 dark:text-slate-300"
                 >
-                  Item Name
+                  {t("menu.item.itemName")}
                 </Text>
                 <TextInput
                   value={name}
                   onChangeText={setName}
                   className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base dark:border-slate-800 dark:bg-slate-800 dark:text-white"
-                  placeholder="e.g. Kung Pao Chicken"
+                  placeholder={t("menu.item.itemNamePlaceholder")}
                   placeholderTextColor="#94a3b8"
                   autoFocus={mode === "add"}
                 />
@@ -223,13 +225,13 @@ export function MenuEditorModal({
                   style={{ fontSize: responsive.baseFontSize - 2 }}
                   className="mb-2 font-medium text-slate-700 dark:text-slate-300"
                 >
-                  Price ($)
+                  {t("menu.item.price")}
                 </Text>
                 <TextInput
                   value={price}
                   onChangeText={setPrice}
                   className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base dark:border-slate-800 dark:bg-slate-800 dark:text-white"
-                  placeholder="0.00"
+                  placeholder={t("menu.item.pricePlaceholder")}
                   placeholderTextColor="#94a3b8"
                   keyboardType="decimal-pad"
                 />
@@ -244,7 +246,7 @@ export function MenuEditorModal({
                   style={{ fontSize: responsive.baseFontSize }}
                   className="font-semibold text-slate-900 dark:text-white"
                 >
-                  Options & Add-ons
+                  {t("menu.item.optionsAndAddons")}
                 </Text>
                 <Ionicons
                   name={showAdvanced ? "chevron-up" : "chevron-down"}
@@ -262,7 +264,7 @@ export function MenuEditorModal({
                         style={{ fontSize: responsive.baseFontSize }}
                         className="font-bold text-slate-900 dark:text-white"
                       >
-                        Customization Options
+                        {t("menu.item.customizationOptions")}
                       </Text>
                       <TouchableOpacity
                         onPress={addOptionGroup}
@@ -284,7 +286,7 @@ export function MenuEditorModal({
                               updateOptionGroup(group.id, "name", text)
                             }
                             className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            placeholder="Option name (e.g. Spice Level)"
+                            placeholder={t("menu.item.optionNamePlaceholder")}
                           />
                           <TouchableOpacity
                             onPress={() => removeOptionGroup(group.id)}
@@ -315,8 +317,10 @@ export function MenuEditorModal({
                                     ? "text-white"
                                     : "text-slate-700 dark:text-slate-300"
                                 }`}
-                              >
-                                {type === "single" ? "Pick One" : "Pick Many"}
+                                >
+                                {type === "single"
+                                  ? t("menu.item.pickOne")
+                                  : t("menu.item.pickMany")}
                               </Text>
                             </TouchableOpacity>
                           ))}
@@ -350,7 +354,7 @@ export function MenuEditorModal({
                             style={{ fontSize: responsive.baseFontSize - 2 }}
                             className="ml-2 text-slate-700 dark:text-slate-300"
                           >
-                            Required
+                            {t("menu.item.required")}
                           </Text>
                         </TouchableOpacity>
 
@@ -360,7 +364,7 @@ export function MenuEditorModal({
                             style={{ fontSize: responsive.baseFontSize - 2 }}
                             className="mb-2 font-medium text-slate-700 dark:text-slate-300"
                           >
-                            Options:
+                            {t("menu.item.optionsLabel")}
                           </Text>
                           {group.choices.map((choice) => (
                             <View
@@ -373,7 +377,7 @@ export function MenuEditorModal({
                                   updateChoice(group.id, choice.id, "name", text)
                                 }
                                 className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                placeholder="Choice name"
+                                placeholder={t("menu.item.choiceNamePlaceholder")}
                               />
                               <TextInput
                                 value={
@@ -388,7 +392,7 @@ export function MenuEditorModal({
                                   )
                                 }
                                 className="w-16 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                                placeholder="+0.00"
+                                placeholder={t("menu.item.choicePricePlaceholder")}
                                 keyboardType="decimal-pad"
                               />
                               <TouchableOpacity
@@ -417,7 +421,7 @@ export function MenuEditorModal({
                             style={{ fontSize: responsive.baseFontSize - 2 }}
                             className="ml-1 font-medium text-blue-600"
                           >
-                            Add Option
+                            {t("menu.item.addOption")}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -431,7 +435,7 @@ export function MenuEditorModal({
                         style={{ fontSize: responsive.baseFontSize }}
                         className="font-bold text-slate-900 dark:text-white"
                       >
-                        Add-ons / Ingredients
+                        {t("menu.item.addonsIngredients")}
                       </Text>
                       <TouchableOpacity
                         onPress={addIngredient}
@@ -452,7 +456,7 @@ export function MenuEditorModal({
                             updateIngredient(ingredient.id, "name", text)
                           }
                           className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                          placeholder="Ingredient name"
+                          placeholder={t("menu.item.ingredientNamePlaceholder")}
                         />
                         <TextInput
                           value={
@@ -466,7 +470,7 @@ export function MenuEditorModal({
                             )
                           }
                           className="w-16 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                          placeholder="+0.00"
+                          placeholder={t("menu.item.ingredientPricePlaceholder")}
                           keyboardType="decimal-pad"
                         />
                         <TouchableOpacity
@@ -484,11 +488,11 @@ export function MenuEditorModal({
               {/* Action Buttons */}
               <View className="mt-4 flex-row gap-3">
                 <View className="flex-1">
-                  <Button label="Cancel" variant="outline" onPress={onClose} />
+                  <Button label={t("common.cancel")} variant="outline" onPress={onClose} />
                 </View>
                 <View className="flex-1">
                   <Button
-                    label="Save"
+                    label={t("common.save")}
                     onPress={handleSave}
                     disabled={!name.trim() || !price}
                   />

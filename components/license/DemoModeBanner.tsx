@@ -2,11 +2,13 @@ import { useLicense } from "@/context/license";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, TouchableOpacity, View } from "react-native";
 
 export function DemoModeBanner() {
   const { isActivated, setShowActivationModal } = useLicense();
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   // 已激活则不显示
   if (isActivated) return null;
@@ -23,16 +25,18 @@ export function DemoModeBanner() {
         </View>
         <View className="flex-1">
           <Text style={{ fontSize: responsive.baseFontSize - 2 }} className="font-semibold text-white" numberOfLines={1}>
-            Demo Mode Active
+            {t("license.demoModeActive")}
           </Text>
           <Text style={{ fontSize: responsive.captionFontSize }} className="text-amber-100" numberOfLines={1}>
-            Tap to activate license
+            {t("license.tapToActivate")}
           </Text>
         </View>
       </View>
       <View className="flex-row items-center rounded-full bg-white/20 px-3 py-1.5">
         <Ionicons name="key" size={responsive.buttonIconSize - 10} color="white" />
-        <Text style={{ fontSize: responsive.captionFontSize }} className="ml-1.5 font-semibold text-white">Activate</Text>
+        <Text style={{ fontSize: responsive.captionFontSize }} className="ml-1.5 font-semibold text-white">
+          {t("license.activate")}
+        </Text>
       </View>
     </TouchableOpacity>
   );

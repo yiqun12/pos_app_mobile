@@ -1,5 +1,6 @@
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, TouchableOpacity, View } from "react-native";
 import { Seat } from "./types";
 
@@ -15,6 +16,7 @@ interface ViewOnlySeatProps {
  */
 export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   
   // Use seat dimensions from Firebase if available, otherwise fall back to responsive default
   const seatWidth = seat.width || responsive.seatSize;
@@ -43,6 +45,11 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
 
   const statusColor = getStatusColor(seat.status);
   const isOccupied = seat.status === "occupied";
+  const statusLabelMap: Record<Seat["status"], string> = {
+    vacant: t("seats.legend.available"),
+    reserved: t("seats.legend.reserved"),
+    occupied: t("seats.legend.occupied"),
+  };
 
   return (
     <View
@@ -93,7 +100,7 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
             adjustsFontSizeToFit
             minimumFontScale={0.8}
           >
-            {seat.itemCount} items
+            {t("seats.itemsCount", { count: seat.itemCount })}
           </Text>
         ) : showStatusText ? (
           <Text
@@ -106,7 +113,7 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
             adjustsFontSizeToFit
             minimumFontScale={0.8}
           >
-            {seat.status}
+            {statusLabelMap[seat.status]}
           </Text>
         ) : null}
       </TouchableOpacity>

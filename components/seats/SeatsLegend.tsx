@@ -1,9 +1,11 @@
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 
 export function SeatsLegend() {
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const indicatorSize = responsive.isTablet ? 6 : 3.5;
   const textSize = responsive.isTablet ? 16 : 12;
   const verticalPadding = responsive.isTablet ? responsive.baseSpacing : 12;
@@ -33,9 +35,10 @@ export function SeatsLegend() {
             }}
             className="text-slate-600 dark:text-slate-400"
           >
-            Available | 空桌
+            {t("seats.legend.available")}
           </Text>
         </View>
+
         <View className="flex-row items-center">
           <View
             className="rounded bg-orange-600"
@@ -51,9 +54,10 @@ export function SeatsLegend() {
             }}
             className="text-slate-600 dark:text-slate-400"
           >
-            Occupied | 已占用
+            {t("seats.legend.occupied")}
           </Text>
         </View>
+
         <View className="flex-row items-center">
           <View
             className="rounded bg-orange-200"
@@ -69,7 +73,7 @@ export function SeatsLegend() {
             }}
             className="text-slate-600 dark:text-slate-400"
           >
-            Reserved | 已预订
+            {t("seats.legend.reserved")}
           </Text>
         </View>
       </View>

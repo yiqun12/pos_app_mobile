@@ -3,6 +3,7 @@ import { Audio } from 'expo-av';
 import Constants from 'expo-constants';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
     ActivityIndicator,
@@ -172,6 +173,7 @@ function matchAutoNavigation(rawText: string): AutoNavMatch | null {
 export default function AIChat() {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isTabRoute = /^\/(seats|menu|revenue|notifications|profile)(\/|$)/.test(
@@ -183,7 +185,7 @@ export default function AIChat() {
   const [modalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', text: '你好！我是你的点餐助手。有什么我可以帮你的吗？', sender: 'ai' }
+    { id: '1', text: t('aiChat.greeting'), sender: 'ai' },
   ]);
   const [loading, setLoading] = useState(false);
   const [lastAutoNavAt, setLastAutoNavAt] = useState<number>(0);
@@ -294,7 +296,7 @@ export default function AIChat() {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') {
-        alert('请授权录音权限');
+        alert(t('aiChat.micPermissionRequired'));
         setIsRecording(false);
         return;
       }
@@ -359,7 +361,7 @@ export default function AIChat() {
 
     } catch (error) {
       console.error('上传语音报错:', error);
-      alert('网络请求失败');
+      alert(t('aiChat.networkRequestFailed'));
     } finally {
       setLoading(false);
     }
@@ -494,8 +496,8 @@ export default function AIChat() {
         id: (Date.now() + 1).toString(), 
         text:
           (error as any)?.name === 'AbortError'
-            ? '请求超时：请检查后端是否启动、电脑 IP 是否正确、手机和电脑是否在同一个 WiFi。'
-            : '连接失败: 请检查电脑IP是否填写正确，或者手机和电脑是否在同一个WiFi下。', 
+            ? t('aiChat.requestTimeout')
+            : t('aiChat.connectionFailed'),
         sender: 'ai' 
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -537,7 +539,7 @@ export default function AIChat() {
               
               {/* 1. 头部 */}
               <View style={styles.header}>
-                <Text style={styles.headerTitle}>AI 点餐助手</Text>
+                <Text style={styles.headerTitle}>{t('aiChat.title')}</Text>
                 <TouchableOpacity onPress={() => setModalVisible(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -611,7 +613,7 @@ export default function AIChat() {
                   style={styles.input}
                   value={message}
                   onChangeText={setMessage}
-                  placeholder="长按左侧麦克风，或输入..."
+                  placeholder={t('aiChat.inputPlaceholder')}
                   returnKeyType="send"
                   onSubmitEditing={sendMessage}
                 />

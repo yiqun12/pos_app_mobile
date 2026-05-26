@@ -1,14 +1,15 @@
-import { StatCard } from "@/components/analytics/StatCard";
+﻿import { StatCard } from "@/components/analytics/StatCard";
 import { DateRangeSelector } from "@/components/revenue/DateRangeSelector";
-import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useModalAction } from "@/hooks/useModalAction";
-import { useLocalSearchParams } from "expo-router"; // 用来获取 URL 里的 orderId
+import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   RefreshControl,
@@ -43,13 +44,6 @@ const DEFAULT_RANGE = {
   startDate: "01/01/2026",
   endDate: "01/11/2026",
 };
-
-const PRESETS = [
-  { label: "Today", startDate: "01/11/2026", endDate: "01/11/2026" },
-  { label: "Yesterday", startDate: "01/10/2026", endDate: "01/10/2026" },
-  { label: "January", startDate: "01/01/2026", endDate: "01/31/2026" },
-  { label: "December", startDate: "12/01/2025", endDate: "12/31/2025" },
-];
 
 const INITIAL_ORDERS: Order[] = [
   {
@@ -142,10 +136,40 @@ export default function RevenueScreen() {
   const responsive = useResponsiveLayout();
   const isPhone = !responsive.isTablet;
   const tabFontSize = responsive.isTablet ? 17 : 14;
+  const { t } = useTranslation();
+
+  const PRESETS = useMemo(
+    () => [
+      { label: t("revenue.preset.today"), startDate: "01/11/2026", endDate: "01/11/2026" },
+      {
+        label: t("revenue.preset.yesterday"),
+        startDate: "01/10/2026",
+        endDate: "01/10/2026",
+      },
+      { label: t("revenue.preset.january"), startDate: "01/01/2026", endDate: "01/31/2026" },
+      {
+        label: t("revenue.preset.december"),
+        startDate: "12/01/2025",
+        endDate: "12/31/2025",
+      },
+    ],
+    [t]
+  );
+
+  const tabs = useMemo(
+    () => [
+      t("revenue.tab.allOrders"),
+      t("revenue.tab.cashDrawer"),
+      t("revenue.tab.salesAnalysis"),
+    ] as const,
+    [t]
+  );
 
   const [dateRange, setDateRange] = useState(DEFAULT_RANGE);
-  const [selectedPreset, setSelectedPreset] = useState<string | null>("Today");
-  const [activeTab, setActiveTab] = useState<"All Orders" | "Cash Drawer" | "Sales Analysis">("All Orders");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(
+    t("revenue.preset.today")
+  );
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>(tabs[0]);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -178,24 +202,20 @@ export default function RevenueScreen() {
     setSelectedOrder(order);
     setOrderModalVisible(true);
   };
-  // 1. 获取 AI 可能传过来的 orderId
+
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
 
-  // 2. 监听弹窗指令
   useModalAction((modalName) => {
     if (modalName === "orderDetail") {
-      // 如果 AI 传了特定订单号，就去找这个订单
       if (orderId) {
         const targetOrder = orders.find((o) => o.id === orderId);
         if (targetOrder) {
           setSelectedOrder(targetOrder);
           setOrderModalVisible(true);
         } else {
-          Alert.alert("Error", `Order ${orderId} not found.`);
+          Alert.alert(t("common.error"), t("revenue.orderNotFound", { orderId }));
         }
-      } 
-      // 如果没有传订单号，默认打开列表里的第一个订单（防止弹窗空白）
-      else if (orders.length > 0) {
+      } else if (orders.length > 0) {
         setSelectedOrder(orders[0]);
         setOrderModalVisible(true);
       }
@@ -204,11 +224,17 @@ export default function RevenueScreen() {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Daily Income Report" subtitle="Manage and analyze your daily revenue data" />
+      <ScreenHeader
+        title={t("revenue.title")}
+        subtitle={t("revenue.subtitle")}
+      />
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ gap: responsive.mediumSpacing, padding: responsive.mediumSpacing }}
+        contentContainerStyle={{
+          gap: responsive.mediumSpacing,
+          padding: responsive.mediumSpacing,
+        }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -230,7 +256,6 @@ export default function RevenueScreen() {
           }}
         />
 
-        {/* Stats Cards Row */}
         {isPhone ? (
           <ScrollView
             horizontal
@@ -239,36 +264,35 @@ export default function RevenueScreen() {
             contentContainerStyle={{ gap: responsive.baseSpacing }}
           >
             <View style={{ width: 152 }}>
-              <StatCard title="Total Revenue" value={`$${total}`} trend="+12.5%" trendUp={true} />
+              <StatCard title={t("revenue.totalRevenue")} value={`$${total}`} trend="+12.5%" trendUp={true} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title="Net Sales" value="$130,500.00" trend="+10.2%" trendUp={true} />
+              <StatCard title={t("revenue.netSales")} value="$130,500.00" trend="+10.2%" trendUp={true} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title="Tax" value="$12,040.22" trend="+5.4%" trendUp={true} />
+              <StatCard title={t("revenue.tax")} value="$12,040.22" trend="+5.4%" trendUp={true} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title="Total Tips" value="$5,225.06" trend="+2.1%" trendUp={true} />
+              <StatCard title={t("revenue.totalTips")} value="$5,225.06" trend="+2.1%" trendUp={true} />
             </View>
           </ScrollView>
         ) : (
           <View className="flex-row gap-4">
             <View className="flex-1">
-              <StatCard title="Total Revenue" value={`$${total}`} trend="+12.5%" trendUp={true} />
+              <StatCard title={t("revenue.totalRevenue")} value={`$${total}`} trend="+12.5%" trendUp={true} />
             </View>
             <View className="flex-1">
-              <StatCard title="Net Sales" value="$130,500.00" trend="+10.2%" trendUp={true} />
+              <StatCard title={t("revenue.netSales")} value="$130,500.00" trend="+10.2%" trendUp={true} />
             </View>
             <View className="flex-1">
-              <StatCard title="Tax" value="$12,040.22" trend="+5.4%" trendUp={true} />
+              <StatCard title={t("revenue.tax")} value="$12,040.22" trend="+5.4%" trendUp={true} />
             </View>
             <View className="flex-1">
-              <StatCard title="Total Tips" value="$5,225.06" trend="+2.1%" trendUp={true} />
+              <StatCard title={t("revenue.totalTips")} value="$5,225.06" trend="+2.1%" trendUp={true} />
             </View>
           </View>
         )}
 
-        {/* Tabs */}
         <ScrollView
           horizontal={isPhone}
           showsHorizontalScrollIndicator={false}
@@ -279,33 +303,31 @@ export default function RevenueScreen() {
             borderBottomColor: colorScheme === "dark" ? "#1e293b" : "#e2e8f0",
           }}
         >
-          {(["All Orders", "Cash Drawer", "Sales Analysis"] as const).map(
-            (tab) => {
-              const isActive = activeTab === tab;
-              return (
-                <TouchableOpacity
-                  key={tab}
-                  onPress={() => setActiveTab(tab)}
-                  className={`px-4 py-2 border-b-2 ${
-                    isActive ? "border-orange-500" : "border-transparent"
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                className={`px-4 py-2 border-b-2 ${
+                  isActive ? "border-orange-500" : "border-transparent"
+                }`}
+              >
+                <Text
+                  numberOfLines={1}
+                  className={`font-semibold ${
+                    isActive ? "text-orange-600" : "text-slate-500"
                   }`}
+                  style={{ fontSize: tabFontSize }}
                 >
-                  <Text
-                    numberOfLines={1}
-                    className={`font-semibold ${
-                      isActive ? "text-orange-600" : "text-slate-500"
-                    }`}
-                    style={{ fontSize: tabFontSize }}
-                  >
-                    {tab}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }
-          )}
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
-        {activeTab === "All Orders" && (
+        {activeTab === tabs[0] && (
           <OrdersList
             orders={orders}
             total={total}
@@ -314,24 +336,24 @@ export default function RevenueScreen() {
           />
         )}
 
-        {activeTab === "Cash Drawer" && (
-          <View className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
-            <Text className="text-base font-semibold text-slate-900 dark:text-white mb-1">
-              Cash Drawer
+        {activeTab === tabs[1] && (
+          <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Text className="mb-1 text-base font-semibold text-slate-900 dark:text-white">
+              {t("revenue.cashDrawer")}
             </Text>
             <Text className="text-sm text-slate-500 dark:text-slate-400">
-              Cash drawer details and reconciliation data will be displayed here.
+              {t("revenue.cashDrawerPlaceholder")}
             </Text>
           </View>
         )}
 
-        {activeTab === "Sales Analysis" && (
-          <View className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
-            <Text className="text-base font-semibold text-slate-900 dark:text-white mb-1">
-              Sales Analysis
+        {activeTab === tabs[2] && (
+          <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <Text className="mb-1 text-base font-semibold text-slate-900 dark:text-white">
+              {t("revenue.salesAnalysis")}
             </Text>
             <Text className="text-sm text-slate-500 dark:text-slate-400">
-              Charts and KPIs for detailed sales analysis will be shown here.
+              {t("revenue.salesAnalysisPlaceholder")}
             </Text>
           </View>
         )}

@@ -2,6 +2,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   FlatList,
   Modal,
@@ -38,6 +39,7 @@ export function StoreSelector({
 }: StoreSelectorProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
 
   const renderStore = ({ item }: { item: Store }) => {
     const isSelected = item.id === currentStoreId;
@@ -119,7 +121,7 @@ export function StoreSelector({
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text className="text-lg font-bold text-slate-900 dark:text-white">
-            Select Store
+            {t("common.selectRestaurant")}
           </Text>
           <View className="w-10" />
         </View>
@@ -139,7 +141,7 @@ export function StoreSelector({
                 color={colors.tabIconDefault}
               />
               <Text className="mt-4 text-slate-500 dark:text-slate-400">
-                No stores found
+                {t("profile.noStoresFound")}
               </Text>
             </View>
           }
@@ -155,7 +157,7 @@ export function StoreSelector({
             >
               <Ionicons name="add-circle" size={24} color="#2563eb" />
               <Text className="ml-2 text-base font-semibold text-blue-600 dark:text-blue-400">
-                Create New Store
+                {t("settings.store.createStore")}
               </Text>
             </TouchableOpacity>
           </View>

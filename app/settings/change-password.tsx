@@ -3,6 +3,7 @@ import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -22,12 +24,18 @@ export default function ChangePasswordScreen() {
 
   const handleSave = () => {
     if (newPassword !== confirmPassword) {
-      Alert.alert("Error", "New passwords do not match");
+      Alert.alert(
+        t("common.error"),
+        t("settings.changePassword.passwordMismatch")
+      );
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+      Alert.alert(
+        t("common.error"),
+        t("settings.changePassword.passwordTooShort")
+      );
       return;
     }
 
@@ -35,14 +43,17 @@ export default function ChangePasswordScreen() {
     // Simulate API call
     setTimeout(() => {
       setSaving(false);
-      Alert.alert("Success", "Password changed successfully");
+      Alert.alert(
+        t("common.success"),
+        t("settings.changePassword.passwordUpdated")
+      );
       router.back();
     }, 1000);
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Change Password" showBackButton />
+      <ScreenHeader title={t("settings.changePassword.title")} showBackButton />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -51,28 +62,28 @@ export default function ChangePasswordScreen() {
         <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
           <View className="gap-4">
             <Input
-              label="Current Password"
+              label={t("settings.changePassword.currentPassword")}
               value={currentPassword}
               onChangeText={setCurrentPassword}
-              placeholder="Enter current password"
+              placeholder={t("settings.changePassword.currentPasswordPlaceholder")}
               secureTextEntry
             />
 
             <View className="h-4" />
 
             <Input
-              label="New Password"
+              label={t("settings.changePassword.newPassword")}
               value={newPassword}
               onChangeText={setNewPassword}
-              placeholder="Enter new password"
+              placeholder={t("settings.changePassword.newPasswordPlaceholder")}
               secureTextEntry
             />
 
             <Input
-              label="Confirm New Password"
+              label={t("settings.changePassword.confirmNewPassword")}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              placeholder="Confirm new password"
+              placeholder={t("settings.changePassword.confirmNewPasswordPlaceholder")}
               secureTextEntry
             />
           </View>
@@ -80,7 +91,7 @@ export default function ChangePasswordScreen() {
 
         <View className="border-t border-slate-200 p-4 dark:border-slate-800">
           <Button
-            label="Update Password"
+            label={t("settings.changePassword.updateButton")}
             onPress={handleSave}
             loading={saving}
             disabled={!currentPassword || !newPassword || !confirmPassword}

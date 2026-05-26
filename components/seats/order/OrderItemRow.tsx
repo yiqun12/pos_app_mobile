@@ -3,6 +3,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, TouchableOpacity, View } from "react-native";
 import { OrderItem } from "../types";
 
@@ -22,6 +23,7 @@ export function OrderItemRow({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
 
   return (
     <TouchableOpacity
@@ -74,7 +76,7 @@ export function OrderItemRow({
               style={{ fontSize: responsive.captionFontSize }}
               className="font-medium text-slate-600 dark:text-slate-400"
             >
-              Add-ons:{" "}
+              {t("revenue.addOns")}:{" "}
               <Text className="font-normal">
                 {item.selectedIngredients
                   .map((i) => i.name)

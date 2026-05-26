@@ -3,6 +3,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Text, TouchableOpacity, View } from "react-native";
 
 export type NotificationType = "order" | "system" | "alert" | "payment";
@@ -67,6 +68,7 @@ export function NotificationCard({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
   const config = typeConfig[notification.type];
 
   return (
@@ -105,7 +107,13 @@ export function NotificationCard({
                 }`}
               >
                 <Text style={{ fontSize: responsive.captionFontSize }} className="font-semibold text-white">
-                  {config.label}
+                  {notification.type === "order"
+                    ? t("notifications.badgeOrder")
+                    : notification.type === "alert"
+                      ? t("notifications.badgeAlert")
+                      : notification.type === "payment"
+                        ? t("notifications.badgePayment")
+                        : t("notifications.badgeSystem")}
                 </Text>
               </View>
               {/* Unread Dot */}
