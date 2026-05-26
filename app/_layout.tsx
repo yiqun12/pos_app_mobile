@@ -28,6 +28,7 @@ import { AuthProvider } from "@/context/auth";
 import { LanguageProvider } from "@/context/language";
 import { LicenseProvider } from "@/context/license";
 import { MenuProvider } from "@/context/menu";
+import { StoreProvider } from "@/context/store";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export const unstable_settings = {
@@ -53,35 +54,38 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <LanguageProvider>
-        <LicenseProvider>
-          <MenuProvider>
-            <ThemeProvider
-              value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-            >
-              {/* 这里的 Stack 负责页面跳转 */}
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="pickup/new" />
-                <Stack.Screen
-                  name="orders/[id]"
-                  options={{ presentation: "modal" }}
-                />
-                <Stack.Screen name="analytics/index" />
-              </Stack>
+      <StoreProvider>
+        <LanguageProvider>
+          <LicenseProvider>
+            <MenuProvider>
+              <ThemeProvider
+                value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+              >
+                {/* 这里的 Stack 负责页面跳转 */}
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="select-store" />
+                  <Stack.Screen name="pickup/new" />
+                  <Stack.Screen
+                    name="orders/[id]"
+                    options={{ presentation: "modal" }}
+                  />
+                  <Stack.Screen name="analytics/index" />
+                </Stack>
 
-              {/* Activation Modal - 全局激活弹窗 */}
-              <ActivationModal />
+                {/* Activation Modal - 全局激活弹窗 */}
+                <ActivationModal />
 
-              {/* === 2. AI 悬浮球在这里！(全剧置顶) === */}
-              <AIChat />
+                {/* === 2. AI 悬浮球在这里！(全剧置顶) === */}
+                <AIChat />
 
-              <StatusBar style="auto" />
-            </ThemeProvider>
-          </MenuProvider>
-        </LicenseProvider>
-      </LanguageProvider>
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </MenuProvider>
+          </LicenseProvider>
+        </LanguageProvider>
+      </StoreProvider>
     </AuthProvider>
   );
 }
