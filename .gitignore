@@ -45,3 +45,13 @@ app-example
 # build artifacts
 *.apk
 eatifyPos/
+
+# Claude Code
+.claude/
+
+# AI-generated docs and test reports (keep README.md only)
+*.md
+!README.md
+docs/
+test-results/
+playwright-report/
