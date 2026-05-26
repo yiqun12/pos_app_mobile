@@ -35,6 +35,7 @@ type Order = {
   tax?: number;
   gratuity?: number;
   total?: number;
+  dateTime?: string;
 };
 
 type OrderItem = {
@@ -235,11 +236,19 @@ export default function RevenueScreen() {
           tax,
           gratuity,
           total: totalVal,
+          dateTime: data.dateTime || "",
         };
       });
 
-      // Sort by doc id / dateTime descending
-      fetched.sort((a, b) => b.id.localeCompare(a.id));
+      // Sort by dateTime descending, fallback to doc id descending
+      fetched.sort((a, b) => {
+        const dateTimeA = a.dateTime || "";
+        const dateTimeB = b.dateTime || "";
+        if (dateTimeA && dateTimeB) {
+          return dateTimeB.localeCompare(dateTimeA);
+        }
+        return b.id.localeCompare(a.id);
+      });
 
       setOrders(fetched);
     }, (err) => {

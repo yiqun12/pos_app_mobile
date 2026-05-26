@@ -40,12 +40,10 @@ export function subscribeTableStatus(
           }
         }
 
-        // occupied if itemCount > 0, otherwise reserved if raw.date is present, else vacant
+        // occupied if itemCount > 0, otherwise vacant
         let status: TableStatus["status"] = "vacant";
         if (itemCount > 0) {
           status = "occupied";
-        } else if (raw.date && raw.product === "[]") {
-          status = "reserved";
         }
 
         return {

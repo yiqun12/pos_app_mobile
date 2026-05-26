@@ -43,7 +43,7 @@ export function subscribeStoreList(
           image: raw.Image,
         } satisfies StoreSummary;
       });
-      onUpdate(list);
+      onUpdate(list.reverse());
     },
     (err) => onError(err)
   );
