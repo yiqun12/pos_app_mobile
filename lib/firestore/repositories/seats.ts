@@ -18,18 +18,39 @@ export function subscribeTableStatus(
   return onSnapshot(
     colRef,
     (snap) => {
+      const prefix = `${storeId}-`;
       const rows: TableStatus[] = snap.docs.map((d) => {
         const raw = d.data() as RawTableDoc;
-        const itemCount = typeof raw.itemCount === "number" ? raw.itemCount : 0;
-        const status =
-          raw.status === "occupied" || raw.status === "reserved"
-            ? raw.status
-            : itemCount > 0
-              ? "occupied"
-              : "vacant";
+        
+        // Slicing storeId prefix from d.id to get the table name (e.g. demo-A1 -> A1)
+        const name = d.id.startsWith(prefix) ? d.id.slice(prefix.length) : d.id;
+        
+        let itemCount = 0;
+        if (typeof raw.product === "string" && raw.product !== "[]") {
+          try {
+            const parsed = JSON.parse(raw.product);
+            if (Array.isArray(parsed)) {
+              itemCount = parsed.reduce(
+                (sum: number, item: any) => sum + (typeof item.quantity === "number" ? item.quantity : 1),
+                0
+              );
+            }
+          } catch (e) {
+            console.error("Error parsing product JSON in subscribeTableStatus:", e);
+          }
+        }
+
+        // occupied if itemCount > 0, otherwise reserved if raw.date is present, else vacant
+        let status: TableStatus["status"] = "vacant";
+        if (itemCount > 0) {
+          status = "occupied";
+        } else if (raw.date && raw.product === "[]") {
+          status = "reserved";
+        }
+
         return {
           id: d.id,
-          name: typeof raw.table_name === "string" ? raw.table_name : d.id,
+          name,
           status,
           itemCount,
         };
