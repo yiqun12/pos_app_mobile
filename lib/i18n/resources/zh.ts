@@ -370,10 +370,12 @@ const zh = {
     },
     "orderSummary": {
       "adjustment": "Adjustment",
+      "discount": "Disc.",
       "paid": "Paid",
       "remaining": "Remaining",
       "serviceFee": "Service Fee",
       "subtotal": "Subtotal",
+      "surcharge": "Surcharge!",
       "tax": "Tax ({{rate}}%)",
       "tip": "Tip",
       "title": "Title",

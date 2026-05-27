@@ -9,6 +9,8 @@ import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
 interface AdjustmentModalProps {
   visible: boolean;
   baseAmount?: number;
+  currentAmount?: number;
+  mode?: "adjustment" | "targetTotal";
   taxExempt?: boolean;
   onClose: () => void;
   onConfirm: (amount: number) => void;
@@ -18,12 +20,15 @@ interface AdjustmentModalProps {
 export function AdjustmentModal({
   visible,
   baseAmount = 0,
+  currentAmount,
+  mode = "adjustment",
   taxExempt = false,
   onClose,
   onConfirm,
   onTaxExemptChange,
 }: AdjustmentModalProps) {
   const [amount, setAmount] = useState("");
+  const [draftTaxExempt, setDraftTaxExempt] = useState(taxExempt);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const { t } = useTranslation();
@@ -31,7 +36,8 @@ export function AdjustmentModal({
   const handleConfirm = () => {
     const num = parseFloat(amount);
     if (!isNaN(num)) {
-      onConfirm(num);
+      onConfirm(mode === "targetTotal" ? num - baseAmount : num);
+      if (mode === "targetTotal") onTaxExemptChange?.(draftTaxExempt);
       onClose();
       setAmount("");
     }
@@ -39,15 +45,28 @@ export function AdjustmentModal({
 
   const applyPercentDiscount = (percent: number) => {
     if (baseAmount <= 0) return;
+    if (mode === "targetTotal") {
+      setAmount((baseAmount * (1 - percent)).toFixed(2));
+      return;
+    }
     setAmount((-(baseAmount * percent)).toFixed(2));
   };
+
+  const difference = mode === "targetTotal" && amount.length > 0
+    ? parseFloat(amount) - baseAmount
+    : 0;
+  const hasDifference = Number.isFinite(difference) && Math.abs(difference) >= 0.01;
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onShow={() => setAmount("")}
+      onShow={() => {
+        const targetAmount = currentAmount ?? baseAmount;
+        setAmount(mode === "targetTotal" && targetAmount > 0 ? targetAmount.toFixed(2) : "");
+        setDraftTaxExempt(taxExempt);
+      }}
     >
       <View className="flex-1 items-center justify-center bg-black/50 p-4">
         <View className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-slate-900">
@@ -61,18 +80,49 @@ export function AdjustmentModal({
           </View>
 
           <Text className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-            {t("seats.adjustment.subtitle")}
+            {mode === "targetTotal" ? "Enter the new subtotal before tax and service fee." : t("seats.adjustment.subtitle")}
           </Text>
+
+          {mode === "targetTotal" && (
+            <View className="mb-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+              <View className="mb-2 flex-row justify-between">
+                <Text className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  Original Total
+                </Text>
+                <Text className="text-base font-semibold text-slate-900 dark:text-white">
+                  ${baseAmount.toFixed(2)}
+                </Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                  New Total
+                </Text>
+                <Text className="text-base font-semibold text-purple-600">
+                  ${Number.isFinite(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : baseAmount.toFixed(2)}
+                </Text>
+              </View>
+              {hasDifference && (
+                <View className="mt-2 flex-row justify-between border-t border-slate-200 pt-2 dark:border-slate-700">
+                  <Text className={`text-sm font-semibold ${difference > 0 ? "text-green-600" : "text-red-600"}`}>
+                    {difference > 0 ? "Surcharge!" : "Discount"}
+                  </Text>
+                  <Text className={`text-sm font-semibold ${difference > 0 ? "text-green-600" : "text-red-600"}`}>
+                    {difference > 0 ? "+" : "-"}${Math.abs(difference).toFixed(2)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           <View className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800">
             <Text className="mb-1 text-xs font-semibold text-slate-500">
-              {t("seats.adjustment.amountLabel")}
+              {mode === "targetTotal" ? "New total" : t("seats.adjustment.amountLabel")}
             </Text>
             <TextInput
               value={amount}
               onChangeText={setAmount}
               keyboardType="numbers-and-punctuation"
-              placeholder={t("seats.adjustment.amountPlaceholder")}
+              placeholder={mode === "targetTotal" ? "Enter new total price" : t("seats.adjustment.amountPlaceholder")}
               placeholderTextColor="#94a3b8"
               className="text-2xl font-bold text-slate-900 dark:text-white"
               autoFocus
@@ -95,17 +145,20 @@ export function AdjustmentModal({
 
           {onTaxExemptChange && (
             <TouchableOpacity
-              onPress={() => onTaxExemptChange(!taxExempt)}
+              onPress={() => {
+                if (mode === "targetTotal") setDraftTaxExempt((enabled) => !enabled);
+                else onTaxExemptChange(!taxExempt);
+              }}
               className={`mb-6 rounded-lg px-4 py-3 ${
-                taxExempt ? "bg-blue-600" : "bg-slate-100 dark:bg-slate-800"
+                (mode === "targetTotal" ? draftTaxExempt : taxExempt) ? "bg-blue-600" : "bg-slate-100 dark:bg-slate-800"
               }`}
             >
               <Text
                 className={`text-center font-semibold ${
-                  taxExempt ? "text-white" : "text-slate-700 dark:text-slate-300"
+                  (mode === "targetTotal" ? draftTaxExempt : taxExempt) ? "text-white" : "text-slate-700 dark:text-slate-300"
                 }`}
               >
-                Tax Exempt {taxExempt ? "On" : "Off"}
+                {(mode === "targetTotal" ? draftTaxExempt : taxExempt) ? "✓ Tax Exempt" : "Tax Exempt"}
               </Text>
             </TouchableOpacity>
           )}

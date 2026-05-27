@@ -33,6 +33,22 @@ export type OrderTotals = {
   total: number;
 };
 
+export type WebOrderTotalsInput = {
+  itemsSubtotal: number;
+  taxRate: number;
+  discount?: number;
+  serviceFee?: number;
+  surcharge?: number;
+  tip?: number;
+  taxExempt?: boolean;
+};
+
+export type WebOrderTotals = OrderTotals & {
+  taxExemptDiscount: number;
+  totalDiscount: number;
+  surcharge: number;
+};
+
 export function cleanProductData<T extends Record<string, any>>(products: T[] | null | undefined): T[] {
   if (!Array.isArray(products)) return [];
 
@@ -167,6 +183,31 @@ export function calculateOrderTotals(input: OrderTotalsInput): OrderTotals {
     serviceFee,
     tip,
     total: roundMoney(taxableSubtotal + tax + serviceFee + tip),
+  };
+}
+
+export function calculateWebOrderTotals(input: WebOrderTotalsInput): WebOrderTotals {
+  const subtotal = roundMoney(input.itemsSubtotal);
+  const surcharge = roundMoney(Math.max(0, input.surcharge ?? 0));
+  const discount = roundMoney(Math.max(0, input.discount ?? 0));
+  const taxableSubtotal = roundMoney(subtotal + surcharge);
+  const tax = roundMoney(taxableSubtotal * (input.taxRate / 100));
+  const taxExemptDiscount = input.taxExempt ? tax : 0;
+  const totalDiscount = roundMoney(discount + taxExemptDiscount);
+  const serviceFee = roundMoney(Math.max(0, input.serviceFee ?? 0));
+  const tip = roundMoney(Math.max(0, input.tip ?? 0));
+
+  return {
+    subtotal,
+    discount,
+    taxableSubtotal,
+    tax,
+    serviceFee,
+    tip,
+    taxExemptDiscount,
+    totalDiscount,
+    surcharge,
+    total: roundMoney(taxableSubtotal + tax + serviceFee + tip - totalDiscount),
   };
 }
 

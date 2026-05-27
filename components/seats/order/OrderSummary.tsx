@@ -57,15 +57,6 @@ export function OrderSummary({ order }: OrderSummaryProps) {
         value={`$${order.taxAmount.toFixed(2)}`}
       />
 
-      <View className="flex-row justify-between py-1">
-        <Text className="text-base font-medium text-slate-700 dark:text-slate-300">
-          {t("seats.orderSummary.tip")}
-        </Text>
-        <Text className="text-base font-medium text-orange-500">
-          {t("common.edit")}
-        </Text>
-      </View>
-
       {order.serviceFee > 0 && (
         <SummaryRow
           label={t("seats.orderSummary.serviceFee")}
@@ -73,11 +64,18 @@ export function OrderSummary({ order }: OrderSummaryProps) {
         />
       )}
 
-      {order.manualAdjustment !== 0 && (
+      {(order.surcharge ?? 0) > 0 && (
         <SummaryRow
-          label={t("seats.orderSummary.adjustment")}
-          value={`${order.manualAdjustment > 0 ? "+" : ""}$${order.manualAdjustment.toFixed(2)}`}
-          isNegative={order.manualAdjustment < 0}
+          label={t("seats.orderSummary.surcharge")}
+          value={`+$${(order.surcharge ?? 0).toFixed(2)}`}
+        />
+      )}
+
+      {(order.discount ?? (order.manualAdjustment < 0 ? Math.abs(order.manualAdjustment) : 0)) > 0 && (
+        <SummaryRow
+          label={t("seats.orderSummary.discount")}
+          value={`-$${(order.discount ?? Math.abs(order.manualAdjustment)).toFixed(2)}`}
+          isNegative
         />
       )}
 

@@ -53,10 +53,14 @@ export type Order = {
   seatId: string;
   items: OrderItem[];
   subtotal: number;
+  taxableSubtotal?: number;
   taxRate: number;
   taxAmount: number;
   serviceFee: number;
   manualAdjustment: number;
+  discount?: number;
+  surcharge?: number;
+  taxExempt?: boolean;
   total: number;
   status: OrderStatus;
   paidAmount: number;

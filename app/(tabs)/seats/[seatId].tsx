@@ -2,6 +2,7 @@ import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal"
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
 import { PriceEditModal } from "@/components/seats/modals/PriceEditModal";
+import { ServiceFeeModal } from "@/components/seats/modals/ServiceFeeModal";
 import { OrderItemRow } from "@/components/seats/order/OrderItemRow";
 import { OrderSummary } from "@/components/seats/order/OrderSummary";
 import { Order, OrderItem } from "@/components/seats/types";
@@ -19,7 +20,7 @@ import { useStoreSelection } from "@/context/store";
 import { useStore } from "@/hooks/firestore/useStore";
 import { db, functions } from "@/lib/firebase";
 import {
-  calculateOrderTotals,
+  calculateWebOrderTotals,
   cartItemSignature,
   cleanProductData,
   createWebCartItem,
@@ -44,7 +45,7 @@ export default function SeatScreen() {
   const [rawProducts, setRawProducts] = useState<any[]>([]);
   const [sentProducts, setSentProducts] = useState<any[]>([]);
   const [terminals, setTerminals] = useState<any[]>([]);
-  const [serviceFeeEnabled, setServiceFeeEnabled] = useState(false);
+  const [serviceFeeAmount, setServiceFeeAmount] = useState(0);
   const [manualAdjustment, setManualAdjustment] = useState(0);
   const [tipAmount, setTipAmount] = useState(0);
   const [taxExempt, setTaxExempt] = useState(false);
@@ -53,6 +54,7 @@ export default function SeatScreen() {
   const [priceEditItem, setPriceEditItem] = useState<OrderItem | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
+  const [serviceFeeModalVisible, setServiceFeeModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
 
   // Find the tableName matching the seatId
@@ -82,7 +84,7 @@ export default function SeatScreen() {
                 setManualAdjustment(0);
                 setTipAmount(0);
                 setTaxExempt(false);
-                setServiceFeeEnabled(false);
+                setServiceFeeAmount(0);
               }
               
               const uiItems: OrderItem[] = parsed.map((item: any) => {
@@ -117,7 +119,7 @@ export default function SeatScreen() {
       setManualAdjustment(0);
       setTipAmount(0);
       setTaxExempt(false);
-      setServiceFeeEnabled(false);
+      setServiceFeeAmount(0);
     }, (error) => {
       console.error("Error listening to table updates:", error);
     });
@@ -206,7 +208,7 @@ export default function SeatScreen() {
   const writeCashSuccessPayment = async (amount: number, currentOrder: Order) => {
     if (!user || !currentStoreId || !store || !tableName) return;
     const dateStr = formatWebDate();
-    const discount = manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0;
+    const discount = currentOrder.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0);
     const paymentRatio = currentOrder.total > 0 ? Math.min(1, amount / currentOrder.total) : 1;
 
     await addDoc(
@@ -238,7 +240,7 @@ export default function SeatScreen() {
           discount: Number((discount * paymentRatio).toFixed(2)),
           isDine: true,
           service_fee: Number((currentOrder.serviceFee * paymentRatio).toFixed(2)),
-          subtotal: Number((currentOrder.subtotal * paymentRatio).toFixed(2)),
+          subtotal: Number(((currentOrder.taxableSubtotal ?? currentOrder.subtotal) * paymentRatio).toFixed(2)),
           tax: Number((currentOrder.taxAmount * paymentRatio).toFixed(2)),
           tips: Number((tipAmount * paymentRatio).toFixed(2)),
           total: Number(amount.toFixed(2)),
@@ -279,7 +281,7 @@ export default function SeatScreen() {
   const writeUnpaidSuccessPayment = async (currentOrder: Order) => {
     if (!user || !currentStoreId || !store || !tableName) return;
     const dateStr = formatWebDate();
-    const discount = manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0;
+    const discount = currentOrder.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0);
 
     await addDoc(
       collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment"),
@@ -310,7 +312,7 @@ export default function SeatScreen() {
           discount,
           isDine: true,
           service_fee: currentOrder.serviceFee,
-          subtotal: currentOrder.subtotal,
+          subtotal: currentOrder.taxableSubtotal ?? currentOrder.subtotal,
           tax: currentOrder.taxAmount,
           tips: tipAmount,
           total: currentOrder.total,
@@ -383,7 +385,7 @@ export default function SeatScreen() {
         date,
         data: cleanedAdded,
         selectedTable: tableName,
-        discount: manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0,
+        discount: order.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0),
         service_fee: order.serviceFee,
         total: order.total,
       }));
@@ -412,7 +414,7 @@ export default function SeatScreen() {
       date,
       data,
       selectedTable: tableName,
-      discount: manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0,
+      discount: order.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0),
       service_fee: order.serviceFee,
       total: order.total,
     };
@@ -448,7 +450,7 @@ export default function SeatScreen() {
 
     const createPaymentIntent = httpsCallable(functions, "createPaymentIntent");
     const processPayment = httpsCallable(functions, "processPayment");
-    const discount = manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0;
+    const discount = order.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0);
     const intentResponse: any = await createPaymentIntent({
       amount: Math.round(amount * 100),
       connected_stripe_account_id: store.stripeStoreAcct,
@@ -476,7 +478,7 @@ export default function SeatScreen() {
     if (modalName === "menu") setMenuModalVisible(true);
     else if (modalName === "adjustment") setAdjustmentModalVisible(true);
     else if (modalName === "payment") setPaymentModalVisible(true);
-    else if (modalName === "serviceFee") setServiceFeeEnabled(true);
+    else if (modalName === "serviceFee") setServiceFeeModalVisible(true);
     else if (modalName === "printOrder") {
       void handlePrint("order");
     } else if (modalName === "printReceipt") {
@@ -490,30 +492,34 @@ export default function SeatScreen() {
       0
     );
     const taxRate = store?.taxRate ?? 0;
-    const serviceFee = serviceFeeEnabled ? itemsSubtotal * 0.18 : 0;
-    const totals = calculateOrderTotals({
+    const discount = manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0;
+    const surcharge = manualAdjustment > 0 ? manualAdjustment : 0;
+    const totals = calculateWebOrderTotals({
       itemsSubtotal,
       taxRate,
-      discount: manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0,
-      serviceFee,
+      discount,
+      surcharge,
+      serviceFee: serviceFeeAmount,
       tip: tipAmount,
       taxExempt,
     });
-    const positiveAdjustment = manualAdjustment > 0 ? manualAdjustment : 0;
-    const total = totals.total + positiveAdjustment;
 
     return {
       id: `ORD-${seatId}-${Date.now()}`,
       seatId: seatId!,
       items,
       subtotal: totals.subtotal,
+      taxableSubtotal: totals.taxableSubtotal,
       taxRate: taxRate / 100,
       taxAmount: totals.tax,
       serviceFee: totals.serviceFee,
       manualAdjustment,
-      total,
+      discount: totals.totalDiscount,
+      surcharge: totals.surcharge,
+      taxExempt,
+      total: totals.total,
       status:
-        paidAmount >= total
+        paidAmount >= totals.total
           ? "paid"
           : paidAmount > 0
             ? "partially_paid"
@@ -521,7 +527,7 @@ export default function SeatScreen() {
       paidAmount,
       createdAt: Date.now(),
     };
-  }, [items, serviceFeeEnabled, manualAdjustment, paidAmount, seatId, store?.taxRate, taxExempt, tipAmount]);
+  }, [items, serviceFeeAmount, manualAdjustment, paidAmount, seatId, store?.taxRate, taxExempt, tipAmount]);
 
   const handleAddItem = (orderItem: OrderItem) => {
     const menuItems = store?.menu?.items || [];
@@ -614,7 +620,7 @@ export default function SeatScreen() {
           setManualAdjustment(0);
           setTipAmount(0);
           setTaxExempt(false);
-          setServiceFeeEnabled(false);
+          setServiceFeeAmount(0);
         } else {
           setPaidAmount(nextPaidAmount);
         }
@@ -658,6 +664,8 @@ export default function SeatScreen() {
       setPaidAmount(0);
       setManualAdjustment(0);
       setTipAmount(0);
+      setTaxExempt(false);
+      setServiceFeeAmount(0);
       Alert.alert("Unpaid", "Order marked as unpaid and table cleared.");
     } catch (e) {
       console.error("Error marking order unpaid:", e);
@@ -771,10 +779,10 @@ export default function SeatScreen() {
             <View className="mt-6 flex-row gap-3">
               <View className="flex-1">
                 <Button
-                  label="Service Fee"
-                  variant={serviceFeeEnabled ? "primary" : "outline"}
+                  label={serviceFeeAmount > 0 ? `Service Fee $${serviceFeeAmount.toFixed(2)}` : "Service Fee"}
+                  variant={serviceFeeAmount > 0 ? "primary" : "outline"}
                   icon="receipt"
-                  onPress={() => setServiceFeeEnabled((enabled) => !enabled)}
+                  onPress={() => setServiceFeeModalVisible(true)}
                 />
               </View>
               <View className="flex-1">
@@ -842,10 +850,20 @@ export default function SeatScreen() {
       <AdjustmentModal
         visible={adjustmentModalVisible}
         baseAmount={items.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+        currentAmount={items.reduce((sum, item) => sum + item.price * item.quantity, 0) + manualAdjustment}
+        mode="targetTotal"
         taxExempt={taxExempt}
         onClose={() => setAdjustmentModalVisible(false)}
         onConfirm={setManualAdjustment}
         onTaxExemptChange={setTaxExempt}
+      />
+
+      <ServiceFeeModal
+        visible={serviceFeeModalVisible}
+        baseAmount={items.reduce((sum, item) => sum + item.price * item.quantity, 0) + Math.max(0, manualAdjustment)}
+        currentAmount={serviceFeeAmount}
+        onClose={() => setServiceFeeModalVisible(false)}
+        onConfirm={setServiceFeeAmount}
       />
 
       <MenuSelectionModal
