@@ -29,24 +29,13 @@ export function MenuSelectionModal({
   onClose,
   onSelect,
 }: MenuSelectionModalProps) {
-  const { categories: ctxCategories, items: ctxItems, error } = useMenu();
+  const {
+    categories,
+    items,
+    loading,
+    error,
+  } = useMenu();
   const { t } = useTranslation();
-  
-  // 🌟 强行植入的假数据
-  const mockCategories = [
-    { id: "cat-1", name: "🥩 Steak Cuts" },
-    { id: "cat-2", name: "🍕 Pizza" }
-  ];
-  const mockItems: MenuItem[] = [
-    { id: "item-1", categoryId: "cat-1", name: "Filet Mignon", price: 45.99 },
-    { id: "item-2", categoryId: "cat-1", name: "Rib Eye Steak", price: 52.99 },
-    { id: "item-3", categoryId: "cat-2", name: "Margherita Pizza", price: 16.99 }
-  ];
-
-  // 如果管家没给数据，就用我们的假数据
-  const categories = ctxCategories?.length ? ctxCategories : mockCategories;
-  const items = ctxItems?.length ? ctxItems : mockItems;
-  const loading = false; // 🛑 强行叫停转圈圈！
   
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
@@ -82,9 +71,14 @@ export function MenuSelectionModal({
       // No options, add directly
       const orderItem: OrderItem = {
         id: `item-${Date.now()}`,
+        menuItemId: item.id,
         name: item.name,
+        rawName: item.rawName,
+        nameCN: item.nameCN,
         price: item.price,
         quantity: 1,
+        imageUrl: item.imageUrl,
+        attributesArr: item.attributesArr,
       };
       onSelect(orderItem);
       onClose();
@@ -120,9 +114,14 @@ export function MenuSelectionModal({
     // Create order item with selections
     const orderItem: OrderItem = {
       id: `item-${Date.now()}`,
+      menuItemId: selectedMenuItem.id,
       name: selectedMenuItem.name,
+      rawName: selectedMenuItem.rawName,
+      nameCN: selectedMenuItem.nameCN,
       price: selectedMenuItem.price + priceAdjustment,
       quantity: 1,
+      imageUrl: selectedMenuItem.imageUrl,
+      attributesArr: selectedMenuItem.attributesArr,
       selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
       selectedIngredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
       selectedGlobalCustomizations: selectedGlobalCustomizations && selectedGlobalCustomizations.length > 0 

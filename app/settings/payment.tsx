@@ -2,41 +2,73 @@ import { SettingsItem } from "@/components/profile";
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
+import { useStoreSelection } from "@/context/store";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useStore } from "@/hooks/firestore/useStore";
+import { db, functions } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { collection, onSnapshot } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
 export default function PaymentSettingsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { currentStoreId } = useStoreSelection();
+  const { data: store } = useStore();
 
-  const [isStripeConnected, setIsStripeConnected] = useState(false);
+  const isStripeConnected = Boolean(store?.stripeStoreAcct);
   const [connecting, setConnecting] = useState(false);
-  const [terminals, setTerminals] = useState([
-    { id: "tm_1", name: "Counter iPad", status: "online" },
-    { id: "tm_2", name: "Mobile Reader 1", status: "offline" },
-  ]);
+  const [terminals, setTerminals] = useState<any[]>([]);
 
   // Preferences
   const [allowTipping, setAllowTipping] = useState(true);
   const [printReceipts, setPrintReceipts] = useState(false);
   const [splitPayments, setSplitPayments] = useState(true);
 
+  useEffect(() => {
+    if (!user || !currentStoreId) {
+      setTerminals([]);
+      return;
+    }
+
+    const terminalsRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "terminals");
+    const unsubscribe = onSnapshot(terminalsRef, (snapshot) => {
+      const nextTerminals = snapshot.docs
+        .map((terminal) => ({ id: terminal.id, ...terminal.data() }))
+        .sort((a: any, b: any) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
+      setTerminals(nextTerminals);
+    }, (error) => {
+      console.error("Error loading terminals:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user, currentStoreId]);
+
   const handleConnectStripe = () => {
+    if (!user || !currentStoreId) return;
     setConnecting(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsStripeConnected(true);
-      setConnecting(false);
-      Alert.alert(
-        t("common.success"),
-        t("settings.payment.stripeConnected")
-      );
-    }, 2000);
+    const createStripeLink = httpsCallable(functions, "createStripeLink");
+    createStripeLink({ store: currentStoreId, userID: user.uid })
+      .then(async (result: any) => {
+        const url = result.data?.url;
+        if (!url) throw new Error("createStripeLink did not return a URL");
+        await WebBrowser.openBrowserAsync(url);
+      })
+      .catch((error) => {
+        console.error("Error creating Stripe link:", error);
+        Alert.alert(t("common.error"), "Failed to create Stripe onboarding link");
+      })
+      .finally(() => {
+        setConnecting(false);
+      });
   };
 
   const handleDisconnectStripe = () => {
@@ -49,7 +81,7 @@ export default function PaymentSettingsScreen() {
           text: t("settings.payment.disconnectButton"),
           style: "destructive",
           onPress: () => {
-            setIsStripeConnected(false);
+            Alert.alert(t("settings.payment.disconnectTitle"), "Disconnecting Stripe must be done from the Stripe dashboard.");
           },
         },
       ]
@@ -130,6 +162,13 @@ export default function PaymentSettingsScreen() {
                 {t("settings.payment.terminals")}
               </Text>
               <View className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                {terminals.length === 0 && (
+                  <View className="p-4">
+                    <Text className="text-sm text-slate-500 dark:text-slate-400">
+                      No terminals registered for this store.
+                    </Text>
+                  </View>
+                )}
                 {terminals.map((terminal, index) => (
                   <View
                     key={terminal.id}
@@ -149,7 +188,7 @@ export default function PaymentSettingsScreen() {
                       </View>
                       <View>
                         <Text className="font-semibold text-slate-900 dark:text-white">
-                          {terminal.name}
+                          {terminal.name ?? terminal.label ?? "Stripe Terminal"}
                         </Text>
                         <Text className="text-xs text-slate-500 dark:text-slate-400">
                           {t("settings.payment.idPrefix")} {terminal.id}
@@ -159,13 +198,13 @@ export default function PaymentSettingsScreen() {
                     <View className="flex-row items-center gap-2">
                       <View
                         className={`h-2.5 w-2.5 rounded-full ${
-                          terminal.status === "online"
+                          terminal.status === "online" || terminal.status === "active"
                             ? "bg-green-500"
                             : "bg-slate-300 dark:bg-slate-600"
                         }`}
                       />
                       <Text className="text-sm text-slate-500 dark:text-slate-400">
-                        {terminal.status === "online"
+                        {terminal.status === "online" || terminal.status === "active"
                           ? t("settings.payment.online")
                           : t("settings.payment.offline")}
                       </Text>

@@ -45,9 +45,28 @@ export interface MenuItem {
   id: string;
   categoryId: string;
   name: string;
+  rawName?: string;
+  nameCN?: string;
+  categoryName?: string;
+  categoryNameCN?: string;
   price: number;
   imageUrl?: string;
   description?: string;
+  attributesArr?: Record<
+    string,
+    {
+      isSingleSelected?: boolean;
+      variations?: { type?: string; price?: number | string }[];
+    }
+  >;
+  optionGroups?: {
+    id: string;
+    name: string;
+    type: "single" | "multi";
+    required: boolean;
+    choices: { id: string; name: string; priceAdjustment?: number }[];
+  }[];
+  ingredients?: { id: string; name: string; priceAdjustment?: number }[];
 }
 
 export interface Menu {
@@ -77,6 +96,7 @@ export interface Store {
   globalModifications: GlobalModification[];
   dailyPayout: boolean;
   storeOwnerId?: string;
+  stripeStoreAcct?: string;
 }
 
 export interface PendingOrder {

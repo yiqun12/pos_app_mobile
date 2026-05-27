@@ -1,4 +1,5 @@
 import { db } from "@/lib/firebase";
+import { transformWebMenuItem } from "@/lib/pos/menuTransforms";
 import { collection, doc, onSnapshot, type Unsubscribe } from "firebase/firestore";
 import { storeListPath, storePath } from "../paths";
 import type {
@@ -94,6 +95,7 @@ function transformStore(id: string, raw: RawStoreDoc): Store {
     ),
     dailyPayout: raw.dailyPayout ?? false,
     storeOwnerId: raw.storeOwnerId,
+    stripeStoreAcct: raw.stripe_store_acct,
   };
 }
 
@@ -150,21 +152,7 @@ function transformMenu(raw: any): Menu {
       categoryIds.add(catId);
     }
 
-    const priceVal = m.price ?? m.subtotal;
-    const price = typeof priceVal === "number" ? priceVal : parseNumericField(priceVal, 0);
-
-    const displayName = m.CHI && m.CHI !== m.name 
-      ? `${m.name} / ${m.CHI}` 
-      : (m.name ?? "Untitled");
-
-    return {
-      id: m.id ?? `item-${i}`,
-      categoryId: catId,
-      name: displayName,
-      price,
-      imageUrl: m.imageUrl ?? m.image,
-      description: m.description,
-    };
+    return transformWebMenuItem(m, i);
   });
 
   return { categories, items };

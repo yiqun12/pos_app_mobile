@@ -51,7 +51,9 @@ export function OrderSummary({ order }: OrderSummaryProps) {
       />
 
       <SummaryRow
-        label={t("seats.orderSummary.tax", { rate: "8.625" })}
+        label={t("seats.orderSummary.tax", {
+          rate: (order.taxRate * 100).toFixed(3).replace(/\.?0+$/, ""),
+        })}
         value={`$${order.taxAmount.toFixed(2)}`}
       />
 

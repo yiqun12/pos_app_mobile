@@ -17,9 +17,22 @@ export type SelectedGlobalCustomization = {
 
 export type OrderItem = {
   id: string;
+  menuItemId?: string;
   name: string;
+  rawName?: string;
+  nameCN?: string;
   price: number;
   quantity: number;
+  count?: number;
+  imageUrl?: string;
+  attributesArr?: Record<
+    string,
+    {
+      isSingleSelected?: boolean;
+      variations?: { type?: string; price?: number | string }[];
+    }
+  >;
+  attributeSelected?: Record<string, string | string[]>;
   notes?: string;
   originalPrice?: number; // In case of manual override
   selectedOptions?: SelectedOption[]; // User-selected options

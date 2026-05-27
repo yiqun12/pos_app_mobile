@@ -18,13 +18,30 @@ export type Ingredient = {
   priceAdjustment?: number; // Additional cost for this ingredient
 };
 
+export type WebAttributeVariation = {
+  type?: string;
+  price?: number | string;
+};
+
+export type WebAttributeGroup = {
+  isSingleSelected?: boolean;
+  variations?: WebAttributeVariation[];
+};
+
+export type WebAttributesArr = Record<string, WebAttributeGroup>;
+
 export type MenuItem = {
   id: string;
   categoryId: string;
   name: string;
+  rawName?: string;
+  nameCN?: string;
+  categoryName?: string;
+  categoryNameCN?: string;
   price: number;
   imageUrl?: string;
   description?: string;
+  attributesArr?: WebAttributesArr; // Raw Web POS attributes, kept for compatible cart writes
   optionGroups?: OptionGroup[]; // Customizable options
   ingredients?: Ingredient[]; // Optional add-ons/ingredients
 };

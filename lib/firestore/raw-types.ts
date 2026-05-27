@@ -20,6 +20,7 @@ export interface RawStoreDoc {
   TaxRate?: string; // numeric string
   dailyPayout?: boolean;
   storeOwnerId?: string;
+  stripe_store_acct?: string;
 }
 
 export interface RawOpenHours {
@@ -62,12 +63,16 @@ export interface RawMenuCategory {
 export interface RawMenuItem {
   id?: string;
   name?: string;
+  CHI?: string;
   price?: number | string;
+  subtotal?: number | string;
   category?: string;
+  categoryCHI?: string;
   categoryId?: string;
   image?: string;
   imageUrl?: string;
   description?: string;
+  attributesArr?: unknown;
   attributes?: unknown[]; // option groups
   attributes2?: unknown[]; // ingredients
   [k: string]: unknown;

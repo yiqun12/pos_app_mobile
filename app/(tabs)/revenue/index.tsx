@@ -13,7 +13,13 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/auth";
 import { useStoreSelection } from "@/context/store";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  parseReceiptItems,
+  summarizeCashDrawer,
+  summarizeItemSales,
+  transformSuccessPaymentSummary,
+} from "@/lib/pos/revenueTransforms";
+import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import {
   Alert,
   RefreshControl,
@@ -36,6 +42,7 @@ type Order = {
   gratuity?: number;
   total?: number;
   dateTime?: string;
+  receiptData?: string;
 };
 
 type OrderItem = {
@@ -56,25 +63,6 @@ function parseDateToFirestoreString(dateStr: string, isEnd: boolean): string {
     return `${year}-${month}-${day}-23-59-59-99`;
   } else {
     return `${year}-${month}-${day}-00-00-00-00`;
-  }
-}
-
-function parseTimeToDisplay(dateTimeStr: string): string {
-  if (!dateTimeStr) return "";
-  const parts = dateTimeStr.split("-");
-  if (parts.length < 6) return dateTimeStr;
-  try {
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    const hour = parseInt(parts[3], 10);
-    const min = parseInt(parts[4], 10);
-    const sec = parseInt(parts[5], 10);
-    
-    const date = new Date(Date.UTC(year, month, day, hour, min, sec));
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return dateTimeStr;
   }
 }
 
@@ -185,69 +173,15 @@ export default function RevenueScreen() {
     const q = query(
       colRef,
       where("dateTime", ">=", startStr),
-      where("dateTime", "<=", endStr)
+      where("dateTime", "<=", endStr),
+      orderBy("dateTime", "desc"),
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetched: Order[] = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
-        const meta = data.metadata || {};
-        
-        const subtotal = typeof meta.subtotal === "number" ? meta.subtotal : parseFloat(meta.subtotal || "0");
-        const tax = typeof meta.tax === "number" ? meta.tax : parseFloat(meta.tax || "0");
-        const gratuity = typeof meta.tips === "number" ? meta.tips : parseFloat(meta.tips || "0");
-        const serviceFee = typeof meta.service_fee === "number" ? meta.service_fee : parseFloat(meta.service_fee || "0");
-        const totalVal = typeof meta.total === "number" ? meta.total : parseFloat(meta.total || "0");
-        const amount = typeof data.amount === "number" ? data.amount / 100 : totalVal;
-
-        let parsedItems: OrderItem[] = [];
-        if (data.receiptData) {
-          try {
-            const rawItems = JSON.parse(data.receiptData);
-            if (Array.isArray(rawItems)) {
-              parsedItems = rawItems.map((ri: any) => {
-                const riSubtotal = ri.subtotal ?? ri.price;
-                const riPrice = typeof riSubtotal === "number" ? riSubtotal : parseFloat(riSubtotal || "0");
-                return {
-                  name: ri.name || "Untitled",
-                  quantity: typeof ri.quantity === "number" ? ri.quantity : 1,
-                  price: riPrice,
-                  total: ri.itemTotalPrice ? parseFloat(ri.itemTotalPrice) : (riPrice * (ri.quantity || 1)),
-                };
-              });
-            }
-          } catch (e) {
-            console.error("Error parsing receiptData:", e);
-          }
-        }
-
-        const channel = data.powerBy || (meta.isDine ? "Dine-In" : "TakeOut");
-        const guest = meta.isDine && data.tableNum ? `Table ${data.tableNum}` : "TakeOut";
-
-        return {
-          id: docSnap.id,
-          guest,
-          time: parseTimeToDisplay(data.dateTime || ""),
-          amount,
-          channel,
-          items: parsedItems,
-          subtotal,
-          serviceFee,
-          tax,
-          gratuity,
-          total: totalVal,
-          dateTime: data.dateTime || "",
-        };
-      });
-
-      // Sort by dateTime descending, fallback to doc id descending
-      fetched.sort((a, b) => {
-        const dateTimeA = a.dateTime || "";
-        const dateTimeB = b.dateTime || "";
-        if (dateTimeA && dateTimeB) {
-          return dateTimeB.localeCompare(dateTimeA);
-        }
-        return b.id.localeCompare(a.id);
+        return transformSuccessPaymentSummary(docSnap.id, data);
       });
 
       setOrders(fetched);
@@ -280,6 +214,8 @@ export default function RevenueScreen() {
   }, [orders]);
 
   const total = stats.totalRevenue;
+  const cashDrawerSummary = useMemo(() => summarizeCashDrawer(orders as any), [orders]);
+  const itemSales = useMemo(() => summarizeItemSales(orders as any).slice(0, 20), [orders]);
 
   const handlePreset = (label: string) => {
     const preset = PRESETS.find((p) => p.label === label);
@@ -296,7 +232,10 @@ export default function RevenueScreen() {
   };
 
   const handleOrderPress = (order: Order) => {
-    setSelectedOrder(order);
+    setSelectedOrder({
+      ...order,
+      items: order.items ?? parseReceiptItems(order.receiptData),
+    });
     setOrderModalVisible(true);
   };
 
@@ -307,13 +246,19 @@ export default function RevenueScreen() {
       if (orderId) {
         const targetOrder = orders.find((o) => o.id === orderId);
         if (targetOrder) {
-          setSelectedOrder(targetOrder);
+          setSelectedOrder({
+            ...targetOrder,
+            items: targetOrder.items ?? parseReceiptItems(targetOrder.receiptData),
+          });
           setOrderModalVisible(true);
         } else {
           Alert.alert(t("common.error"), t("revenue.orderNotFound", { orderId }));
         }
       } else if (orders.length > 0) {
-        setSelectedOrder(orders[0]);
+        setSelectedOrder({
+          ...orders[0],
+          items: orders[0].items ?? parseReceiptItems(orders[0].receiptData),
+        });
         setOrderModalVisible(true);
       }
     }
@@ -435,23 +380,71 @@ export default function RevenueScreen() {
 
         {activeTab === tabs[1] && (
           <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <Text className="mb-1 text-base font-semibold text-slate-900 dark:text-white">
+            <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.cashDrawer")}
             </Text>
-            <Text className="text-sm text-slate-500 dark:text-slate-400">
-              {t("revenue.cashDrawerPlaceholder")}
-            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              {[
+                ["Orders", cashDrawerSummary.orderCount.toString()],
+                ["Cash", `$${cashDrawerSummary.cashSales.toFixed(2)}`],
+                ["Card", `$${cashDrawerSummary.cardSales.toFixed(2)}`],
+                ["Unpaid", `$${cashDrawerSummary.unpaid.toFixed(2)}`],
+                ["Other", `$${cashDrawerSummary.otherSales.toFixed(2)}`],
+                ["Avg", `$${cashDrawerSummary.averageOrder.toFixed(2)}`],
+              ].map(([label, value]) => (
+                <View
+                  key={label}
+                  className="min-w-[45%] flex-1 rounded-lg bg-slate-50 p-3 dark:bg-slate-800"
+                >
+                  <Text className="text-xs font-semibold uppercase text-slate-500">
+                    {label}
+                  </Text>
+                  <Text className="mt-1 text-lg font-bold text-slate-900 dark:text-white">
+                    {value}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
         {activeTab === tabs[2] && (
           <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <Text className="mb-1 text-base font-semibold text-slate-900 dark:text-white">
+            <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.salesAnalysis")}
             </Text>
-            <Text className="text-sm text-slate-500 dark:text-slate-400">
-              {t("revenue.salesAnalysisPlaceholder")}
-            </Text>
+            {itemSales.length === 0 ? (
+              <Text className="text-sm text-slate-500 dark:text-slate-400">
+                {t("revenue.salesAnalysisPlaceholder")}
+              </Text>
+            ) : (
+              <View>
+                <View className="mb-2 flex-row border-b border-slate-100 pb-2 dark:border-slate-800">
+                  <Text className="flex-1 text-xs font-bold uppercase text-slate-500">Item</Text>
+                  <Text className="w-16 text-right text-xs font-bold uppercase text-slate-500">Qty</Text>
+                  <Text className="w-24 text-right text-xs font-bold uppercase text-slate-500">Revenue</Text>
+                </View>
+                {itemSales.map((item) => (
+                  <View
+                    key={item.name}
+                    className="flex-row border-b border-slate-100 py-2 dark:border-slate-800"
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className="flex-1 font-medium text-slate-900 dark:text-white"
+                    >
+                      {item.name}
+                    </Text>
+                    <Text className="w-16 text-right text-slate-600 dark:text-slate-300">
+                      {item.quantity}
+                    </Text>
+                    <Text className="w-24 text-right font-semibold text-slate-900 dark:text-white">
+                      ${item.revenue.toFixed(2)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>

@@ -8,14 +8,20 @@ import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface AdjustmentModalProps {
   visible: boolean;
+  baseAmount?: number;
+  taxExempt?: boolean;
   onClose: () => void;
   onConfirm: (amount: number) => void;
+  onTaxExemptChange?: (enabled: boolean) => void;
 }
 
 export function AdjustmentModal({
   visible,
+  baseAmount = 0,
+  taxExempt = false,
   onClose,
   onConfirm,
+  onTaxExemptChange,
 }: AdjustmentModalProps) {
   const [amount, setAmount] = useState("");
   const colorScheme = useColorScheme();
@@ -29,6 +35,11 @@ export function AdjustmentModal({
       onClose();
       setAmount("");
     }
+  };
+
+  const applyPercentDiscount = (percent: number) => {
+    if (baseAmount <= 0) return;
+    setAmount((-(baseAmount * percent)).toFixed(2));
   };
 
   return (
@@ -67,6 +78,37 @@ export function AdjustmentModal({
               autoFocus
             />
           </View>
+
+          <View className="mb-4 flex-row gap-2">
+            {[0.05, 0.15, 0.25].map((percent) => (
+              <TouchableOpacity
+                key={percent}
+                onPress={() => applyPercentDiscount(percent)}
+                className="flex-1 rounded-lg bg-orange-50 px-3 py-2 dark:bg-orange-900/20"
+              >
+                <Text className="text-center font-semibold text-orange-700 dark:text-orange-300">
+                  {(percent * 100).toFixed(0)}% off
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {onTaxExemptChange && (
+            <TouchableOpacity
+              onPress={() => onTaxExemptChange(!taxExempt)}
+              className={`mb-6 rounded-lg px-4 py-3 ${
+                taxExempt ? "bg-blue-600" : "bg-slate-100 dark:bg-slate-800"
+              }`}
+            >
+              <Text
+                className={`text-center font-semibold ${
+                  taxExempt ? "text-white" : "text-slate-700 dark:text-slate-300"
+                }`}
+              >
+                Tax Exempt {taxExempt ? "On" : "Off"}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <View className="flex-row gap-3">
             <View className="flex-1">
