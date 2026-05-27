@@ -3,7 +3,7 @@ import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 type ColorMode = (typeof Colors)["light"];
 
@@ -32,14 +32,22 @@ type OrdersListProps = {
   orders: Order[];
   total: string;
   colors: ColorMode;
+  loading?: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
   onOrderPress: (order: Order) => void;
+  onLoadMore?: () => void;
 };
 
 export function OrdersList({
   orders,
   total,
   colors,
+  loading = false,
+  loadingMore = false,
+  hasMore = false,
   onOrderPress,
+  onLoadMore,
 }: OrdersListProps) {
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
@@ -66,6 +74,21 @@ export function OrdersList({
         </View>
       </View>
 
+      {loading ? (
+        <View className="items-center justify-center py-16">
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+            Loading orders...
+          </Text>
+        </View>
+      ) : orders.length === 0 ? (
+        <View className="items-center justify-center py-16">
+          <Ionicons name="receipt-outline" size={40} color="#94a3b8" />
+          <Text className="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+            No orders found
+          </Text>
+        </View>
+      ) : (
       <ScrollView
         horizontal={!isTablet}
         showsHorizontalScrollIndicator={false}
@@ -233,8 +256,31 @@ export function OrdersList({
               </View>
             </View>
           ))}
+
+          {(hasMore || loadingMore) && (
+            <View className="items-center border-t border-slate-100 px-4 py-4 dark:border-slate-800">
+              {loadingMore ? (
+                <View className="flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color={colors.tint} />
+                  <Text className="font-medium text-slate-500 dark:text-slate-400">
+                    Loading more...
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={onLoadMore}
+                  className="rounded-lg bg-slate-100 px-4 py-2 dark:bg-slate-800"
+                >
+                  <Text className="font-semibold text-slate-700 dark:text-slate-200">
+                    Load more
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
+      )}
     </View>
   );
 }

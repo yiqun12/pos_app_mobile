@@ -744,77 +744,83 @@ export default function SeatScreen() {
           </View>
         </View>
 
-        <View className="w-full bg-slate-50 p-4 pt-0 dark:bg-slate-950 md:w-[400px] md:pt-4">
-          <OrderSummary order={order} />
+        <View className="w-full bg-slate-50 p-4 pt-0 dark:bg-slate-950 md:h-full md:w-[400px] md:pt-4">
+          <ScrollView
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 24 }}
+          >
+            <OrderSummary order={order} />
 
-          <View className="mt-6">
-            <Button
-              label={t("seats.payNow")}
-              variant="primary"
-              size="lg"
-              icon="card"
-              onPress={() => setPaymentModalVisible(true)}
-              disabled={order.status === "paid"}
-            />
-          </View>
-
-          <View className="mt-4 flex-row gap-3">
-            <View className="flex-1">
+            <View className="mt-6">
               <Button
-                label="Kitchen"
-                variant="outline"
-                icon="restaurant"
-                onPress={() => void handlePrint("order")}
+                label={t("seats.payNow")}
+                variant="primary"
+                size="lg"
+                icon="card"
+                onPress={() => setPaymentModalVisible(true)}
+                disabled={order.status === "paid"}
               />
             </View>
-            <View className="flex-1">
-              <Button
-                label={t("seats.print")}
-                variant="outline"
-                icon="print"
-                onPress={() => void handlePrint("receipt")}
-              />
+
+            <View className="mt-4 flex-row gap-3">
+              <View className="flex-1">
+                <Button
+                  label="Kitchen"
+                  variant="outline"
+                  icon="restaurant"
+                  onPress={() => void handlePrint("order")}
+                />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label={t("seats.print")}
+                  variant="outline"
+                  icon="print"
+                  onPress={() => void handlePrint("receipt")}
+                />
+              </View>
             </View>
-          </View>
-          <View className="mt-4 flex-row gap-3">
-            <View className="flex-1">
+            <View className="mt-4 flex-row gap-3">
+              <View className="flex-1">
+                <Button
+                  label={t("seats.splitBill")}
+                  variant="outline"
+                  icon="git-branch"
+                  onPress={() => {}}
+                />
+              </View>
+            </View>
+            <View className="mt-3">
               <Button
-                label={t("seats.splitBill")}
-                variant="outline"
-                icon="git-branch"
+                label={t("seats.shareOrder")}
+                variant="secondary"
+                icon="share-social"
+                className="bg-slate-800 text-white dark:bg-slate-700"
                 onPress={() => {}}
               />
             </View>
-          </View>
-          <View className="mt-3">
-            <Button
-              label={t("seats.shareOrder")}
-              variant="secondary"
-              icon="share-social"
-              className="bg-slate-800 text-white dark:bg-slate-700"
-              onPress={() => {}}
-            />
-          </View>
 
-          <View className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
-            <View className="mb-3 flex-row items-center gap-3">
-              <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                <Ionicons name="person" size={20} color="#3b82f6" />
+            <View className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+              <View className="mb-3 flex-row items-center gap-3">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                  <Ionicons name="person" size={20} color="#3b82f6" />
+                </View>
+                <View>
+                  <Text className="text-xs font-bold text-blue-900 dark:text-blue-100">
+                    {t("seats.customerLoyalty")}
+                  </Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-300">
+                    {t("seats.addPhoneOrScanCard")}
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text className="text-xs font-bold text-blue-900 dark:text-blue-100">
-                  {t("seats.customerLoyalty")}
-                </Text>
-                <Text className="text-xs text-blue-600 dark:text-blue-300">
-                  {t("seats.addPhoneOrScanCard")}
-                </Text>
+              <View className="flex-row items-center justify-between rounded-lg border border-blue-200 bg-white p-3 dark:border-blue-800 dark:bg-slate-900">
+                <Text className="text-slate-400">{t("seats.phoneNumber")}</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#3b82f6" />
               </View>
             </View>
-            <View className="flex-row items-center justify-between rounded-lg border border-blue-200 bg-white p-3 dark:border-blue-800 dark:bg-slate-900">
-              <Text className="text-slate-400">{t("seats.phoneNumber")}</Text>
-              <Ionicons name="checkmark-circle" size={20} color="#3b82f6" />
-            </View>
-          </View>
+          </ScrollView>
         </View>
       </View>
 

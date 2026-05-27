@@ -15,13 +15,29 @@ import { useStoreSelection } from "@/context/store";
 import { db } from "@/lib/firebase";
 import {
   parseReceiptItems,
+  type RevenueOrderSummary,
   summarizeCashDrawer,
   summarizeItemSales,
   transformSuccessPaymentSummary,
 } from "@/lib/pos/revenueTransforms";
-import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { sliceRevenuePage } from "@/lib/pos/revenuePagination";
 import {
+  collection,
+  type DocumentData,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
+  startAfter,
+  where,
+} from "firebase/firestore";
+import {
+  ActivityIndicator,
   Alert,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   RefreshControl,
   ScrollView,
   Text,
@@ -80,6 +96,8 @@ const DEFAULT_RANGE = {
 };
 
 const INITIAL_ORDERS: Order[] = [];
+const REVENUE_PAGE_SIZE = 100;
+const REVENUE_SUMMARY_BATCH_SIZE = 500;
 
 export default function RevenueScreen() {
   const colorScheme = useColorScheme();
@@ -158,39 +176,112 @@ export default function RevenueScreen() {
   );
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>(tabs[0]);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [summaryOrders, setSummaryOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
+  const [lastOrderDoc, setLastOrderDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderModalVisible, setOrderModalVisible] = useState(false);
 
-  // Load from Firestore success_payment
-  useEffect(() => {
+  const fetchRevenuePage = React.useCallback(async ({
+    append = false,
+    afterDoc = null,
+  }: {
+    append?: boolean;
+    afterDoc?: QueryDocumentSnapshot<DocumentData> | null;
+  } = {}) => {
     if (!user || !currentStoreId) return;
 
     const startStr = parseDateToFirestoreString(dateRange.startDate, false);
     const endStr = parseDateToFirestoreString(dateRange.endDate, true);
 
-    const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
-    const q = query(
-      colRef,
-      where("dateTime", ">=", startStr),
-      where("dateTime", "<=", endStr),
-      orderBy("dateTime", "desc"),
-      limit(100)
-    );
+    if (!append) setLoadingOrders(true);
+    else setLoadingMoreOrders(true);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched: Order[] = snapshot.docs.map((docSnap) => {
+    try {
+      const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
+      const constraints: QueryConstraint[] = [
+        where("dateTime", ">=", startStr),
+        where("dateTime", "<=", endStr),
+        orderBy("dateTime", "desc"),
+      ];
+
+      if (afterDoc) constraints.push(startAfter(afterDoc));
+      constraints.push(limit(REVENUE_PAGE_SIZE + 1));
+
+      const snapshot = await getDocs(query(colRef, ...constraints));
+      const page = sliceRevenuePage(snapshot.docs, REVENUE_PAGE_SIZE);
+      const fetched: Order[] = page.rows.map((docSnap) => {
         const data = docSnap.data();
         return transformSuccessPaymentSummary(docSnap.id, data);
       });
 
-      setOrders(fetched);
-    }, (err) => {
+      setOrders((prev) => append ? [...prev, ...fetched] : fetched);
+      setLastOrderDoc(page.rows[page.rows.length - 1] ?? null);
+      setHasMoreOrders(page.hasMore);
+    } catch (err) {
       console.error("Error loading success_payment:", err);
-    });
+      if (!append) setOrders([]);
+      Alert.alert(t("common.error"), "Failed to load revenue orders");
+    } finally {
+      if (!append) setLoadingOrders(false);
+      else setLoadingMoreOrders(false);
+    }
+  }, [currentStoreId, dateRange.endDate, dateRange.startDate, t, user]);
 
-    return () => unsubscribe();
-  }, [user, currentStoreId, dateRange]);
+  const fetchRevenueSummary = React.useCallback(async () => {
+    if (!user || !currentStoreId) return;
+
+    const startStr = parseDateToFirestoreString(dateRange.startDate, false);
+    const endStr = parseDateToFirestoreString(dateRange.endDate, true);
+    const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
+    const allOrders: Order[] = [];
+    let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+
+    setLoadingSummary(true);
+    try {
+      while (true) {
+        const constraints: QueryConstraint[] = [
+          where("dateTime", ">=", startStr),
+          where("dateTime", "<=", endStr),
+          orderBy("dateTime", "desc"),
+        ];
+
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(REVENUE_SUMMARY_BATCH_SIZE));
+
+        const snapshot = await getDocs(query(colRef, ...constraints));
+        const batch = snapshot.docs.map((docSnap) =>
+          transformSuccessPaymentSummary(docSnap.id, docSnap.data())
+        );
+        allOrders.push(...batch);
+
+        if (snapshot.docs.length < REVENUE_SUMMARY_BATCH_SIZE) break;
+        cursor = snapshot.docs[snapshot.docs.length - 1];
+      }
+
+      setSummaryOrders(allOrders);
+    } catch (err) {
+      console.error("Error loading complete revenue summary:", err);
+      setSummaryOrders([]);
+      Alert.alert(t("common.error"), "Failed to load complete revenue summary");
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [currentStoreId, dateRange.endDate, dateRange.startDate, t, user]);
+
+  // Load from Firestore success_payment
+  useEffect(() => {
+    setOrders([]);
+    setSummaryOrders([]);
+    setLastOrderDoc(null);
+    setHasMoreOrders(false);
+    void fetchRevenuePage();
+    void fetchRevenueSummary();
+  }, [fetchRevenuePage, fetchRevenueSummary]);
 
   const stats = useMemo(() => {
     let totalRevenue = 0;
@@ -198,7 +289,7 @@ export default function RevenueScreen() {
     let tax = 0;
     let tips = 0;
 
-    orders.forEach((o) => {
+    summaryOrders.forEach((o) => {
       totalRevenue += o.total ?? o.amount ?? 0;
       netSales += o.subtotal ?? 0;
       tax += o.tax ?? 0;
@@ -211,11 +302,11 @@ export default function RevenueScreen() {
       tax: tax.toFixed(2),
       tips: tips.toFixed(2),
     };
-  }, [orders]);
+  }, [summaryOrders]);
 
   const total = stats.totalRevenue;
-  const cashDrawerSummary = useMemo(() => summarizeCashDrawer(orders as any), [orders]);
-  const itemSales = useMemo(() => summarizeItemSales(orders as any).slice(0, 20), [orders]);
+  const cashDrawerSummary = useMemo(() => summarizeCashDrawer(summaryOrders as RevenueOrderSummary[]), [summaryOrders]);
+  const itemSales = useMemo(() => summarizeItemSales(summaryOrders as RevenueOrderSummary[]).slice(0, 20), [summaryOrders]);
 
   const handlePreset = (label: string) => {
     const preset = PRESETS.find((p) => p.label === label);
@@ -224,11 +315,25 @@ export default function RevenueScreen() {
     setDateRange({ startDate: preset.startDate, endDate: preset.endDate });
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await Promise.all([fetchRevenuePage(), fetchRevenueSummary()]);
+    } finally {
       setRefreshing(false);
-    }, 600);
+    }
+  };
+
+  const handleLoadMoreOrders = () => {
+    if (!lastOrderDoc || !hasMoreOrders || loadingOrders || loadingMoreOrders) return;
+    void fetchRevenuePage({ append: true, afterDoc: lastOrderDoc });
+  };
+
+  const handleRevenueScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (activeTab !== tabs[0]) return;
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+    if (distanceFromBottom < 180) handleLoadMoreOrders();
   };
 
   const handleOrderPress = (order: Order) => {
@@ -278,6 +383,8 @@ export default function RevenueScreen() {
           padding: responsive.mediumSpacing,
         }}
         showsVerticalScrollIndicator={false}
+        onScroll={handleRevenueScroll}
+        scrollEventThrottle={200}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -297,6 +404,15 @@ export default function RevenueScreen() {
             setSelectedPreset(null);
           }}
         />
+
+        {loadingSummary && (
+          <View className="flex-row items-center gap-2 rounded-lg bg-orange-50 px-3 py-2 dark:bg-orange-900/20">
+            <ActivityIndicator size="small" color={colors.tint} />
+            <Text className="text-sm font-medium text-orange-700 dark:text-orange-300">
+              Loading complete summary...
+            </Text>
+          </View>
+        )}
 
         {isPhone ? (
           <ScrollView
@@ -374,7 +490,11 @@ export default function RevenueScreen() {
             orders={orders}
             total={total}
             colors={colors}
+            loading={loadingOrders}
+            loadingMore={loadingMoreOrders}
+            hasMore={hasMoreOrders}
             onOrderPress={handleOrderPress}
+            onLoadMore={handleLoadMoreOrders}
           />
         )}
 
