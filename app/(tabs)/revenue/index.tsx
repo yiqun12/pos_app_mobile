@@ -102,7 +102,7 @@ export default function RevenueScreen() {
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
   const isPhone = !responsive.isTablet;
-  const tabFontSize = responsive.isTablet ? 17 : 14;
+  const tabFontSize = responsive.isTablet ? 13 : 12;
   const { t } = useTranslation();
 
   const { user } = useAuth();
@@ -396,13 +396,14 @@ export default function RevenueScreen() {
         )}
 
         <ScrollView
-          horizontal={isPhone}
+          horizontal
           showsHorizontalScrollIndicator={false}
           bounces={false}
           contentContainerStyle={{
             gap: responsive.smallSpacing,
-            borderBottomWidth: 1,
-            borderBottomColor: colorScheme === "dark" ? "#1e293b" : "#e2e8f0",
+            padding: 4,
+            borderRadius: 10,
+            backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f1f5f9",
           }}
         >
           {tabs.map((tab) => {
@@ -411,13 +412,13 @@ export default function RevenueScreen() {
               <TouchableOpacity
                 key={tab}
                 onPress={() => setActiveTab(tab)}
-                className={`px-4 py-2 border-b-2 ${
-                  isActive ? "border-orange-500" : "border-transparent"
+                className={`min-w-[128px] rounded-lg px-4 py-2 ${
+                  isActive ? "bg-white shadow-sm dark:bg-slate-800" : "bg-transparent"
                 }`}
               >
                 <Text
                   numberOfLines={1}
-                  className={`font-semibold ${
+                  className={`text-center font-semibold ${
                     isActive ? "text-orange-600" : "text-slate-500"
                   }`}
                   style={{ fontSize: tabFontSize }}

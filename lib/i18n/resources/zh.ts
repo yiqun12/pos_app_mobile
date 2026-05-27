@@ -78,20 +78,20 @@ const zh = {
     "whereIsMyKey": "Where Is My Key"
   },
   "menu": {
-    "addFirstItem": "Add First Item",
-    "aiScan": "AI Scan",
-    "aiScannerTitle": "AI Scanner Title",
+    "addFirstItem": "添加第一个菜品",
+    "aiScan": "AI 扫描",
+    "aiScannerTitle": "AI 菜单扫描",
     "category": {
-      "addCategory": "Add Category",
-      "categoryName": "Category Name",
-      "categoryNamePlaceholder": "Category Name Placeholder",
-      "editCategory": "Edit Category"
+      "addCategory": "添加分类",
+      "categoryName": "分类名称",
+      "categoryNamePlaceholder": "输入分类名称",
+      "editCategory": "编辑分类"
     },
-    "deleteCategoryMessage": "Are you sure you want to delete {{name}}?",
-    "deleteCategoryTitle": "Delete Category Title",
-    "deleteItemMessage": "Are you sure you want to delete {{name}}?",
-    "deleteItemTitle": "Delete Item Title",
-    "inStock": "In Stock",
+    "deleteCategoryMessage": "确定要删除 {{name}} 吗？",
+    "deleteCategoryTitle": "删除分类",
+    "deleteItemMessage": "确定要删除 {{name}} 吗？",
+    "deleteItemTitle": "删除菜品",
+    "inStock": "有货",
     "item": {
       "addItem": "Add Item",
       "addonsIngredients": "Addons Ingredients",
@@ -116,11 +116,11 @@ const zh = {
       "pricePlaceholder": "Price Placeholder",
       "required": "Required"
     },
-    "loadingMenu": "Loading Menu",
-    "managementTitle": "Management Title",
-    "menuCloudMissing": "Menu Cloud Missing",
-    "menuDbFailed": "Menu Db Failed",
-    "noItemsInCategory": "No Items In Category",
+    "loadingMenu": "正在加载菜单...",
+    "managementTitle": "菜单管理",
+    "menuCloudMissing": "菜单数据未配置",
+    "menuDbFailed": "菜单数据加载失败",
+    "noItemsInCategory": "该分类暂无菜品",
     "options": {
       "addOns": "Add Ons",
       "addToOrder": "Add To Order",
@@ -131,7 +131,7 @@ const zh = {
       "noCustomizationOptions": "No Customization Options",
       "specialRequests": "Special Requests"
     },
-    "outOfStock": "Out Of Stock",
+    "outOfStock": "售罄",
     "scanner": {
       "analyzeFailed": "Analyze Failed",
       "analyzeSuccess": "Analyze Success",
@@ -140,22 +140,22 @@ const zh = {
       "cameraPermissionRequired": "Camera Permission Required",
       "cameraUnavailableMessage": "Camera Unavailable Message",
       "cameraUnavailableTitle": "Camera Unavailable Title",
-      "chooseFromGallery": "Choose From Gallery",
-      "chooseOption": "Choose Option",
-      "howItWorks": "How It Works",
-      "processMenu": "Process Menu",
-      "scanMenu": "Scan Menu",
+      "chooseFromGallery": "从相册选择",
+      "chooseOption": "选择导入方式",
+      "howItWorks": "使用说明",
+      "processMenu": "解析菜单",
+      "scanMenu": "扫描菜单",
       "step1Desc": "Step1 Desc",
       "step1Title": "Step1 Title",
       "step2Desc": "Step2 Desc",
       "step2Title": "Step2 Title",
       "step3Desc": "Step3 Desc",
       "step3Title": "Step3 Title",
-      "subtitle": "Subtitle",
-      "takePhoto": "Take Photo",
-      "tapToTakePhoto": "Tap To Take Photo"
+      "subtitle": "拍照或选择菜单图片，自动识别菜品。",
+      "takePhoto": "拍照",
+      "tapToTakePhoto": "点击拍照或选择菜单图片"
     },
-    "searchPlaceholder": "Search Placeholder",
+    "searchPlaceholder": "搜索菜品",
     "selection": {
       "all": "All",
       "customizable": "Customizable",
@@ -163,8 +163,8 @@ const zh = {
       "searchItems": "Search Items",
       "selectItem": "Select Item"
     },
-    "stockStatus": "Stock Status",
-    "unableLoadMenu": "Unable Load Menu"
+    "stockStatus": "库存状态",
+    "unableLoadMenu": "无法加载菜单"
   },
   "notifications": {
     "badgeAlert": "Badge Alert",

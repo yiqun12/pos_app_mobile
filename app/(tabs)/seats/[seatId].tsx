@@ -688,14 +688,14 @@ export default function SeatScreen() {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+      <View className="flex-row items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
         <TouchableOpacity
           onPress={() => router.back()}
-          className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
+          className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
         >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text className="text-xl font-bold text-slate-900 dark:text-white">
+        <Text className="text-lg font-bold text-slate-900 dark:text-white">
           {t("seats.seatOrder", { seatId: seatId ?? "-" })}
         </Text>
         <TouchableOpacity
@@ -713,17 +713,17 @@ export default function SeatScreen() {
               ]
             );
           }}
-          className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
+          className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
         >
-          <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+          <Ionicons name="ellipsis-horizontal" size={19} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       <View className="flex-1 flex-col bg-slate-50 dark:bg-slate-950 md:flex-row">
-        <View className="flex-1 px-4 py-4 md:mr-4 md:bg-transparent">
-          <View className="h-full rounded-xl bg-white p-4 shadow-sm dark:bg-slate-900">
-            <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-slate-900 dark:text-white">
+        <View className="flex-1 px-3 py-3 md:mr-3 md:bg-transparent">
+          <View className="h-full rounded-xl bg-white p-3 shadow-sm dark:bg-slate-900">
+            <View className="mb-3 flex-row items-center justify-between">
+              <Text className="text-base font-bold text-slate-900 dark:text-white">
                 {t("seats.itemizedReceipt")}
               </Text>
               <Text className="text-sm text-slate-500">
@@ -768,7 +768,7 @@ export default function SeatScreen() {
           </View>
         </View>
 
-        <View className="w-full bg-slate-50 p-4 pt-0 dark:bg-slate-950 md:h-full md:w-[400px] md:pt-4">
+        <View className="w-full bg-slate-50 p-3 pt-0 dark:bg-slate-950 md:h-full md:w-[380px] md:pt-3">
           <ScrollView
             className="flex-1"
             showsVerticalScrollIndicator={false}
@@ -776,7 +776,16 @@ export default function SeatScreen() {
           >
             <OrderSummary order={order} />
 
-            <View className="mt-6 flex-row gap-3">
+            <View className="mt-4">
+              <Button
+                label={taxExempt ? "✓ Tax Exempt" : "Tax Exempt"}
+                variant={taxExempt ? "primary" : "outline"}
+                icon="pricetag"
+                onPress={() => setTaxExempt((enabled) => !enabled)}
+              />
+            </View>
+
+            <View className="mt-4 flex-row gap-2">
               <View className="flex-1">
                 <Button
                   label={serviceFeeAmount > 0 ? `Service Fee $${serviceFeeAmount.toFixed(2)}` : "Service Fee"}
@@ -795,7 +804,7 @@ export default function SeatScreen() {
               </View>
             </View>
 
-            <View className="mt-4 flex-row gap-3">
+            <View className="mt-3 flex-row gap-2">
               <View className="flex-1">
                 <Button
                   label="Print Order"
@@ -814,7 +823,7 @@ export default function SeatScreen() {
               </View>
             </View>
 
-            <View className="mt-4 flex-row gap-3">
+            <View className="mt-3 flex-row gap-2">
               <View className="flex-1">
                 <Button
                   label="Split Payment"

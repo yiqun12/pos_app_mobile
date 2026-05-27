@@ -74,7 +74,7 @@ export function PaymentModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView className="p-6">
+          <ScrollView className="p-4">
             {/* Split Toggles */}
             <View className="flex-row bg-slate-100 p-1 rounded-xl mb-6 dark:bg-slate-800">
                 {(["full", "equal", "item"] as const).map((mode) => (
@@ -103,7 +103,7 @@ export function PaymentModal({
                     >
                         <Ionicons name="remove" size={24} color={colors.text} />
                     </TouchableOpacity>
-                    <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                    <Text className="text-base font-bold text-slate-900 dark:text-white">
                       {t("seats.payment.peopleCount", { count: splitCount })}
                     </Text>
                     <TouchableOpacity 
@@ -116,17 +116,17 @@ export function PaymentModal({
             )}
 
             {/* Amount Display */}
-            <View className="items-center mb-8">
+            <View className="items-center mb-6">
                 <Text className="text-slate-500 mb-2 font-medium">
                   {t("seats.payment.amountToPay")}
                 </Text>
                 <View className="flex-row items-center">
-                    <Text className="text-4xl font-bold text-orange-600">$</Text>
+                    <Text className="text-3xl font-bold text-orange-600">$</Text>
                     <TextInput
                         value={amount}
                         onChangeText={setAmount}
                         keyboardType="decimal-pad"
-                        className="text-5xl font-bold text-orange-600 ml-1 p-0"
+                        className="ml-1 p-0 text-4xl font-bold text-orange-600"
                         selectTextOnFocus
                     />
                 </View>

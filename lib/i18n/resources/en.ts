@@ -78,19 +78,19 @@ const en = {
     "whereIsMyKey": "Where Is My Key"
   },
   "menu": {
-    "addFirstItem": "Add First Item",
+    "addFirstItem": "Add first item",
     "aiScan": "AI Scan",
-    "aiScannerTitle": "AI Scanner Title",
+    "aiScannerTitle": "AI Menu Scanner",
     "category": {
       "addCategory": "Add Category",
       "categoryName": "Category Name",
-      "categoryNamePlaceholder": "Category Name Placeholder",
+      "categoryNamePlaceholder": "Category name",
       "editCategory": "Edit Category"
     },
     "deleteCategoryMessage": "Are you sure you want to delete {{name}}?",
-    "deleteCategoryTitle": "Delete Category Title",
+    "deleteCategoryTitle": "Delete category",
     "deleteItemMessage": "Are you sure you want to delete {{name}}?",
-    "deleteItemTitle": "Delete Item Title",
+    "deleteItemTitle": "Delete item",
     "inStock": "In Stock",
     "item": {
       "addItem": "Add Item",
@@ -116,11 +116,11 @@ const en = {
       "pricePlaceholder": "Price Placeholder",
       "required": "Required"
     },
-    "loadingMenu": "Loading Menu",
-    "managementTitle": "Management Title",
-    "menuCloudMissing": "Menu Cloud Missing",
-    "menuDbFailed": "Menu Db Failed",
-    "noItemsInCategory": "No Items In Category",
+    "loadingMenu": "Loading menu...",
+    "managementTitle": "Menu Management",
+    "menuCloudMissing": "Menu data is not configured",
+    "menuDbFailed": "Failed to load menu data",
+    "noItemsInCategory": "No items in this category",
     "options": {
       "addOns": "Add Ons",
       "addToOrder": "Add To Order",
@@ -151,11 +151,11 @@ const en = {
       "step2Title": "Step2 Title",
       "step3Desc": "Step3 Desc",
       "step3Title": "Step3 Title",
-      "subtitle": "Subtitle",
+      "subtitle": "Scan a paper menu or menu photo to extract items.",
       "takePhoto": "Take Photo",
-      "tapToTakePhoto": "Tap To Take Photo"
+      "tapToTakePhoto": "Tap to take or choose a menu photo"
     },
-    "searchPlaceholder": "Search Placeholder",
+    "searchPlaceholder": "Search menu items",
     "selection": {
       "all": "All",
       "customizable": "Customizable",

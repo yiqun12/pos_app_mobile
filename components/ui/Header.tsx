@@ -24,9 +24,9 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const router = useRouter();
   const responsive = useResponsiveLayout();
-  const headerPadding = responsive.isTablet ? responsive.mediumSpacing : 16;
-  const headerGap = responsive.isTablet ? responsive.baseSpacing : 12;
-  const backButtonSize = responsive.isTablet ? 32 : 24;
+  const headerPadding = responsive.isTablet ? responsive.baseSpacing : 14;
+  const headerGap = responsive.isTablet ? responsive.smallSpacing : 10;
+  const backButtonSize = responsive.isTablet ? 24 : 22;
 
   return (
     <View

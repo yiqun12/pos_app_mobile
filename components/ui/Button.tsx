@@ -39,27 +39,27 @@ export function Button({
 
   // Responsive padding - tablet gets larger touch targets
   const baseSizes = {
-    sm: { px: 12, py: 6, fontSize: 14 },
-    md: { px: 16, py: 10, fontSize: 16 },
-    lg: { px: 24, py: 14, fontSize: 18 },
+    sm: { px: 10, py: 6, fontSize: 13 },
+    md: { px: 14, py: 9, fontSize: 14 },
+    lg: { px: 18, py: 12, fontSize: 16 },
   };
 
   const sizes = responsive.isTablet
     ? {
         sm: {
-          px: responsive.smallSpacing + 4,
+          px: responsive.smallSpacing + 3,
           py: responsive.smallSpacing,
-          fontSize: responsive.baseFontSize - 2,
+          fontSize: responsive.baseFontSize - 1,
         },
         md: {
-          px: responsive.baseSpacing + 8,
-          py: responsive.baseSpacing - 2,
-          fontSize: responsive.baseFontSize,
+          px: responsive.baseSpacing + 4,
+          py: responsive.smallSpacing + 1,
+          fontSize: responsive.baseFontSize - 1,
         },
         lg: {
           px: responsive.mediumSpacing,
-          py: responsive.baseSpacing,
-          fontSize: responsive.subheadingFontSize,
+          py: responsive.baseSpacing - 2,
+          fontSize: responsive.baseFontSize,
         },
       }
     : baseSizes;

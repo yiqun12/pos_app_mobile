@@ -1,9 +1,6 @@
-import { Button } from "@/components/ui/Button";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Ionicons } from "@expo/vector-icons";
+import { KeypadAmountModal, KeypadQuickAction } from "@/components/seats/modals/KeypadAmountModal";
 import React, { useEffect, useState } from "react";
-import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Text, View } from "react-native";
 
 interface ServiceFeeModalProps {
   visible: boolean;
@@ -15,14 +12,6 @@ interface ServiceFeeModalProps {
 
 const QUICK_PERCENTAGES = [0.15, 0.18, 0.2, 0.25];
 
-function parseMoneyInput(value: string): number | null {
-  const normalized = value.replace(/。/g, ".").trim();
-  if (!/^\d*\.?\d*$/.test(normalized)) return null;
-  if (normalized.length === 0 || normalized === ".") return 0;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? Math.max(0, parsed) : null;
-}
-
 export function ServiceFeeModal({
   visible,
   baseAmount,
@@ -30,29 +19,21 @@ export function ServiceFeeModal({
   onClose,
   onConfirm,
 }: ServiceFeeModalProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
   const [amount, setAmount] = useState("");
 
   useEffect(() => {
     if (visible) setAmount(currentAmount > 0 ? currentAmount.toFixed(2) : "");
   }, [currentAmount, visible]);
 
-  const handleAmountChange = (value: string) => {
-    const normalized = value.replace(/。/g, ".");
-    if (/^\d*\.?\d*$/.test(normalized)) setAmount(normalized);
-  };
-
   const applyPercent = (percent: number) => {
     setAmount((Math.max(0, baseAmount) * percent).toFixed(2));
   };
 
-  const handleConfirm = () => {
-    const parsed = parseMoneyInput(amount);
-    if (parsed === null) return;
-    onConfirm(Math.round(parsed * 100) / 100);
-    onClose();
-  };
+  const quickActions: KeypadQuickAction[] = QUICK_PERCENTAGES.map((percent) => ({
+    label: `${(percent * 100).toFixed(0)}%`,
+    tone: "green",
+    onPress: () => applyPercent(percent),
+  }));
 
   const handleCancelAdd = () => {
     onConfirm(0);
@@ -60,57 +41,34 @@ export function ServiceFeeModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 items-center justify-center bg-black/50 p-4">
-        <View className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-slate-900">
-          <View className="mb-4 flex-row items-center justify-between">
-            <Text className="text-xl font-bold text-slate-900 dark:text-white">
-              Add Service Fee
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <View className="mb-4 flex-row gap-2">
-            {QUICK_PERCENTAGES.map((percent) => (
-              <TouchableOpacity
-                key={percent}
-                onPress={() => applyPercent(percent)}
-                className="flex-1 rounded-lg bg-green-600 px-2 py-3"
-              >
-                <Text className="text-center font-semibold text-white">
-                  {(percent * 100).toFixed(0)}%
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800">
-            <Text className="mb-1 text-xs font-semibold text-slate-500">
-              Service fee amount
-            </Text>
-            <TextInput
-              value={amount}
-              onChangeText={handleAmountChange}
-              keyboardType="decimal-pad"
-              placeholder="Enter service fee by amount"
-              placeholderTextColor="#94a3b8"
-              className="text-2xl font-bold text-slate-900 dark:text-white"
-              autoFocus
-            />
-          </View>
-
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Button label="Cancel Add" variant="ghost" onPress={handleCancelAdd} />
-            </View>
-            <View className="flex-1">
-              <Button label="Add Service Fee" onPress={handleConfirm} />
-            </View>
-          </View>
-        </View>
+    <KeypadAmountModal
+      visible={visible}
+      title="Add Service Fee"
+      amount={amount}
+      amountLabel="Service fee amount"
+      confirmLabel="Add Service Fee"
+      cancelLabel="Cancel Add"
+      quickActions={quickActions}
+      onAmountChange={setAmount}
+      onQuickAmount={(quickAmount) => setAmount(quickAmount.toFixed(2))}
+      onClose={onClose}
+      onClear={handleCancelAdd}
+      onConfirm={(nextAmount) => {
+        onConfirm(nextAmount);
+        onClose();
+      }}
+    >
+      <View className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
+        <Text className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          Base amount
+        </Text>
+        <Text className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+          ${baseAmount.toFixed(2)}
+        </Text>
+        <Text className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+          Pick a percentage or enter the service fee amount directly.
+        </Text>
       </View>
-    </Modal>
+    </KeypadAmountModal>
   );
 }

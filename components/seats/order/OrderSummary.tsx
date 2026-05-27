@@ -24,14 +24,14 @@ export function OrderSummary({ order }: OrderSummaryProps) {
     <View className="flex-row justify-between py-1">
       <Text
         className={`${
-          isTotal ? "text-xl font-bold" : "text-base font-medium"
+          isTotal ? "text-lg font-bold" : "text-sm font-medium"
         } text-slate-700 dark:text-slate-300`}
       >
         {label}
       </Text>
       <Text
         className={`${
-          isTotal ? "text-xl font-bold" : "text-base font-medium"
+          isTotal ? "text-lg font-bold" : "text-sm font-medium"
         } ${isNegative ? "text-red-500" : "text-slate-900 dark:text-white"}`}
       >
         {value}
@@ -40,8 +40,8 @@ export function OrderSummary({ order }: OrderSummaryProps) {
   );
 
   return (
-    <View className="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-900">
-      <Text className="mb-4 text-lg font-bold text-slate-900 dark:text-white">
+    <View className="rounded-xl bg-white p-4 shadow-sm dark:bg-slate-900">
+      <Text className="mb-3 text-base font-bold text-slate-900 dark:text-white">
         {t("seats.orderSummary.title")}
       </Text>
 
@@ -85,7 +85,7 @@ export function OrderSummary({ order }: OrderSummaryProps) {
         <Text className="text-sm font-medium uppercase text-slate-500 dark:text-slate-400">
           {t("seats.orderSummary.totalAmount")}
         </Text>
-        <Text className="text-3xl font-bold text-slate-900 dark:text-white">
+        <Text className="text-2xl font-bold text-slate-900 dark:text-white">
           ${order.total.toFixed(2)}
         </Text>
       </View>

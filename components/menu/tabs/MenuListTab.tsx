@@ -32,7 +32,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   const { t } = useTranslation();
   const isTablet = responsive.isTablet;
   const insets = useSafeAreaInsets();
-  const floatingBottomOffset = (responsive.isTablet ? 124 : 116) + insets.bottom;
+  const bottomPadding = (responsive.isTablet ? 92 : 84) + insets.bottom;
 
   // Menu state from context
   const {
@@ -65,7 +65,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   }>({ visible: false, mode: "add", category: null });
 
   // Responsive columns
-  const numColumns = responsive.isTablet ? 3 : 1;
+  const numColumns = responsive.isLargeTablet ? 3 : responsive.isTablet ? 2 : 1;
 
   // Auto-select the first category once data arrives.
   useEffect(() => {
@@ -173,41 +173,68 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      {/* Search Bar */}
+      {/* Toolbar */}
       <View 
-        className="py-2 border-b border-slate-100 dark:border-slate-800"
-        style={{ paddingHorizontal: responsive.mediumSpacing }}
+        className="border-b border-slate-100 py-2 dark:border-slate-800"
+        style={{ paddingHorizontal: responsive.baseSpacing }}
       >
-        <Input 
+        <View className={isTablet ? "flex-row items-center gap-2" : "gap-2"}>
+          <View className="min-w-0 flex-1">
+            <Input
             placeholder={t("menu.searchPlaceholder")}
             icon="search"
             className="mb-0"
             value={searchQuery}
             onChangeText={setSearchQuery}
-        />
+            />
+          </View>
+          <View className="flex-row gap-2">
+            <Button
+              label={isTablet ? t("menu.aiScan") : "Scan"}
+              size="sm"
+              variant="outline"
+              icon="scan"
+              onPress={onScanPress}
+            />
+            <Button
+              label={isTablet ? "Category" : "Cat."}
+              size="sm"
+              variant="outline"
+              icon="folder"
+              onPress={handleAddCategoryPress}
+            />
+            <Button
+              label={isTablet ? "Add Item" : "Item"}
+              size="sm"
+              icon="add"
+              disabled={!selectedCategory}
+              onPress={handleAddItemPress}
+            />
+          </View>
+        </View>
       </View>
 
       {/* Categories Sidebar/TopBar */}
-      <View className="border-b border-slate-200 bg-white py-3 dark:border-slate-800 dark:bg-slate-900">
+      <View className="border-b border-slate-200 bg-white py-2 dark:border-slate-800 dark:bg-slate-900">
         <FlatList
           horizontal
           data={categories}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: responsive.mediumSpacing, gap: 12 }}
+          contentContainerStyle={{ paddingHorizontal: responsive.baseSpacing, gap: 8 }}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => setSelectedCategory(item.id)}
               onLongPress={() => handleEditCategoryPress(item.id, item.name)}
               delayLongPress={500}
-              className={`pb-2 px-3 ${
+              className={`rounded-full border px-3 py-2 ${
                 selectedCategory === item.id
-                  ? "border-b-2 border-orange-500"
-                  : "border-b-2 border-transparent"
+                  ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                  : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
               }`}
             >
               <Text
-                style={{ fontSize: responsive.baseFontSize }}
+                style={{ fontSize: responsive.baseFontSize - 1 }}
                 className={`font-semibold ${
                   selectedCategory === item.id
                     ? "text-orange-600 dark:text-orange-400"
@@ -221,9 +248,9 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
           ListFooterComponent={
             <TouchableOpacity
               onPress={handleAddCategoryPress}
-              className="px-3 pb-2 border-b-2 border-transparent opacity-50"
+              className="h-9 w-9 items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
             >
-              <Ionicons name="add" size={20} color={colors.text} />
+              <Ionicons name="add" size={18} color={colors.text} />
             </TouchableOpacity>
           }
         />
@@ -236,9 +263,9 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         numColumns={numColumns}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{
-          padding: responsive.mediumSpacing,
-          paddingBottom: floatingBottomOffset + 92,
-          gap: numColumns > 1 ? responsive.mediumSpacing : 0,
+          padding: responsive.baseSpacing,
+          paddingBottom: bottomPadding,
+          gap: numColumns > 1 ? responsive.baseSpacing : 0,
         }}
         ListEmptyComponent={
           <View className="items-center py-20">
@@ -258,118 +285,71 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         }
         renderItem={({ item }) => (
           <View 
-            className="rounded-xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden"
+            className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
             style={
               numColumns > 1
                 ? {
                     flex: 1,
-                    marginHorizontal: responsive.mediumSpacing / 2,
-                    marginBottom: responsive.mediumSpacing,
+                    marginHorizontal: responsive.baseSpacing / 2,
+                    marginBottom: responsive.baseSpacing,
                   }
-                : { marginBottom: 16 }
+                : { marginBottom: 10 }
             }
           >
-            {/* Image Placeholder */}
-            <View className="h-40 w-full items-center justify-center bg-slate-100 dark:bg-slate-800 relative">
-              {item.imageUrl ? (
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  className="h-full w-full"
-                  resizeMode="cover"
-                />
-              ) : (
-                <Ionicons name="fast-food" size={48} color="#cbd5e1" />
-              )}
-              
-              {/* Floating Action Buttons on Card */}
-              <View className="absolute top-2 right-2 flex-row gap-2">
-                 <TouchableOpacity 
-                    className="bg-white/90 p-2 rounded-full shadow-sm dark:bg-slate-800/90"
-                    onPress={() => handleEditItemPress(item)}
-                 >
-                    <Ionicons name="pencil" size={16} color={colors.text} />
-                 </TouchableOpacity>
+            <View className="flex-row p-3">
+              <View className="mr-3 h-16 w-16 items-center justify-center overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800">
+                {item.imageUrl ? (
+                  <Image
+                    source={{ uri: item.imageUrl }}
+                    className="h-full w-full"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Ionicons name="fast-food" size={26} color="#cbd5e1" />
+                )}
               </View>
 
-              {/* Stock Badge (Mock) */}
-              {Math.random() > 0.8 && (
-                  <View className="absolute bottom-2 right-2 bg-red-500 px-2 py-1 rounded">
-                      <Text
-                        className="text-white font-bold"
-                        style={{ fontSize: isTablet ? 13 : 12 }}
-                      >
-                        {t("menu.outOfStock")}
-                      </Text>
-                  </View>
-              )}
-            </View>
-
-            <View className="p-4">
-              <View className="flex-row justify-between items-start mb-2">
+              <View className="min-w-0 flex-1">
                 <Text
-                    style={{ fontSize: responsive.subheadingFontSize }}
-                    className="font-bold text-slate-900 dark:text-white flex-1 mr-2"
-                    numberOfLines={1}
+                  style={{ fontSize: responsive.baseFontSize }}
+                  className="font-bold text-slate-900 dark:text-white"
+                  numberOfLines={1}
                 >
-                    {item.name}
+                  {item.name}
                 </Text>
                 <Text
-                    style={{ fontSize: responsive.subheadingFontSize }}
-                    className="font-bold text-orange-500"
+                  style={{ fontSize: responsive.captionFontSize }}
+                  className="mt-1 text-slate-500 dark:text-slate-400"
+                  numberOfLines={1}
                 >
-                    ${item.price.toFixed(2)}
+                  {categories.find((category) => category.id === item.categoryId)?.name ?? ""}
+                </Text>
+                <Text
+                  style={{ fontSize: responsive.baseFontSize }}
+                  className="mt-2 font-bold text-orange-600"
+                >
+                  ${item.price.toFixed(2)}
                 </Text>
               </View>
-              
-              {/* Mock Stock Status */}
-              <View className="flex-row justify-between items-center mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
-                 <Text
-                   className="text-slate-500"
-                   style={{ fontSize: isTablet ? 14 : 12 }}
-                  >
-                    {t("menu.stockStatus")}
-                  </Text>
-                 <View className="flex-row items-center gap-2">
-                    <View className="w-8 h-4 bg-green-100 rounded-full items-end px-1 justify-center">
-                        <View className="w-2 h-2 bg-green-500 rounded-full" />
-                    </View>
-                    <Text
-                      className="text-green-600 font-medium"
-                      style={{ fontSize: isTablet ? 14 : 12 }}
-                    >
-                      {t("menu.inStock")}
-                    </Text>
-                 </View>
+
+              <View className="ml-2 justify-center gap-2">
+                <TouchableOpacity
+                  className="h-9 w-9 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800"
+                  onPress={() => handleEditItemPress(item)}
+                >
+                  <Ionicons name="pencil" size={16} color={colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="h-9 w-9 items-center justify-center rounded-md bg-red-50 dark:bg-red-900/20"
+                  onPress={() => handleDeleteItem(item.id, item.name)}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
         )}
       />
-
-      {/* Floating Action Buttons */}
-      <View
-        className="absolute right-6 items-end gap-4"
-        style={{ bottom: floatingBottomOffset }}
-      >
-        {/* AI Scanner FAB */}
-        <TouchableOpacity
-          onPress={onScanPress}
-          className="flex-row items-center rounded-full bg-indigo-600 px-4 py-3 shadow-lg"
-        >
-          <Ionicons name="scan" size={20} color="white" />
-          <Text className="ml-2 font-semibold text-white">{t("menu.aiScan")}</Text>
-        </TouchableOpacity>
-
-        {/* Add Item FAB */}
-        {selectedCategory && (
-          <TouchableOpacity
-            onPress={handleAddItemPress}
-            className="h-14 w-14 items-center justify-center rounded-full bg-orange-500 shadow-lg"
-          >
-            <Ionicons name="add" size={32} color="white" />
-          </TouchableOpacity>
-        )}
-      </View>
 
       {/* Modals */}
       <MenuEditorModal
