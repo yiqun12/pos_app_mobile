@@ -34,7 +34,6 @@ import {
   where,
 } from "firebase/firestore";
 import {
-  ActivityIndicator,
   Alert,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -97,7 +96,6 @@ const DEFAULT_RANGE = {
 
 const INITIAL_ORDERS: Order[] = [];
 const REVENUE_PAGE_SIZE = 100;
-const REVENUE_SUMMARY_BATCH_SIZE = 500;
 
 export default function RevenueScreen() {
   const colorScheme = useColorScheme();
@@ -176,10 +174,8 @@ export default function RevenueScreen() {
   );
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>(tabs[0]);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
-  const [summaryOrders, setSummaryOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
-  const [loadingSummary, setLoadingSummary] = useState(false);
   const [hasMoreOrders, setHasMoreOrders] = useState(false);
   const [lastOrderDoc, setLastOrderDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -232,56 +228,13 @@ export default function RevenueScreen() {
     }
   }, [currentStoreId, dateRange.endDate, dateRange.startDate, t, user]);
 
-  const fetchRevenueSummary = React.useCallback(async () => {
-    if (!user || !currentStoreId) return;
-
-    const startStr = parseDateToFirestoreString(dateRange.startDate, false);
-    const endStr = parseDateToFirestoreString(dateRange.endDate, true);
-    const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
-    const allOrders: Order[] = [];
-    let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
-
-    setLoadingSummary(true);
-    try {
-      while (true) {
-        const constraints: QueryConstraint[] = [
-          where("dateTime", ">=", startStr),
-          where("dateTime", "<=", endStr),
-          orderBy("dateTime", "desc"),
-        ];
-
-        if (cursor) constraints.push(startAfter(cursor));
-        constraints.push(limit(REVENUE_SUMMARY_BATCH_SIZE));
-
-        const snapshot = await getDocs(query(colRef, ...constraints));
-        const batch = snapshot.docs.map((docSnap) =>
-          transformSuccessPaymentSummary(docSnap.id, docSnap.data())
-        );
-        allOrders.push(...batch);
-
-        if (snapshot.docs.length < REVENUE_SUMMARY_BATCH_SIZE) break;
-        cursor = snapshot.docs[snapshot.docs.length - 1];
-      }
-
-      setSummaryOrders(allOrders);
-    } catch (err) {
-      console.error("Error loading complete revenue summary:", err);
-      setSummaryOrders([]);
-      Alert.alert(t("common.error"), "Failed to load complete revenue summary");
-    } finally {
-      setLoadingSummary(false);
-    }
-  }, [currentStoreId, dateRange.endDate, dateRange.startDate, t, user]);
-
   // Load from Firestore success_payment
   useEffect(() => {
     setOrders([]);
-    setSummaryOrders([]);
     setLastOrderDoc(null);
     setHasMoreOrders(false);
     void fetchRevenuePage();
-    void fetchRevenueSummary();
-  }, [fetchRevenuePage, fetchRevenueSummary]);
+  }, [fetchRevenuePage]);
 
   const stats = useMemo(() => {
     let totalRevenue = 0;
@@ -289,7 +242,7 @@ export default function RevenueScreen() {
     let tax = 0;
     let tips = 0;
 
-    summaryOrders.forEach((o) => {
+    orders.forEach((o) => {
       totalRevenue += o.total ?? o.amount ?? 0;
       netSales += o.subtotal ?? 0;
       tax += o.tax ?? 0;
@@ -302,11 +255,11 @@ export default function RevenueScreen() {
       tax: tax.toFixed(2),
       tips: tips.toFixed(2),
     };
-  }, [summaryOrders]);
+  }, [orders]);
 
   const total = stats.totalRevenue;
-  const cashDrawerSummary = useMemo(() => summarizeCashDrawer(summaryOrders as RevenueOrderSummary[]), [summaryOrders]);
-  const itemSales = useMemo(() => summarizeItemSales(summaryOrders as RevenueOrderSummary[]).slice(0, 20), [summaryOrders]);
+  const cashDrawerSummary = useMemo(() => summarizeCashDrawer(orders as RevenueOrderSummary[]), [orders]);
+  const itemSales = useMemo(() => summarizeItemSales(orders as RevenueOrderSummary[]).slice(0, 20), [orders]);
 
   const handlePreset = (label: string) => {
     const preset = PRESETS.find((p) => p.label === label);
@@ -318,7 +271,7 @@ export default function RevenueScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([fetchRevenuePage(), fetchRevenueSummary()]);
+      await fetchRevenuePage();
     } finally {
       setRefreshing(false);
     }
@@ -404,15 +357,6 @@ export default function RevenueScreen() {
             setSelectedPreset(null);
           }}
         />
-
-        {loadingSummary && (
-          <View className="flex-row items-center gap-2 rounded-lg bg-orange-50 px-3 py-2 dark:bg-orange-900/20">
-            <ActivityIndicator size="small" color={colors.tint} />
-            <Text className="text-sm font-medium text-orange-700 dark:text-orange-300">
-              Loading complete summary...
-            </Text>
-          </View>
-        )}
 
         {isPhone ? (
           <ScrollView
