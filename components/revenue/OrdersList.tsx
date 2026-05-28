@@ -3,7 +3,7 @@ import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type ColorMode = (typeof Colors)["light"];
 
@@ -39,6 +39,37 @@ type OrdersListProps = {
   onLoadMore?: () => void;
 };
 
+const styles = StyleSheet.create({
+  headerCell: {
+    borderRightColor: "#e2e8f0",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  rowCell: {
+    borderRightColor: "#e2e8f0",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    minHeight: 56,
+    paddingHorizontal: 12,
+  },
+  lastCell: {
+    borderRightWidth: 0,
+  },
+  actionButton: {
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 34,
+    justifyContent: "center",
+    width: 38,
+  },
+});
+
 export function OrdersList({
   orders,
   total,
@@ -61,7 +92,7 @@ export function OrdersList({
   const amountColumn = 92;
   const dateColumn = 78;
   const actionColumn = 54;
-  const tableColumnStyle = { flex: 1, minWidth: isTablet ? 260 : 190, paddingRight: 16 };
+  const tableColumnStyle = { flex: 1, minWidth: isTablet ? 260 : 190 };
 
   const paymentIcon = (channel: string) => {
     const normalized = channel.toLowerCase();
@@ -107,87 +138,60 @@ export function OrdersList({
         bounces={false}
       >
         <View style={isTablet ? { width: "100%" } : { minWidth: tableMinWidth }}>
-          <View className="flex-row border-b border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
-            <Text
-              className="font-bold uppercase text-slate-500"
-              style={[
-                { width: numberColumn },
-                { fontSize: headerFontSize },
-              ]}
-              numberOfLines={1}
-            >
-              #
-            </Text>
-            <Text
-              className="font-bold uppercase text-slate-500"
-              style={[
-                { width: orderColumn },
-                { fontSize: headerFontSize },
-              ]}
-              numberOfLines={1}
-            >
-              {t("revenue.column.orderId")}
-            </Text>
-            <Text
-              className="font-bold uppercase text-slate-500"
-              style={[
-                tableColumnStyle,
-                { fontSize: headerFontSize },
-              ]}
-              numberOfLines={1}
-            >
-              {t("revenue.column.tableType")}
-            </Text>
-            <Text
-              className="font-bold uppercase text-slate-500"
-              style={[
-                { width: paymentColumn },
-                { fontSize: headerFontSize },
-              ]}
-              numberOfLines={1}
-            >
-              {t("revenue.column.payment")}
-            </Text>
-            <Text
-              className="text-right font-bold uppercase text-slate-500"
-              style={{ width: amountColumn, fontSize: headerFontSize }}
-            >
-              {t("revenue.column.price")}
-            </Text>
-            <Text
-              className="text-right font-bold uppercase text-slate-500"
-              style={{ width: dateColumn, fontSize: headerFontSize }}
-            >
-              {t("revenue.column.date")}
-            </Text>
-            <Text
-              className="text-center font-bold uppercase text-slate-500"
-              style={{ width: actionColumn, fontSize: headerFontSize }}
-            >
-              View
-            </Text>
+          <View className="flex-row border-b border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950">
+            <View style={[styles.headerCell, { width: numberColumn }]}>
+              <Text className="font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+                #
+              </Text>
+            </View>
+            <View style={[styles.headerCell, { width: orderColumn }]}>
+              <Text className="font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+                {t("revenue.column.orderId")}
+              </Text>
+            </View>
+            <View style={[styles.headerCell, tableColumnStyle]}>
+              <Text className="font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+                {t("revenue.column.tableType")}
+              </Text>
+            </View>
+            <View style={[styles.headerCell, { width: paymentColumn }]}>
+              <Text className="font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+                {t("revenue.column.payment")}
+              </Text>
+            </View>
+            <View style={[styles.headerCell, { width: amountColumn }]}>
+              <Text className="text-right font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+                {t("revenue.column.price")}
+              </Text>
+            </View>
+            <View style={[styles.headerCell, { width: dateColumn }]}>
+              <Text className="text-right font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+                {t("revenue.column.date")}
+              </Text>
+            </View>
+            <View style={[styles.headerCell, styles.lastCell, { width: actionColumn }]}>
+              <Text className="text-center font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+                View
+              </Text>
+            </View>
           </View>
 
           {orders.map((order, index) => (
             <View
               key={order.id}
-              className={`flex-row items-center border-b border-slate-100 px-3 py-2 dark:border-slate-800 ${
+              className={`flex-row border-b border-slate-100 dark:border-slate-800 ${
                 index % 2 === 0
                   ? "bg-white dark:bg-slate-900"
                   : "bg-slate-50/50 dark:bg-slate-900/50"
               }`}
             >
-              <Text
-                className="font-medium text-slate-900 dark:text-white"
-                style={[
-                  { width: numberColumn },
-                  { fontSize: bodyFontSize },
-                ]}
-              >
-                {index + 1}
-              </Text>
+              <View style={[styles.rowCell, { width: numberColumn }]}>
+                <Text className="font-medium text-slate-900 dark:text-white" style={{ fontSize: bodyFontSize }}>
+                  {index + 1}
+                </Text>
+              </View>
 
-              <TouchableOpacity onPress={() => onOrderPress(order)} style={{ width: orderColumn }}>
+              <TouchableOpacity onPress={() => onOrderPress(order)} style={[styles.rowCell, { width: orderColumn }]}>
                 <Text
                   numberOfLines={1}
                   className="font-bold text-orange-600"
@@ -198,7 +202,7 @@ export function OrdersList({
               </TouchableOpacity>
 
               <View
-                style={tableColumnStyle}
+                style={[styles.rowCell, tableColumnStyle]}
               >
                 <Text
                   numberOfLines={1}
@@ -214,7 +218,7 @@ export function OrdersList({
                 return (
                   <View
                     className="flex-row items-center"
-                    style={{ width: paymentColumn, gap: 6 }}
+                    style={[styles.rowCell, { width: paymentColumn, gap: 6 }]}
                   >
                     <Ionicons name={paymentIcon(paymentLabel)} size={isTablet ? 16 : 14} color="#64748b" />
                     <Text
@@ -228,28 +232,26 @@ export function OrdersList({
                 );
               })()}
 
-              <Text
-                className="text-right font-bold text-slate-900 dark:text-white"
-                style={{ width: amountColumn, fontSize: bodyFontSize }}
-              >
-                ${order.amount.toFixed(2)}
-              </Text>
+              <View style={[styles.rowCell, { width: amountColumn }]}>
+                <Text className="text-right font-bold text-slate-900 dark:text-white" style={{ fontSize: bodyFontSize }}>
+                  ${order.amount.toFixed(2)}
+                </Text>
+              </View>
 
-              <Text
-                numberOfLines={1}
-                className="text-right text-slate-500"
-                style={{ width: dateColumn, fontSize: bodyFontSize }}
-              >
-                {order.time}
-              </Text>
+              <View style={[styles.rowCell, { width: dateColumn }]}>
+                <Text numberOfLines={1} className="text-right text-slate-500" style={{ fontSize: bodyFontSize }}>
+                  {order.time}
+                </Text>
+              </View>
 
-              <TouchableOpacity
-                className="items-center justify-center rounded-md bg-orange-50 p-2 dark:bg-orange-900/20"
-                style={{ width: actionColumn }}
-                onPress={() => onOrderPress(order)}
-              >
-                <Ionicons name="chevron-forward" size={16} color="#ea580c" />
-              </TouchableOpacity>
+              <View style={[styles.rowCell, styles.lastCell, { width: actionColumn, paddingHorizontal: 8 }]}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => onOrderPress(order)}
+                >
+                  <Ionicons name="chevron-forward" size={17} color="#ea580c" />
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
 
