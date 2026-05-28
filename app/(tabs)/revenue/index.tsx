@@ -100,11 +100,23 @@ const EMPTY_DASHBOARD_SUMMARY: RevenueDashboardSummary = {
 };
 
 const styles = StyleSheet.create({
+  segmentedTabsScroll: {
+    flexGrow: 0,
+    height: 48,
+  },
+  segmentedTabsContent: {
+    alignItems: "center",
+    borderRadius: 10,
+    minHeight: 48,
+    padding: 4,
+  },
   segmentedTab: {
+    alignItems: "center",
+    height: 40,
+    justifyContent: "center",
     minWidth: 128,
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 8,
   },
   segmentedTabActive: {
     shadowColor: "#0f172a",
@@ -377,14 +389,16 @@ export default function RevenueScreen() {
 
         <ScrollView
           horizontal
+          style={styles.segmentedTabsScroll}
           showsHorizontalScrollIndicator={false}
           bounces={false}
-          contentContainerStyle={{
-            gap: responsive.smallSpacing,
-            padding: 4,
-            borderRadius: 10,
-            backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f1f5f9",
-          }}
+          contentContainerStyle={[
+            styles.segmentedTabsContent,
+            {
+              gap: responsive.smallSpacing,
+              backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f1f5f9",
+            },
+          ]}
         >
           {REVENUE_TABS.map((tab) => {
             const isActive = activeTab === tab.key;
