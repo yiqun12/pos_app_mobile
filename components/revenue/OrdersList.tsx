@@ -52,15 +52,16 @@ export function OrdersList({
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
   const isTablet = responsive.isTablet;
-  const tableMinWidth = isTablet ? 860 : 720;
+  const tableMinWidth = 760;
   const headerFontSize = 12;
   const bodyFontSize = isTablet ? 14 : 13;
   const numberColumn = 64;
-  const orderColumn = isTablet ? 150 : 132;
-  const paymentColumn = isTablet ? 170 : 150;
+  const orderColumn = isTablet ? 220 : 150;
+  const paymentColumn = isTablet ? 190 : 150;
   const amountColumn = 92;
   const dateColumn = 78;
   const actionColumn = 54;
+  const tableColumnStyle = { flex: 1, minWidth: isTablet ? 260 : 190, paddingRight: 16 };
 
   const paymentIcon = (channel: string) => {
     const normalized = channel.toLowerCase();
@@ -101,11 +102,11 @@ export function OrdersList({
         </View>
       ) : (
       <ScrollView
-        horizontal
+        horizontal={!isTablet}
         showsHorizontalScrollIndicator={false}
         bounces={false}
       >
-        <View style={{ minWidth: tableMinWidth, width: "100%" }}>
+        <View style={isTablet ? { width: "100%" } : { minWidth: tableMinWidth }}>
           <View className="flex-row border-b border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
             <Text
               className="font-bold uppercase text-slate-500"
@@ -130,7 +131,7 @@ export function OrdersList({
             <Text
               className="font-bold uppercase text-slate-500"
               style={[
-                { flex: 1, minWidth: isTablet ? 230 : 190, paddingRight: 12 },
+                tableColumnStyle,
                 { fontSize: headerFontSize },
               ]}
               numberOfLines={1}
@@ -197,7 +198,7 @@ export function OrdersList({
               </TouchableOpacity>
 
               <View
-                style={{ flex: 1, minWidth: isTablet ? 230 : 190, paddingRight: 12 }}
+                style={tableColumnStyle}
               >
                 <Text
                   numberOfLines={1}
