@@ -53,6 +53,7 @@ const en = {
     "edit": "Edit",
     "english": "EN",
     "error": "Error",
+    "loading": "Loading...",
     "ok": "OK",
     "or": "or",
     "save": "Save",
@@ -280,6 +281,8 @@ const en = {
   },
   "revenue": {
     "addOns": "Add Ons",
+    "businessDay": "Business Day",
+    "businessDayHint": "Showing today's revenue window from 05:00 to next day 05:00.",
     "cashDrawer": "Cash Drawer",
     "cashDrawerPlaceholder": "Cash Drawer Placeholder",
     "channel": "Channel",

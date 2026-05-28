@@ -38,6 +38,19 @@ export type ItemSalesSummary = {
   averagePrice: number;
 };
 
+export type RevenueStatsSummary = {
+  totalRevenue: string;
+  netSales: string;
+  tax: string;
+  tips: string;
+};
+
+export type RevenueDashboardSummary = {
+  stats: RevenueStatsSummary;
+  cashDrawer: CashDrawerSummary;
+  itemSales: ItemSalesSummary[];
+};
+
 function parseNumber(value: unknown, fallback = 0): number {
   if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
   if (typeof value !== "string") return fallback;
@@ -141,6 +154,29 @@ export function summarizeCashDrawer(orders: RevenueOrderSummary[]): CashDrawerSu
   return summary;
 }
 
+export function summarizeRevenueStats(
+  orders: Array<Partial<Pick<RevenueOrderSummary, "amount" | "subtotal" | "tax" | "gratuity" | "total">>>
+): RevenueStatsSummary {
+  let totalRevenue = 0;
+  let netSales = 0;
+  let tax = 0;
+  let tips = 0;
+
+  orders.forEach((order) => {
+    totalRevenue += order.total ?? order.amount ?? 0;
+    netSales += order.subtotal ?? 0;
+    tax += order.tax ?? 0;
+    tips += order.gratuity ?? 0;
+  });
+
+  return {
+    totalRevenue: totalRevenue.toFixed(2),
+    netSales: netSales.toFixed(2),
+    tax: tax.toFixed(2),
+    tips: tips.toFixed(2),
+  };
+}
+
 export function summarizeItemSales(orders: RevenueOrderSummary[]): ItemSalesSummary[] {
   const byName = new Map<string, { quantity: number; revenue: number }>();
 
@@ -162,4 +198,14 @@ export function summarizeItemSales(orders: RevenueOrderSummary[]): ItemSalesSumm
       averagePrice: value.quantity > 0 ? roundMoney(value.revenue / value.quantity) : 0,
     }))
     .sort((a, b) => b.revenue - a.revenue);
+}
+
+export function summarizeRevenueDashboard(
+  orders: RevenueOrderSummary[]
+): RevenueDashboardSummary {
+  return {
+    stats: summarizeRevenueStats(orders),
+    cashDrawer: summarizeCashDrawer(orders),
+    itemSales: summarizeItemSales(orders).slice(0, 20),
+  };
 }

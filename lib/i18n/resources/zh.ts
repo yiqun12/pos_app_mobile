@@ -53,6 +53,7 @@ const zh = {
     "edit": "Edit",
     "english": "EN",
     "error": "Error",
+    "loading": "加载中...",
     "ok": "??",
     "or": "?",
     "save": "Save",
@@ -280,6 +281,8 @@ const zh = {
   },
   "revenue": {
     "addOns": "Add Ons",
+    "businessDay": "营业日",
+    "businessDayHint": "当前只显示 05:00 到次日 05:00 的当天营业日营收。",
     "cashDrawer": "Cash Drawer",
     "cashDrawerPlaceholder": "Cash Drawer Placeholder",
     "channel": "Channel",

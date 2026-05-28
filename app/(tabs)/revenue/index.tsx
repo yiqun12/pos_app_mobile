@@ -1,23 +1,26 @@
 import { StatCard } from "@/components/analytics/StatCard";
-import { DateRangeSelector } from "@/components/revenue/DateRangeSelector";
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useModalAction } from "@/hooks/useModalAction";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
-import { useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/auth";
 import { useStoreSelection } from "@/context/store";
 import { db } from "@/lib/firebase";
 import {
+  formatBusinessDayLabel,
+  getBusinessDayWindow,
+  type RevenueBusinessDayWindow,
+} from "@/lib/pos/revenueBusinessDay";
+import {
   parseReceiptItems,
+  type RevenueDashboardSummary,
   type RevenueOrderSummary,
-  summarizeCashDrawer,
-  summarizeItemSales,
+  summarizeRevenueDashboard,
+  summarizeRevenueStats,
   transformSuccessPaymentSummary,
 } from "@/lib/pos/revenueTransforms";
 import { sliceRevenuePage } from "@/lib/pos/revenuePagination";
@@ -67,35 +70,31 @@ type OrderItem = {
   total: number;
 };
 
-function parseDateToFirestoreString(dateStr: string, isEnd: boolean): string {
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) return "";
-  const month = parts[0].padStart(2, "0");
-  const day = parts[1].padStart(2, "0");
-  const year = parts[2];
-  
-  if (isEnd) {
-    return `${year}-${month}-${day}-23-59-59-99`;
-  } else {
-    return `${year}-${month}-${day}-00-00-00-00`;
-  }
-}
-
-const todayStr = (() => {
-  const date = new Date();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${month}/${day}/${year}`;
-})();
-
-const DEFAULT_RANGE = {
-  startDate: todayStr,
-  endDate: todayStr,
-};
-
 const INITIAL_ORDERS: Order[] = [];
 const REVENUE_PAGE_SIZE = 100;
+const REVENUE_SUMMARY_PAGE_SIZE = 500;
+
+type RevenueTab = "orders" | "cash" | "sales";
+
+const REVENUE_TABS: Array<{ key: RevenueTab; labelKey: string }> = [
+  { key: "orders", labelKey: "revenue.tab.allOrders" },
+  { key: "cash", labelKey: "revenue.tab.cashDrawer" },
+  { key: "sales", labelKey: "revenue.tab.salesAnalysis" },
+];
+
+const EMPTY_DASHBOARD_SUMMARY: RevenueDashboardSummary = {
+  stats: summarizeRevenueStats([]),
+  cashDrawer: {
+    orderCount: 0,
+    cashSales: 0,
+    cardSales: 0,
+    unpaid: 0,
+    otherSales: 0,
+    total: 0,
+    averageOrder: 0,
+  },
+  itemSales: [],
+};
 
 export default function RevenueScreen() {
   const colorScheme = useColorScheme();
@@ -108,73 +107,12 @@ export default function RevenueScreen() {
   const { user } = useAuth();
   const { currentStoreId } = useStoreSelection();
 
-  const PRESETS = useMemo(() => {
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(today.getDate() - 1);
-
-    const formatDate = (date: Date) => {
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const year = date.getFullYear();
-      return `${month}/${day}/${year}`;
-    };
-
-    const getMonthRange = (year: number, monthZeroIndexed: number) => {
-      const start = new Date(year, monthZeroIndexed, 1);
-      const end = new Date(year, monthZeroIndexed + 1, 0);
-      return {
-        startDate: formatDate(start),
-        endDate: formatDate(end),
-      };
-    };
-
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
-    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-    const currentMonthLabel = today.toLocaleString("default", { month: "long" });
-    const lastMonthLabel = new Date(lastMonthYear, lastMonth, 1).toLocaleString("default", { month: "long" });
-
-    return [
-      {
-        label: t("revenue.preset.today"),
-        startDate: formatDate(today),
-        endDate: formatDate(today),
-      },
-      {
-        label: t("revenue.preset.yesterday"),
-        startDate: formatDate(yesterday),
-        endDate: formatDate(yesterday),
-      },
-      {
-        label: currentMonthLabel,
-        ...getMonthRange(currentYear, currentMonth),
-      },
-      {
-        label: lastMonthLabel,
-        ...getMonthRange(lastMonthYear, lastMonth),
-      },
-    ];
-  }, [t]);
-
-  const tabs = useMemo(
-    () => [
-      t("revenue.tab.allOrders"),
-      t("revenue.tab.cashDrawer"),
-      t("revenue.tab.salesAnalysis"),
-    ] as const,
-    [t]
-  );
-
-  const [dateRange, setDateRange] = useState(DEFAULT_RANGE);
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(
-    t("revenue.preset.today")
-  );
-  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>(tabs[0]);
+  const [businessDayWindow, setBusinessDayWindow] = useState(() => getBusinessDayWindow());
+  const [activeTab, setActiveTab] = useState<RevenueTab>("orders");
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [dashboardSummary, setDashboardSummary] = useState<RevenueDashboardSummary>(EMPTY_DASHBOARD_SUMMARY);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
   const [hasMoreOrders, setHasMoreOrders] = useState(false);
   const [lastOrderDoc, setLastOrderDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -185,14 +123,15 @@ export default function RevenueScreen() {
   const fetchRevenuePage = React.useCallback(async ({
     append = false,
     afterDoc = null,
+    windowOverride,
   }: {
     append?: boolean;
     afterDoc?: QueryDocumentSnapshot<DocumentData> | null;
+    windowOverride?: RevenueBusinessDayWindow;
   } = {}) => {
     if (!user || !currentStoreId) return;
 
-    const startStr = parseDateToFirestoreString(dateRange.startDate, false);
-    const endStr = parseDateToFirestoreString(dateRange.endDate, true);
+    const window = windowOverride ?? businessDayWindow;
 
     if (!append) setLoadingOrders(true);
     else setLoadingMoreOrders(true);
@@ -200,8 +139,8 @@ export default function RevenueScreen() {
     try {
       const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
       const constraints: QueryConstraint[] = [
-        where("dateTime", ">=", startStr),
-        where("dateTime", "<=", endStr),
+        where("dateTime", ">=", window.start),
+        where("dateTime", "<=", window.end),
         orderBy("dateTime", "desc"),
       ];
 
@@ -226,56 +165,90 @@ export default function RevenueScreen() {
       if (!append) setLoadingOrders(false);
       else setLoadingMoreOrders(false);
     }
-  }, [currentStoreId, dateRange.endDate, dateRange.startDate, t, user]);
+  }, [businessDayWindow, currentStoreId, t, user]);
+
+  const fetchRevenueSummary = React.useCallback(async (
+    windowOverride?: RevenueBusinessDayWindow
+  ) => {
+    if (!user || !currentStoreId) return;
+
+    const window = windowOverride ?? businessDayWindow;
+    setLoadingSummary(true);
+
+    try {
+      const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
+      const allOrders: RevenueOrderSummary[] = [];
+      let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+
+      while (true) {
+        const constraints: QueryConstraint[] = [
+          where("dateTime", ">=", window.start),
+          where("dateTime", "<=", window.end),
+          orderBy("dateTime", "desc"),
+          limit(REVENUE_SUMMARY_PAGE_SIZE),
+        ];
+
+        if (cursor) constraints.push(startAfter(cursor));
+
+        const snapshot = await getDocs(query(colRef, ...constraints));
+        allOrders.push(
+          ...snapshot.docs.map((docSnap) =>
+            transformSuccessPaymentSummary(docSnap.id, docSnap.data())
+          )
+        );
+
+        if (snapshot.docs.length < REVENUE_SUMMARY_PAGE_SIZE) break;
+        cursor = snapshot.docs[snapshot.docs.length - 1];
+      }
+
+      setDashboardSummary(summarizeRevenueDashboard(allOrders));
+    } catch (err) {
+      console.error("Error loading success_payment summary:", err);
+      setDashboardSummary(EMPTY_DASHBOARD_SUMMARY);
+      Alert.alert(t("common.error"), "Failed to load revenue summary");
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [businessDayWindow, currentStoreId, t, user]);
 
   // Load from Firestore success_payment
   useEffect(() => {
     setOrders([]);
+    setDashboardSummary(EMPTY_DASHBOARD_SUMMARY);
     setLastOrderDoc(null);
     setHasMoreOrders(false);
     void fetchRevenuePage();
-  }, [fetchRevenuePage]);
+    void fetchRevenueSummary();
+  }, [fetchRevenuePage, fetchRevenueSummary]);
 
-  const stats = useMemo(() => {
-    let totalRevenue = 0;
-    let netSales = 0;
-    let tax = 0;
-    let tips = 0;
-
-    orders.forEach((o) => {
-      totalRevenue += o.total ?? o.amount ?? 0;
-      netSales += o.subtotal ?? 0;
-      tax += o.tax ?? 0;
-      tips += o.gratuity ?? 0;
-    });
-
-    return {
-      totalRevenue: totalRevenue.toFixed(2),
-      netSales: netSales.toFixed(2),
-      tax: tax.toFixed(2),
-      tips: tips.toFixed(2),
-    };
-  }, [orders]);
-
+  const stats = dashboardSummary.stats;
   const total = stats.totalRevenue;
-  const cashDrawerSummary = useMemo(() => summarizeCashDrawer(orders as RevenueOrderSummary[]), [orders]);
-  const itemSales = useMemo(() => summarizeItemSales(orders as RevenueOrderSummary[]).slice(0, 20), [orders]);
-
-  const handlePreset = (label: string) => {
-    const preset = PRESETS.find((p) => p.label === label);
-    if (!preset) return;
-    setSelectedPreset(label);
-    setDateRange({ startDate: preset.startDate, endDate: preset.endDate });
-  };
+  const cashDrawerSummary = dashboardSummary.cashDrawer;
+  const itemSales = dashboardSummary.itemSales;
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetchRevenuePage();
+      const nextBusinessDayWindow = getBusinessDayWindow();
+      if (
+        nextBusinessDayWindow.start !== businessDayWindow.start ||
+        nextBusinessDayWindow.end !== businessDayWindow.end
+      ) {
+        setBusinessDayWindow(nextBusinessDayWindow);
+      }
+      await Promise.all([
+        fetchRevenuePage({ windowOverride: nextBusinessDayWindow }),
+        fetchRevenueSummary(nextBusinessDayWindow),
+      ]);
     } finally {
       setRefreshing(false);
     }
   };
+
+  const businessDayLabel = useMemo(
+    () => formatBusinessDayLabel(businessDayWindow),
+    [businessDayWindow]
+  );
 
   const handleLoadMoreOrders = () => {
     if (!lastOrderDoc || !hasMoreOrders || loadingOrders || loadingMoreOrders) return;
@@ -283,7 +256,7 @@ export default function RevenueScreen() {
   };
 
   const handleRevenueScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (activeTab !== tabs[0]) return;
+    if (activeTab !== "orders") return;
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
     if (distanceFromBottom < 180) handleLoadMoreOrders();
@@ -296,31 +269,6 @@ export default function RevenueScreen() {
     });
     setOrderModalVisible(true);
   };
-
-  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
-
-  useModalAction((modalName) => {
-    if (modalName === "orderDetail") {
-      if (orderId) {
-        const targetOrder = orders.find((o) => o.id === orderId);
-        if (targetOrder) {
-          setSelectedOrder({
-            ...targetOrder,
-            items: targetOrder.items ?? parseReceiptItems(targetOrder.receiptData),
-          });
-          setOrderModalVisible(true);
-        } else {
-          Alert.alert(t("common.error"), t("revenue.orderNotFound", { orderId }));
-        }
-      } else if (orders.length > 0) {
-        setSelectedOrder({
-          ...orders[0],
-          items: orders[0].items ?? parseReceiptItems(orders[0].receiptData),
-        });
-        setOrderModalVisible(true);
-      }
-    }
-  });
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
@@ -346,17 +294,17 @@ export default function RevenueScreen() {
           />
         }
       >
-        <DateRangeSelector
-          dateRange={dateRange}
-          selectedPreset={selectedPreset}
-          presets={PRESETS}
-          colors={colors}
-          onPresetSelect={handlePreset}
-          onDateChange={(range) => {
-            setDateRange(range);
-            setSelectedPreset(null);
-          }}
-        />
+        <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <Text className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+            {t("revenue.businessDay")}
+          </Text>
+          <Text className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+            {businessDayLabel}
+          </Text>
+          <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {loadingSummary ? t("common.loading") : t("revenue.businessDayHint")}
+          </Text>
+        </View>
 
         {isPhone ? (
           <ScrollView
@@ -366,31 +314,31 @@ export default function RevenueScreen() {
             contentContainerStyle={{ gap: responsive.baseSpacing }}
           >
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalRevenue")} value={`$${stats.totalRevenue}`} />
+              <StatCard title={t("revenue.totalRevenue")} value={loadingSummary ? "..." : `$${stats.totalRevenue}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.netSales")} value={`$${stats.netSales}`} />
+              <StatCard title={t("revenue.netSales")} value={loadingSummary ? "..." : `$${stats.netSales}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.tax")} value={`$${stats.tax}`} />
+              <StatCard title={t("revenue.tax")} value={loadingSummary ? "..." : `$${stats.tax}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalTips")} value={`$${stats.tips}`} />
+              <StatCard title={t("revenue.totalTips")} value={loadingSummary ? "..." : `$${stats.tips}`} />
             </View>
           </ScrollView>
         ) : (
           <View className="flex-row gap-4">
             <View className="flex-1">
-              <StatCard title={t("revenue.totalRevenue")} value={`$${stats.totalRevenue}`} />
+              <StatCard title={t("revenue.totalRevenue")} value={loadingSummary ? "..." : `$${stats.totalRevenue}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.netSales")} value={`$${stats.netSales}`} />
+              <StatCard title={t("revenue.netSales")} value={loadingSummary ? "..." : `$${stats.netSales}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.tax")} value={`$${stats.tax}`} />
+              <StatCard title={t("revenue.tax")} value={loadingSummary ? "..." : `$${stats.tax}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.totalTips")} value={`$${stats.tips}`} />
+              <StatCard title={t("revenue.totalTips")} value={loadingSummary ? "..." : `$${stats.tips}`} />
             </View>
           </View>
         )}
@@ -406,12 +354,12 @@ export default function RevenueScreen() {
             backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f1f5f9",
           }}
         >
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab;
+          {REVENUE_TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
             return (
               <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab)}
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
                 className={`min-w-[128px] rounded-lg px-4 py-2 ${
                   isActive ? "bg-white shadow-sm dark:bg-slate-800" : "bg-transparent"
                 }`}
@@ -423,14 +371,14 @@ export default function RevenueScreen() {
                   }`}
                   style={{ fontSize: tabFontSize }}
                 >
-                  {tab}
+                  {t(tab.labelKey)}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
-        {activeTab === tabs[0] && (
+        {activeTab === "orders" && (
           <OrdersList
             orders={orders}
             total={total}
@@ -443,7 +391,7 @@ export default function RevenueScreen() {
           />
         )}
 
-        {activeTab === tabs[1] && (
+        {activeTab === "cash" && (
           <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.cashDrawer")}
@@ -473,7 +421,7 @@ export default function RevenueScreen() {
           </View>
         )}
 
-        {activeTab === tabs[2] && (
+        {activeTab === "sales" && (
           <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.salesAnalysis")}
