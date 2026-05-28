@@ -42,6 +42,7 @@ import {
   type NativeSyntheticEvent,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -95,6 +96,26 @@ const EMPTY_DASHBOARD_SUMMARY: RevenueDashboardSummary = {
   },
   itemSales: [],
 };
+
+const styles = StyleSheet.create({
+  segmentedTab: {
+    minWidth: 128,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  segmentedTabActive: {
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  segmentedTabText: {
+    fontWeight: "600",
+    textAlign: "center",
+  },
+});
 
 export default function RevenueScreen() {
   const colorScheme = useColorScheme();
@@ -360,16 +381,25 @@ export default function RevenueScreen() {
               <TouchableOpacity
                 key={tab.key}
                 onPress={() => setActiveTab(tab.key)}
-                className={`min-w-[128px] rounded-lg px-4 py-2 ${
-                  isActive ? "bg-white shadow-sm dark:bg-slate-800" : "bg-transparent"
-                }`}
+                style={[
+                  styles.segmentedTab,
+                  {
+                    backgroundColor: isActive
+                      ? colorScheme === "dark" ? "#1e293b" : "#ffffff"
+                      : "transparent",
+                  },
+                  isActive && styles.segmentedTabActive,
+                ]}
               >
                 <Text
                   numberOfLines={1}
-                  className={`text-center font-semibold ${
-                    isActive ? "text-orange-600" : "text-slate-500"
-                  }`}
-                  style={{ fontSize: tabFontSize }}
+                  style={[
+                    styles.segmentedTabText,
+                    {
+                      fontSize: tabFontSize,
+                      color: isActive ? "#ea580c" : "#64748b",
+                    },
+                  ]}
                 >
                   {t(tab.labelKey)}
                 </Text>
