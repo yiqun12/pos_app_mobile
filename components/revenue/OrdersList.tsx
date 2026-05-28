@@ -168,8 +168,8 @@ export function OrdersList({
                 {t("revenue.column.tableType")}
               </Text>
             </View>
-            <View style={[styles.headerCell, paymentColumnStyle]}>
-              <Text className="font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
+            <View style={[styles.headerCell, styles.centerCell, paymentColumnStyle]}>
+              <Text className="text-center font-bold uppercase text-slate-500" style={{ fontSize: headerFontSize }} numberOfLines={1}>
                 {t("revenue.column.payment")}
               </Text>
             </View>
