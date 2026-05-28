@@ -52,15 +52,22 @@ export function OrdersList({
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
   const isTablet = responsive.isTablet;
-  const tableMinWidth = isTablet ? 0 : 680;
-  const headerFontSize = isTablet ? 13 : 12;
+  const tableMinWidth = isTablet ? 860 : 720;
+  const headerFontSize = 12;
   const bodyFontSize = isTablet ? 14 : 13;
-  const metaFontSize = isTablet ? 12 : 11;
-  const numberColumn = isTablet ? 44 : 48;
-  const orderColumn = isTablet ? 92 : 92;
-  const amountColumn = isTablet ? 86 : 84;
-  const dateColumn = isTablet ? 96 : 92;
-  const actionColumn = isTablet ? 52 : 48;
+  const numberColumn = 64;
+  const orderColumn = isTablet ? 150 : 132;
+  const paymentColumn = isTablet ? 170 : 150;
+  const amountColumn = 92;
+  const dateColumn = 78;
+  const actionColumn = 54;
+
+  const paymentIcon = (channel: string) => {
+    const normalized = channel.toLowerCase();
+    if (normalized.includes("cash")) return "cash";
+    if (normalized.includes("unpaid")) return "alert-circle";
+    return "card";
+  };
 
   return (
     <View className="flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -94,11 +101,11 @@ export function OrdersList({
         </View>
       ) : (
       <ScrollView
-        horizontal={!isTablet}
+        horizontal
         showsHorizontalScrollIndicator={false}
         bounces={false}
       >
-        <View style={isTablet ? { flex: 1 } : { minWidth: tableMinWidth }}>
+        <View style={{ minWidth: tableMinWidth, width: "100%" }}>
           <View className="flex-row border-b border-slate-100 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
             <Text
               className="font-bold uppercase text-slate-500"
@@ -106,8 +113,9 @@ export function OrdersList({
                 { width: numberColumn },
                 { fontSize: headerFontSize },
               ]}
+              numberOfLines={1}
             >
-              {t("revenue.column.number")}
+              #
             </Text>
             <Text
               className="font-bold uppercase text-slate-500"
@@ -115,24 +123,27 @@ export function OrdersList({
                 { width: orderColumn },
                 { fontSize: headerFontSize },
               ]}
+              numberOfLines={1}
             >
               {t("revenue.column.orderId")}
             </Text>
             <Text
               className="font-bold uppercase text-slate-500"
               style={[
-                isTablet ? { flex: 1.3, paddingRight: 10 } : { width: 164 },
+                { flex: 1, minWidth: isTablet ? 230 : 190, paddingRight: 12 },
                 { fontSize: headerFontSize },
               ]}
+              numberOfLines={1}
             >
               {t("revenue.column.tableType")}
             </Text>
             <Text
               className="font-bold uppercase text-slate-500"
               style={[
-                isTablet ? { flex: 0.9 } : { width: 110 },
+                { width: paymentColumn },
                 { fontSize: headerFontSize },
               ]}
+              numberOfLines={1}
             >
               {t("revenue.column.payment")}
             </Text>
@@ -186,11 +197,7 @@ export function OrdersList({
               </TouchableOpacity>
 
               <View
-                style={
-                  isTablet
-                    ? { flex: 1.3, paddingRight: 10 }
-                    : { width: 164, paddingRight: 10 }
-                }
+                style={{ flex: 1, minWidth: isTablet ? 230 : 190, paddingRight: 12 }}
               >
                 <Text
                   numberOfLines={1}
@@ -199,28 +206,26 @@ export function OrdersList({
                 >
                   {order.guest}
                 </Text>
-                <Text
-                  numberOfLines={1}
-                  className="mt-0.5 text-slate-500 dark:text-slate-400"
-                  style={{ fontSize: metaFontSize }}
-                >
-                  {order.channel}
-                </Text>
               </View>
 
-              <View
-                className="flex-row items-center"
-                style={isTablet ? { flex: 0.9, gap: 6 } : { width: 110, gap: 6 }}
-              >
-                <Ionicons name="card" size={isTablet ? 16 : 14} color="#64748b" />
-                <Text
-                  numberOfLines={1}
-                  className="text-slate-600 dark:text-slate-400"
-                  style={{ fontSize: bodyFontSize }}
-                >
-                  {t("revenue.creditCard")}
-                </Text>
-              </View>
+              {(() => {
+                const paymentLabel = order.channel || "Unknown";
+                return (
+                  <View
+                    className="flex-row items-center"
+                    style={{ width: paymentColumn, gap: 6 }}
+                  >
+                    <Ionicons name={paymentIcon(paymentLabel)} size={isTablet ? 16 : 14} color="#64748b" />
+                    <Text
+                      numberOfLines={1}
+                      className="text-slate-600 dark:text-slate-400"
+                      style={{ fontSize: bodyFontSize }}
+                    >
+                      {paymentLabel}
+                    </Text>
+                  </View>
+                );
+              })()}
 
               <Text
                 className="text-right font-bold text-slate-900 dark:text-white"
