@@ -4,6 +4,7 @@ import { OrdersList } from "@/components/revenue/OrdersList";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useStore } from "@/hooks/firestore/useStore";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +12,7 @@ import { useAuth } from "@/context/auth";
 import { useStoreSelection } from "@/context/store";
 import { db } from "@/lib/firebase";
 import {
+  deriveStoreTimeZone,
   formatBusinessDayLabel,
   getBusinessDayWindow,
   type RevenueBusinessDayWindow,
@@ -127,8 +129,13 @@ export default function RevenueScreen() {
 
   const { user } = useAuth();
   const { currentStoreId } = useStoreSelection();
+  const { data: store } = useStore();
+  const storeTimeZone = useMemo(
+    () => deriveStoreTimeZone(store?.address.zip, store?.address.state),
+    [store?.address.state, store?.address.zip]
+  );
 
-  const [businessDayWindow, setBusinessDayWindow] = useState(() => getBusinessDayWindow());
+  const [businessDayWindow, setBusinessDayWindow] = useState(() => getBusinessDayWindow(new Date(), storeTimeZone));
   const [activeTab, setActiveTab] = useState<RevenueTab>("orders");
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [dashboardSummary, setDashboardSummary] = useState<RevenueDashboardSummary>(EMPTY_DASHBOARD_SUMMARY);
@@ -250,7 +257,7 @@ export default function RevenueScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const nextBusinessDayWindow = getBusinessDayWindow();
+      const nextBusinessDayWindow = getBusinessDayWindow(new Date(), storeTimeZone);
       if (
         nextBusinessDayWindow.start !== businessDayWindow.start ||
         nextBusinessDayWindow.end !== businessDayWindow.end
@@ -267,9 +274,13 @@ export default function RevenueScreen() {
   };
 
   const businessDayLabel = useMemo(
-    () => formatBusinessDayLabel(businessDayWindow),
-    [businessDayWindow]
+    () => formatBusinessDayLabel(businessDayWindow, storeTimeZone),
+    [businessDayWindow, storeTimeZone]
   );
+
+  useEffect(() => {
+    setBusinessDayWindow(getBusinessDayWindow(new Date(), storeTimeZone));
+  }, [storeTimeZone]);
 
   const handleLoadMoreOrders = () => {
     if (!lastOrderDoc || !hasMoreOrders || loadingOrders || loadingMoreOrders) return;
