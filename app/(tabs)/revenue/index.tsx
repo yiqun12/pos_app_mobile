@@ -1,6 +1,7 @@
 import { StatCard } from "@/components/analytics/StatCard";
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
+import { RevenueBreakdownPieChart } from "@/components/revenue/RevenueBreakdownPieChart";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -97,6 +98,17 @@ const EMPTY_DASHBOARD_SUMMARY: RevenueDashboardSummary = {
     averageOrder: 0,
   },
   itemSales: [],
+  revenueBreakdown: {
+    totalRevenue: 0,
+    totalParts: 0,
+    items: [
+      { key: "subtotal", label: "Subtotal", value: 0, percentage: 0, color: "#0088FE" },
+      { key: "tax", label: "Tax", value: 0, percentage: 0, color: "#00C49F" },
+      { key: "gratuity", label: "Cash Gratuity", value: 0, percentage: 0, color: "#FF8042" },
+      { key: "serviceFee", label: "Service Fee", value: 0, percentage: 0, color: "#9e2820" },
+      { key: "discount", label: "Discount", value: 0, percentage: 0, color: "#000000" },
+    ],
+  },
 };
 
 const styles = StyleSheet.create({
@@ -481,6 +493,10 @@ export default function RevenueScreen() {
             <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.salesAnalysis")}
             </Text>
+            <RevenueBreakdownPieChart
+              revenueBreakdown={dashboardSummary.revenueBreakdown}
+              loading={loadingSummary}
+            />
             {itemSales.length === 0 ? (
               <Text className="text-sm text-slate-500 dark:text-slate-400">
                 {t("revenue.salesAnalysisPlaceholder")}

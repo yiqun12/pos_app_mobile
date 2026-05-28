@@ -16,6 +16,7 @@ export type RevenueOrderSummary = {
   serviceFee: number;
   tax: number;
   gratuity: number;
+  discount: number;
   total: number;
   dateTime: string;
   receiptData?: string;
@@ -45,10 +46,27 @@ export type RevenueStatsSummary = {
   tips: string;
 };
 
+export type RevenueBreakdownKey = "subtotal" | "tax" | "gratuity" | "serviceFee" | "discount";
+
+export type RevenueBreakdownItem = {
+  key: RevenueBreakdownKey;
+  label: string;
+  value: number;
+  percentage: number;
+  color: string;
+};
+
+export type RevenueBreakdownSummary = {
+  totalRevenue: number;
+  totalParts: number;
+  items: RevenueBreakdownItem[];
+};
+
 export type RevenueDashboardSummary = {
   stats: RevenueStatsSummary;
   cashDrawer: CashDrawerSummary;
   itemSales: ItemSalesSummary[];
+  revenueBreakdown: RevenueBreakdownSummary;
 };
 
 function parseNumber(value: unknown, fallback = 0): number {
@@ -99,6 +117,7 @@ export function transformSuccessPaymentSummary(
   const tax = parseNumber(meta.tax, 0);
   const gratuity = parseNumber(meta.tips, 0);
   const serviceFee = parseNumber(meta.service_fee, 0);
+  const discount = parseNumber(meta.discount, 0);
   const total = parseNumber(meta.total, 0);
   const amount = typeof data.amount === "number" ? data.amount / 100 : total;
   const dateTime = data.dateTime || "";
@@ -113,6 +132,7 @@ export function transformSuccessPaymentSummary(
     serviceFee,
     tax,
     gratuity,
+    discount,
     total,
     dateTime,
     receiptData: data.receiptData,
@@ -177,6 +197,55 @@ export function summarizeRevenueStats(
   };
 }
 
+const REVENUE_BREAKDOWN_PARTS: Array<Omit<RevenueBreakdownItem, "value" | "percentage">> = [
+  { key: "subtotal", label: "Subtotal", color: "#0088FE" },
+  { key: "tax", label: "Tax", color: "#00C49F" },
+  { key: "gratuity", label: "Cash Gratuity", color: "#FF8042" },
+  { key: "serviceFee", label: "Service Fee", color: "#9e2820" },
+  { key: "discount", label: "Discount", color: "#000000" },
+];
+
+export function summarizeRevenueBreakdown(
+  orders: Array<Partial<Pick<RevenueOrderSummary, "subtotal" | "tax" | "gratuity" | "serviceFee" | "discount">>>
+): RevenueBreakdownSummary {
+  const emptyTotals: Record<RevenueBreakdownKey, number> = {
+    subtotal: 0,
+    tax: 0,
+    gratuity: 0,
+    serviceFee: 0,
+    discount: 0,
+  };
+  const totals = orders.reduce<Record<RevenueBreakdownKey, number>>(
+    (accumulator, order) => {
+      accumulator.subtotal += order.subtotal ?? 0;
+      accumulator.tax += order.tax ?? 0;
+      accumulator.gratuity += order.gratuity ?? 0;
+      accumulator.serviceFee += order.serviceFee ?? 0;
+      accumulator.discount += order.discount ?? 0;
+      return accumulator;
+    },
+    emptyTotals
+  );
+
+  const rawItems = REVENUE_BREAKDOWN_PARTS.map((part) => ({
+    ...part,
+    value: roundMoney(totals[part.key]),
+  }));
+  const totalParts = roundMoney(rawItems.reduce((sum, item) => sum + item.value, 0));
+  const totalRevenue = roundMoney(
+    totals.subtotal + totals.tax + totals.gratuity + totals.serviceFee - totals.discount
+  );
+
+  return {
+    totalRevenue,
+    totalParts,
+    items: rawItems.map((item) => ({
+      ...item,
+      percentage: totalParts > 0 ? roundMoney((item.value / totalParts) * 100) : 0,
+    })),
+  };
+}
+
 export function summarizeItemSales(orders: RevenueOrderSummary[]): ItemSalesSummary[] {
   const byName = new Map<string, { quantity: number; revenue: number }>();
 
@@ -207,5 +276,6 @@ export function summarizeRevenueDashboard(
     stats: summarizeRevenueStats(orders),
     cashDrawer: summarizeCashDrawer(orders),
     itemSales: summarizeItemSales(orders).slice(0, 20),
+    revenueBreakdown: summarizeRevenueBreakdown(orders),
   };
 }
