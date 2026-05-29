@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/Button";
 import {
   buildCashPaymentBreakdown,
+  buildCashReceivedForTip,
   calculateCashGratuityFromPercent,
   type CashPaymentBreakdown,
 } from "@/lib/pos/orderTransforms";
@@ -71,15 +72,32 @@ export function CashPaymentModal({
   }, [amountDue, visible]);
 
   const setActiveAmount = (value: string) => {
-    if (activeInput === "tip") setGratuity(value);
-    else setCashReceived(value);
+    if (activeInput === "tip") {
+      updateGratuity(value);
+      return;
+    }
+    setCashReceived(value);
+  };
+
+  const updateGratuity = (value: string) => {
+    setGratuity(value);
+    const nextTip = parseMoneyInput(value);
+    if (nextTip <= 0) return;
+    setCashReceived((currentCash) =>
+      buildCashReceivedForTip({
+        amountDue,
+        currentCashReceived: parseMoneyInput(currentCash),
+        gratuity: nextTip,
+      }).toFixed(2)
+    );
   };
 
   const applyTipPercent = (percent: number) => {
-    setGratuity(calculateCashGratuityFromPercent({
+    const nextTip = calculateCashGratuityFromPercent({
       subtotal: tipBaseAmount,
       percent,
-    }).toFixed(2));
+    });
+    updateGratuity(nextTip.toFixed(2));
     setActiveInput("tip");
   };
 
@@ -96,7 +114,7 @@ export function CashPaymentModal({
       label: "Overage as Tip",
       tone: "orange",
       onPress: () => {
-        if (overage > 0) setGratuity(overage.toFixed(2));
+        if (overage > 0) updateGratuity(overage.toFixed(2));
         setActiveInput("tip");
       },
     },
@@ -141,6 +159,22 @@ export function CashPaymentModal({
             </Text>
             <Text className="text-base font-bold text-slate-900 dark:text-white">
               {money(breakdown.basePayment)}
+            </Text>
+          </View>
+          <View className="mt-2 flex-row justify-between">
+            <Text className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              Tip
+            </Text>
+            <Text className="text-base font-bold text-slate-900 dark:text-white">
+              {money(breakdown.gratuity)}
+            </Text>
+          </View>
+          <View className="mt-2 flex-row justify-between">
+            <Text className="text-sm font-medium text-slate-500 dark:text-slate-400">
+              Payment Total
+            </Text>
+            <Text className="text-base font-bold text-slate-900 dark:text-white">
+              {money(breakdown.paymentTotal)}
             </Text>
           </View>
           <View className="mt-2 flex-row justify-between">
@@ -210,7 +244,7 @@ export function CashPaymentModal({
             ))}
             <TouchableOpacity
               onPress={() => {
-                setGratuity("");
+                updateGratuity("");
                 setActiveInput("tip");
               }}
               className="min-h-[42px] flex-1 basis-[28%] items-center justify-center rounded-lg bg-slate-700 px-3"
