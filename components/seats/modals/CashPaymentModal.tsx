@@ -118,11 +118,6 @@ export function CashPaymentModal({
         setActiveInput("tip");
       },
     },
-    {
-      label: "Open Drawer",
-      tone: "blue",
-      onPress: onOpenCashDrawer,
-    },
   ];
 
   return (
