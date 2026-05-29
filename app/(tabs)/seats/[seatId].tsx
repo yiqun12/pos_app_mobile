@@ -960,6 +960,7 @@ export default function SeatScreen() {
       <CashPaymentModal
         visible={cashPaymentModalVisible}
         amountDue={Math.max(0, order.total - order.paidAmount)}
+        tipBaseAmount={order.taxableSubtotal ?? order.subtotal}
         onClose={() => setCashPaymentModalVisible(false)}
         onPayment={(breakdown) => void handleCashPayment(breakdown)}
         onOpenCashDrawer={() => void writeOpenCashDrawerEvent()}

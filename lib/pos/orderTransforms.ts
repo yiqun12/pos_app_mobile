@@ -72,6 +72,11 @@ export type CashPaymentBreakdownInput = {
   gratuity?: number;
 };
 
+export type CashGratuityPercentInput = {
+  subtotal: number;
+  percent: number;
+};
+
 export type CashPaymentBreakdown = {
   basePayment: number;
   gratuity: number;
@@ -224,6 +229,13 @@ export function buildCashPaymentBreakdown({
     changeDue: roundMoney(Math.max(0, received - paymentTotal)),
     isFullPayment: basePayment >= due && due > 0,
   };
+}
+
+export function calculateCashGratuityFromPercent({
+  subtotal,
+  percent,
+}: CashGratuityPercentInput): number {
+  return roundMoney(Math.max(0, subtotal) * (Math.max(0, percent) / 100));
 }
 
 function stableAttributeSignature(value: unknown): string {
