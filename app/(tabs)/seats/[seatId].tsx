@@ -1,5 +1,6 @@
 import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
+import { CashPaymentModal } from "@/components/seats/modals/CashPaymentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
 import { PriceEditModal } from "@/components/seats/modals/PriceEditModal";
 import { ServiceFeeModal } from "@/components/seats/modals/ServiceFeeModal";
@@ -21,10 +22,15 @@ import { useStore } from "@/hooks/firestore/useStore";
 import { db, functions } from "@/lib/firebase";
 import {
   calculateWebOrderTotals,
+  applyTargetTotalAdjustment,
+  buildCashPaymentBreakdown,
   cartItemSignature,
   cleanProductData,
   createWebCartItem,
   diffKitchenChanges,
+  getProductsSubtotal,
+  getSurchargeTotal,
+  isSurchargeCartItem,
 } from "@/lib/pos/orderTransforms";
 import { formatWebDate } from "@/lib/pos/webDate";
 import { httpsCallable } from "firebase/functions";
@@ -53,6 +59,7 @@ export default function SeatScreen() {
 
   const [priceEditItem, setPriceEditItem] = useState<OrderItem | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [cashPaymentModalVisible, setCashPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
   const [serviceFeeModalVisible, setServiceFeeModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
@@ -205,19 +212,20 @@ export default function SeatScreen() {
     ]);
   };
 
-  const writeCashSuccessPayment = async (amount: number, currentOrder: Order) => {
+  const writeCashSuccessPayment = async (baseAmount: number, currentOrder: Order, extraTip = 0) => {
     if (!user || !currentStoreId || !store || !tableName) return;
     const dateStr = formatWebDate();
     const discount = currentOrder.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0);
-    const paymentRatio = currentOrder.total > 0 ? Math.min(1, amount / currentOrder.total) : 1;
+    const paymentRatio = currentOrder.total > 0 ? Math.min(1, baseAmount / currentOrder.total) : 1;
+    const paymentTotal = baseAmount + extraTip;
 
     await addDoc(
       collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment"),
       {
-        amount: Math.round(amount * 100),
+        amount: Math.round(paymentTotal * 100),
         amount_capturable: 0,
         amount_details: { tip: { amount: 0 } },
-        amount_received: Math.round(amount * 100),
+        amount_received: Math.round(paymentTotal * 100),
         application: "",
         application_fee_amount: 0,
         automatic_payment_methods: null,
@@ -242,8 +250,8 @@ export default function SeatScreen() {
           service_fee: Number((currentOrder.serviceFee * paymentRatio).toFixed(2)),
           subtotal: Number(((currentOrder.taxableSubtotal ?? currentOrder.subtotal) * paymentRatio).toFixed(2)),
           tax: Number((currentOrder.taxAmount * paymentRatio).toFixed(2)),
-          tips: Number((tipAmount * paymentRatio).toFixed(2)),
-          total: Number(amount.toFixed(2)),
+          tips: Number((tipAmount * paymentRatio + extraTip).toFixed(2)),
+          total: Number(paymentTotal.toFixed(2)),
         },
         next_action: null,
         object: "payment_intent",
@@ -257,7 +265,7 @@ export default function SeatScreen() {
         payment_method_types: ["Paid_by_Cash"],
         powerBy: "Paid by Cash",
         processing: null,
-        receiptData: JSON.stringify(rawProducts),
+        receiptData: JSON.stringify(cleanProductData(rawProducts)),
         receipt_email: null,
         review: null,
         setup_future_usage: null,
@@ -487,13 +495,10 @@ export default function SeatScreen() {
   });
 
   const order = useMemo<Order>(() => {
-    const itemsSubtotal = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    const itemsSubtotal = getProductsSubtotal(rawProducts, { includeSurcharge: false });
     const taxRate = store?.taxRate ?? 0;
     const discount = manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0;
-    const surcharge = manualAdjustment > 0 ? manualAdjustment : 0;
+    const surcharge = getSurchargeTotal(rawProducts);
     const totals = calculateWebOrderTotals({
       itemsSubtotal,
       taxRate,
@@ -527,7 +532,7 @@ export default function SeatScreen() {
       paidAmount,
       createdAt: Date.now(),
     };
-  }, [items, serviceFeeAmount, manualAdjustment, paidAmount, seatId, store?.taxRate, taxExempt, tipAmount]);
+  }, [items, rawProducts, serviceFeeAmount, manualAdjustment, paidAmount, seatId, store?.taxRate, taxExempt, tipAmount]);
 
   const handleAddItem = (orderItem: OrderItem) => {
     const menuItems = store?.menu?.items || [];
@@ -561,6 +566,7 @@ export default function SeatScreen() {
 
   const handleIncrement = (id: string) => {
     const newRaw = rawProducts.map((p) => {
+      if (isSurchargeCartItem(p)) return p;
       if (String(p.count) === id) {
         const newQty = (p.quantity ?? 1) + 1;
         const basePrice = parseFloat(p.subtotal || "0");
@@ -577,6 +583,7 @@ export default function SeatScreen() {
 
   const handleDecrement = (id: string) => {
     const newRaw = rawProducts.map((p) => {
+      if (isSurchargeCartItem(p)) return p;
       if (String(p.count) === id) {
         const newQty = (p.quantity ?? 1) - 1;
         if (newQty <= 0) return null;
@@ -595,6 +602,7 @@ export default function SeatScreen() {
   const handleEditPriceSave = (newPrice: number) => {
     if (priceEditItem) {
       const newRaw = rawProducts.map((p) => {
+        if (isSurchargeCartItem(p)) return p;
         if (String(p.count) === priceEditItem.id) {
           return {
             ...p,
@@ -608,25 +616,67 @@ export default function SeatScreen() {
     }
   };
 
+  const handleAdjustTotal = (amountDifference: number, nextTaxExempt = taxExempt) => {
+    const baseSubtotal = getProductsSubtotal(rawProducts, { includeSurcharge: false });
+    const result = applyTargetTotalAdjustment({
+      products: rawProducts,
+      targetSubtotal: baseSubtotal + amountDifference,
+      taxRate: store?.taxRate ?? 0,
+      taxExempt: nextTaxExempt,
+      count: Date.now(),
+    });
+
+    setManualAdjustment(result.manualAdjustment);
+    setTaxExempt(nextTaxExempt);
+    void saveToFirestore(result.products);
+  };
+
+  const resetPaymentState = () => {
+    setPaidAmount(0);
+    setManualAdjustment(0);
+    setTipAmount(0);
+    setTaxExempt(false);
+    setServiceFeeAmount(0);
+  };
+
+  const handleCashPayment = async (breakdown: ReturnType<typeof buildCashPaymentBreakdown>) => {
+    try {
+      await writeCashSuccessPayment(breakdown.basePayment, order, breakdown.gratuity);
+      const nextPaidAmount = paidAmount + breakdown.basePayment;
+      if (breakdown.isFullPayment || nextPaidAmount >= order.total) {
+        await clearTableInFirestore();
+        resetPaymentState();
+      } else {
+        setPaidAmount(nextPaidAmount);
+      }
+      Alert.alert(
+        t("seats.paymentSuccessful"),
+        t("seats.paidViaMethod", { amount: breakdown.paymentTotal.toFixed(2), method: "cash" })
+      );
+    } catch (e) {
+      console.error("Error writing cash payment:", e);
+      Alert.alert(t("common.error"), "Failed to write cash payment");
+    }
+  };
+
   const handlePayment = async (method: "cash" | "card" | "split", amount: number) => {
     if (method === "cash") {
       try {
-        await writeCashSuccessPayment(amount, order);
-        const nextPaidAmount = paidAmount + amount;
+        const breakdown = buildCashPaymentBreakdown({
+          amountDue: Math.max(0, order.total - paidAmount),
+          cashReceived: amount,
+        });
+        await writeCashSuccessPayment(breakdown.basePayment, order, breakdown.gratuity);
+        const nextPaidAmount = paidAmount + breakdown.basePayment;
         if (nextPaidAmount >= order.total) {
-          await writeOpenCashDrawerEvent();
           await clearTableInFirestore();
-          setPaidAmount(0);
-          setManualAdjustment(0);
-          setTipAmount(0);
-          setTaxExempt(false);
-          setServiceFeeAmount(0);
+          resetPaymentState();
         } else {
           setPaidAmount(nextPaidAmount);
         }
         Alert.alert(
           t("seats.paymentSuccessful"),
-          t("seats.paidViaMethod", { amount: amount.toFixed(2), method })
+          t("seats.paidViaMethod", { amount: breakdown.paymentTotal.toFixed(2), method })
         );
       } catch (e) {
         console.error("Error writing cash payment:", e);
@@ -752,7 +802,10 @@ export default function SeatScreen() {
                     item={item}
                     onIncrement={handleIncrement}
                     onDecrement={handleDecrement}
-                    onPress={setPriceEditItem}
+                    onPress={(nextItem) => {
+                      if (nextItem.menuItemId === "SURCHARGE_ITEM") return;
+                      setPriceEditItem(nextItem);
+                    }}
                   />
                 ))
               )}
@@ -858,18 +911,22 @@ export default function SeatScreen() {
 
       <AdjustmentModal
         visible={adjustmentModalVisible}
-        baseAmount={items.reduce((sum, item) => sum + item.price * item.quantity, 0)}
-        currentAmount={items.reduce((sum, item) => sum + item.price * item.quantity, 0) + manualAdjustment}
+        baseAmount={getProductsSubtotal(rawProducts, { includeSurcharge: false })}
+        currentAmount={
+          getProductsSubtotal(rawProducts, { includeSurcharge: false })
+          + getSurchargeTotal(rawProducts)
+          + Math.min(0, manualAdjustment)
+        }
         mode="targetTotal"
         taxExempt={taxExempt}
         onClose={() => setAdjustmentModalVisible(false)}
-        onConfirm={setManualAdjustment}
+        onConfirm={handleAdjustTotal}
         onTaxExemptChange={setTaxExempt}
       />
 
       <ServiceFeeModal
         visible={serviceFeeModalVisible}
-        baseAmount={items.reduce((sum, item) => sum + item.price * item.quantity, 0) + Math.max(0, manualAdjustment)}
+        baseAmount={getProductsSubtotal(rawProducts)}
         currentAmount={serviceFeeAmount}
         onClose={() => setServiceFeeModalVisible(false)}
         onConfirm={setServiceFeeAmount}
@@ -897,6 +954,15 @@ export default function SeatScreen() {
         remaining={order.total - order.paidAmount}
         onClose={() => setPaymentModalVisible(false)}
         onPayment={handlePayment}
+        onCashPress={() => setCashPaymentModalVisible(true)}
+      />
+
+      <CashPaymentModal
+        visible={cashPaymentModalVisible}
+        amountDue={Math.max(0, order.total - order.paidAmount)}
+        onClose={() => setCashPaymentModalVisible(false)}
+        onPayment={(breakdown) => void handleCashPayment(breakdown)}
+        onOpenCashDrawer={() => void writeOpenCashDrawerEvent()}
       />
     </View>
   );

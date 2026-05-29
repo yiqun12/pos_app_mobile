@@ -12,6 +12,7 @@ interface PaymentModalProps {
   remaining: number;
   onClose: () => void;
   onPayment: (method: "cash" | "card" | "split", amount: number) => void;
+  onCashPress?: () => void;
 }
 
 export function PaymentModal({
@@ -20,6 +21,7 @@ export function PaymentModal({
   remaining,
   onClose,
   onPayment,
+  onCashPress,
 }: PaymentModalProps) {
   const [amount, setAmount] = useState(remaining.toFixed(2));
   const [splitMode, setSplitMode] = useState<"full" | "equal" | "item">("full");
@@ -152,7 +154,14 @@ export function PaymentModal({
                     icon="cash"
                     size="lg"
                     className="bg-green-600 border-green-600"
-                    onPress={() => handlePay("cash")}
+                    onPress={() => {
+                      if (onCashPress) {
+                        onClose();
+                        onCashPress();
+                        return;
+                      }
+                      handlePay("cash");
+                    }}
                 />
                 <Button
                     label={t("seats.payment.otherMethods")}

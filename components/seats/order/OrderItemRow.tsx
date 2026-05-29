@@ -24,11 +24,13 @@ export function OrderItemRow({
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
+  const isSurcharge = item.menuItemId === "SURCHARGE_ITEM";
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={isSurcharge ? 1 : 0.7}
       onPress={() => onPress(item)}
+      disabled={isSurcharge}
       className="mb-3 flex-row items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800"
     >
       {/* Food Image Placeholder */}
@@ -124,26 +126,37 @@ export function OrderItemRow({
       </View>
 
       <View className="ml-3 flex-col items-end gap-3">
-        <View className="flex-row items-center rounded-lg bg-slate-100 dark:bg-slate-800">
-          <TouchableOpacity
-            onPress={() => onDecrement(item.id)}
-            className="p-2"
-          >
-            <Ionicons name="remove" size={20} color={colors.text} />
-          </TouchableOpacity>
-          <Text
-            style={{ fontSize: responsive.baseFontSize }}
-            className="min-w-[20px] text-center font-bold text-slate-900 dark:text-white"
-          >
-            {item.quantity}
-          </Text>
-          <TouchableOpacity
-            onPress={() => onIncrement(item.id)}
-            className="p-2"
-          >
-            <Ionicons name="add" size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+        {isSurcharge ? (
+          <View className="rounded-lg bg-orange-50 px-3 py-2 dark:bg-orange-900/20">
+            <Text
+              style={{ fontSize: responsive.captionFontSize }}
+              className="font-semibold text-orange-600"
+            >
+              Surcharge
+            </Text>
+          </View>
+        ) : (
+          <View className="flex-row items-center rounded-lg bg-slate-100 dark:bg-slate-800">
+            <TouchableOpacity
+              onPress={() => onDecrement(item.id)}
+              className="p-2"
+            >
+              <Ionicons name="remove" size={20} color={colors.text} />
+            </TouchableOpacity>
+            <Text
+              style={{ fontSize: responsive.baseFontSize }}
+              className="min-w-[20px] text-center font-bold text-slate-900 dark:text-white"
+            >
+              {item.quantity}
+            </Text>
+            <TouchableOpacity
+              onPress={() => onIncrement(item.id)}
+              className="p-2"
+            >
+              <Ionicons name="add" size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <Text
           style={{ fontSize: responsive.baseFontSize - 2 }}

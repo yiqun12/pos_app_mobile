@@ -10,7 +10,7 @@ interface AdjustmentModalProps {
   mode?: "adjustment" | "targetTotal";
   taxExempt?: boolean;
   onClose: () => void;
-  onConfirm: (amount: number) => void;
+  onConfirm: (amount: number, taxExempt?: boolean) => void;
   onTaxExemptChange?: (enabled: boolean) => void;
 }
 
@@ -66,7 +66,10 @@ export function AdjustmentModal({
       onQuickAmount={(quickAmount) => setAmount(quickAmount.toFixed(2))}
       onClose={onClose}
       onConfirm={(nextAmount) => {
-        onConfirm(mode === "targetTotal" ? nextAmount - baseAmount : nextAmount);
+        onConfirm(
+          mode === "targetTotal" ? nextAmount - baseAmount : nextAmount,
+          mode === "targetTotal" ? draftTaxExempt : taxExempt
+        );
         if (mode === "targetTotal") onTaxExemptChange?.(draftTaxExempt);
         onClose();
         setAmount("");

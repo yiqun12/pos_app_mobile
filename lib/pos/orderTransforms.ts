@@ -12,6 +12,7 @@ export type WebCartItem = {
   count: number;
   itemTotalPrice: number;
   CHI?: string;
+  availability?: boolean;
 };
 
 export type OrderTotalsInput = {
@@ -49,6 +50,36 @@ export type WebOrderTotals = OrderTotals & {
   surcharge: number;
 };
 
+export type TargetTotalAdjustmentInput<T extends Record<string, any>> = {
+  products: T[];
+  targetSubtotal: number;
+  taxRate: number;
+  taxExempt?: boolean;
+  count?: number;
+};
+
+export type TargetTotalAdjustmentResult<T extends Record<string, any>> = {
+  products: Array<T | WebCartItem>;
+  manualAdjustment: number;
+  discount: number;
+  surcharge: number;
+  taxExemptDiscount: number;
+};
+
+export type CashPaymentBreakdownInput = {
+  amountDue: number;
+  cashReceived: number;
+  gratuity?: number;
+};
+
+export type CashPaymentBreakdown = {
+  basePayment: number;
+  gratuity: number;
+  paymentTotal: number;
+  changeDue: number;
+  isFullPayment: boolean;
+};
+
 export function cleanProductData<T extends Record<string, any>>(products: T[] | null | undefined): T[] {
   if (!Array.isArray(products)) return [];
 
@@ -82,6 +113,117 @@ export function cleanProductData<T extends Record<string, any>>(products: T[] | 
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function parseMoney(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+export const SURCHARGE_ITEM_ID = "SURCHARGE_ITEM";
+
+export function isSurchargeCartItem(item: Pick<WebCartItem, "id" | "name"> | Record<string, any>): boolean {
+  return item.id === SURCHARGE_ITEM_ID;
+}
+
+export function createSurchargeCartItem(amount: number, count = Date.now()): WebCartItem {
+  const value = roundMoney(Math.max(0, amount));
+  return {
+    id: SURCHARGE_ITEM_ID,
+    name: "Surcharge!",
+    CHI: "加价！",
+    image: "",
+    subtotal: value.toFixed(2),
+    itemTotalPrice: value,
+    quantity: 1,
+    availability: true,
+    attributesArr: {},
+    attributeSelected: {},
+    count,
+  };
+}
+
+export function removeSurchargeCartItems<T extends Record<string, any>>(products: T[]): T[] {
+  return products.filter((product) => !isSurchargeCartItem(product));
+}
+
+export function getSurchargeTotal(products: Array<Record<string, any>>): number {
+  return roundMoney(
+    products
+      .filter(isSurchargeCartItem)
+      .reduce((sum, product) => sum + parseMoney(product.itemTotalPrice ?? product.subtotal), 0)
+  );
+}
+
+export function getProductsSubtotal(products: Array<Record<string, any>>, {
+  includeSurcharge = true,
+}: { includeSurcharge?: boolean } = {}): number {
+  return roundMoney(
+    products
+      .filter((product) => includeSurcharge || !isSurchargeCartItem(product))
+      .reduce((sum, product) => sum + parseMoney(product.itemTotalPrice ?? product.subtotal), 0)
+  );
+}
+
+export function applyTargetTotalAdjustment<T extends Record<string, any>>({
+  products,
+  targetSubtotal,
+  taxRate,
+  taxExempt = false,
+  count = Date.now(),
+}: TargetTotalAdjustmentInput<T>): TargetTotalAdjustmentResult<T> {
+  const normalProducts = removeSurchargeCartItems(products);
+  const originalSubtotal = getProductsSubtotal(normalProducts, { includeSurcharge: false });
+  const target = roundMoney(Math.max(0, targetSubtotal));
+  const difference = roundMoney(target - originalSubtotal);
+  const taxableBaseForExemption = difference > 0 ? target : originalSubtotal;
+  const taxExemptDiscount = taxExempt ? roundMoney(taxableBaseForExemption * (taxRate / 100)) : 0;
+
+  if (difference > 0) {
+    return {
+      products: [...normalProducts, createSurchargeCartItem(difference, count)],
+      manualAdjustment: 0,
+      discount: taxExemptDiscount,
+      surcharge: difference,
+      taxExemptDiscount,
+    };
+  }
+
+  const discount = roundMoney(Math.abs(Math.min(0, difference)) + taxExemptDiscount);
+  return {
+    products: normalProducts,
+    manualAdjustment: difference,
+    discount,
+    surcharge: 0,
+    taxExemptDiscount,
+  };
+}
+
+export function buildCashPaymentBreakdown({
+  amountDue,
+  cashReceived,
+  gratuity = 0,
+}: CashPaymentBreakdownInput): CashPaymentBreakdown {
+  const due = roundMoney(Math.max(0, amountDue));
+  const received = roundMoney(Math.max(0, cashReceived));
+  const basePayment = roundMoney(Math.min(due, received));
+  const availableExtra = roundMoney(Math.max(0, received - basePayment));
+  const appliedGratuity = basePayment >= due
+    ? roundMoney(Math.min(Math.max(0, gratuity), availableExtra))
+    : 0;
+  const paymentTotal = roundMoney(basePayment + appliedGratuity);
+
+  return {
+    basePayment,
+    gratuity: appliedGratuity,
+    paymentTotal,
+    changeDue: roundMoney(Math.max(0, received - paymentTotal)),
+    isFullPayment: basePayment >= due && due > 0,
+  };
 }
 
 function stableAttributeSignature(value: unknown): string {
