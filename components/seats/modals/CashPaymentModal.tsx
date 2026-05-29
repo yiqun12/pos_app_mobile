@@ -235,28 +235,13 @@ export function CashPaymentModal({
               <TouchableOpacity
                 key={percent}
                 onPress={() => applyTipPercent(percent)}
-                className="min-h-[42px] flex-1 basis-[28%] items-center justify-center rounded-lg bg-purple-600 px-3"
+                className="min-h-[42px] flex-1 basis-[30%] items-center justify-center rounded-lg bg-purple-600 px-3"
               >
                 <Text className="text-sm font-bold text-white">
                   {percent}%
                 </Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity
-              onPress={() => {
-                updateGratuity("");
-                setActiveInput("tip");
-              }}
-              className="min-h-[42px] flex-1 basis-[28%] items-center justify-center rounded-lg bg-slate-700 px-3"
-            >
-              <Text className="text-sm font-bold text-white">0</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setActiveInput("tip")}
-              className="min-h-[42px] flex-1 basis-[28%] items-center justify-center rounded-lg bg-orange-500 px-3"
-            >
-              <Text className="text-sm font-bold text-white">Other</Text>
-            </TouchableOpacity>
           </View>
         </View>
 

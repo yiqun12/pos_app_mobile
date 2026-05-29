@@ -132,12 +132,6 @@ export function KeypadAmountModal({
                     >
                       <Ionicons name="backspace-outline" size={22} color={colors.text} />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={confirm}
-                      className="min-h-[50px] flex-1 items-center justify-center rounded-lg bg-green-600"
-                    >
-                      <Ionicons name="checkmark" size={24} color="white" />
-                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
