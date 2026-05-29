@@ -77,12 +77,6 @@ export type CashGratuityPercentInput = {
   percent: number;
 };
 
-export type CashReceivedForTipInput = {
-  amountDue: number;
-  currentCashReceived: number;
-  gratuity: number;
-};
-
 export type CashPaymentBreakdown = {
   basePayment: number;
   gratuity: number;
@@ -222,9 +216,8 @@ export function buildCashPaymentBreakdown({
   const due = roundMoney(Math.max(0, amountDue));
   const received = roundMoney(Math.max(0, cashReceived));
   const basePayment = roundMoney(Math.min(due, received));
-  const availableExtra = roundMoney(Math.max(0, received - basePayment));
   const appliedGratuity = basePayment >= due
-    ? roundMoney(Math.min(Math.max(0, gratuity), availableExtra))
+    ? roundMoney(Math.max(0, gratuity))
     : 0;
   const paymentTotal = roundMoney(basePayment + appliedGratuity);
 
@@ -242,18 +235,6 @@ export function calculateCashGratuityFromPercent({
   percent,
 }: CashGratuityPercentInput): number {
   return roundMoney(Math.max(0, subtotal) * (Math.max(0, percent) / 100));
-}
-
-export function buildCashReceivedForTip({
-  amountDue,
-  currentCashReceived,
-  gratuity,
-}: CashReceivedForTipInput): number {
-  return roundMoney(Math.max(
-    0,
-    currentCashReceived,
-    Math.max(0, amountDue) + Math.max(0, gratuity)
-  ));
 }
 
 function stableAttributeSignature(value: unknown): string {

@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import {
   buildCashPaymentBreakdown,
-  buildCashReceivedForTip,
   calculateCashGratuityFromPercent,
   type CashPaymentBreakdown,
 } from "@/lib/pos/orderTransforms";
@@ -81,15 +80,6 @@ export function CashPaymentModal({
 
   const updateGratuity = (value: string) => {
     setGratuity(value);
-    const nextTip = parseMoneyInput(value);
-    if (nextTip <= 0) return;
-    setCashReceived((currentCash) =>
-      buildCashReceivedForTip({
-        amountDue,
-        currentCashReceived: parseMoneyInput(currentCash),
-        gratuity: nextTip,
-      }).toFixed(2)
-    );
   };
 
   const applyTipPercent = (percent: number) => {
