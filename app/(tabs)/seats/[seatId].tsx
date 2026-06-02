@@ -3,7 +3,6 @@ import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal"
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { CashPaymentModal } from "@/components/seats/modals/CashPaymentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
-import { PriceEditModal } from "@/components/seats/modals/PriceEditModal";
 import { ServiceFeeModal } from "@/components/seats/modals/ServiceFeeModal";
 import { OrderItemRow } from "@/components/seats/order/OrderItemRow";
 import { OrderSummary } from "@/components/seats/order/OrderSummary";
@@ -32,6 +31,7 @@ import {
   cleanProductData,
   createWebCartItem,
   diffKitchenChanges,
+  getCartProductKey,
   getProductsSubtotal,
   getSurchargeTotal,
   isSurchargeCartItem,
@@ -63,7 +63,6 @@ export default function SeatScreen() {
   const [taxExempt, setTaxExempt] = useState(false);
   const [paidAmount, setPaidAmount] = useState(0);
 
-  const [priceEditItem, setPriceEditItem] = useState<OrderItem | null>(null);
   const [optionEditContext, setOptionEditContext] = useState<{
     orderItem: OrderItem;
     rawProduct: any;
@@ -113,7 +112,7 @@ export default function SeatScreen() {
               const uiItems: OrderItem[] = parsed.map((item: any) => {
                 const priceVal = item.subtotal ?? item.price;
                 const price = typeof priceVal === "number" ? priceVal : parseFloat(priceVal || "0");
-                const count = typeof item.count === "number" ? item.count : undefined;
+                const count = item.count;
                 const menuItem = availableMenuItems.find((menuItem) => menuItem.id === item.id);
                 const editableSelections = cartItemToEditableSelections({
                   product: item,
@@ -121,7 +120,7 @@ export default function SeatScreen() {
                   globalCustomizations,
                 });
                 return {
-                  id: count ? String(count) : (item.id || `item-${Date.now()}-${Math.random()}`),
+                  id: getCartProductKey(item),
                   menuItemId: item.id,
                   name: item.CHI && item.CHI !== item.name ? `${item.name} / ${item.CHI}` : (item.name || "Untitled"),
                   rawName: item.name,
@@ -629,25 +628,8 @@ export default function SeatScreen() {
     saveToFirestore(newRaw);
   };
 
-  const handleEditPriceSave = (newPrice: number) => {
-    if (priceEditItem) {
-      const newRaw = rawProducts.map((p) => {
-        if (isSurchargeCartItem(p)) return p;
-        if (String(p.count) === priceEditItem.id) {
-          return {
-            ...p,
-            subtotal: newPrice.toFixed(2),
-            itemTotalPrice: parseFloat((newPrice * p.quantity).toFixed(2)),
-          };
-        }
-        return p;
-      });
-      saveToFirestore(newRaw);
-    }
-  };
-
   const findRawProductForOrderItem = (orderItem: OrderItem) =>
-    rawProducts.find((product) => String(product.count ?? product.id) === orderItem.id);
+    rawProducts.find((product) => getCartProductKey(product) === orderItem.id);
 
   const handleOpenOptionsEdit = (orderItem: OrderItem) => {
     const rawProduct = findRawProductForOrderItem(orderItem);
@@ -671,15 +653,7 @@ export default function SeatScreen() {
 
   const handleOrderItemPress = (orderItem: OrderItem) => {
     if (orderItem.menuItemId === "SURCHARGE_ITEM") return;
-    Alert.alert(
-      "Edit Item",
-      orderItem.name,
-      [
-        { text: "Edit Options", onPress: () => handleOpenOptionsEdit(orderItem) },
-        { text: "Edit Price", onPress: () => setPriceEditItem(orderItem) },
-        { text: t("common.cancel"), style: "cancel" },
-      ]
-    );
+    handleOpenOptionsEdit(orderItem);
   };
 
   const handleOptionsEditSave = (
@@ -690,7 +664,7 @@ export default function SeatScreen() {
     if (!optionEditContext) return;
 
     const newRaw = rawProducts.map((product) => {
-      if (String(product.count ?? product.id) !== optionEditContext.orderItem.id) return product;
+      if (getCartProductKey(product) !== optionEditContext.orderItem.id) return product;
       return buildEditedWebCartItem({
         product,
         menuItem: optionEditContext.menuItem,
@@ -891,6 +865,7 @@ export default function SeatScreen() {
                     onIncrement={handleIncrement}
                     onDecrement={handleDecrement}
                     onPress={handleOrderItemPress}
+                    onEdit={handleOpenOptionsEdit}
                   />
                 ))
               )}
@@ -1042,16 +1017,6 @@ export default function SeatScreen() {
           />
         );
       })()}
-
-      {priceEditItem && (
-        <PriceEditModal
-          visible={!!priceEditItem}
-          initialPrice={priceEditItem.price}
-          itemName={priceEditItem.name}
-          onClose={() => setPriceEditItem(null)}
-          onSave={handleEditPriceSave}
-        />
-      )}
 
       <PaymentModal
         visible={paymentModalVisible}

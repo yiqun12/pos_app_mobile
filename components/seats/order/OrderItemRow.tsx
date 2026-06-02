@@ -11,7 +11,8 @@ interface OrderItemRowProps {
   item: OrderItem;
   onIncrement: (id: string) => void;
   onDecrement: (id: string) => void;
-  onPress: (item: OrderItem) => void;
+  onPress?: (item: OrderItem) => void;
+  onEdit?: (item: OrderItem) => void;
 }
 
 export function OrderItemRow({
@@ -19,6 +20,7 @@ export function OrderItemRow({
   onIncrement,
   onDecrement,
   onPress,
+  onEdit,
 }: OrderItemRowProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
@@ -29,7 +31,7 @@ export function OrderItemRow({
   return (
     <TouchableOpacity
       activeOpacity={isSurcharge ? 1 : 0.7}
-      onPress={() => onPress(item)}
+      onPress={() => onPress?.(item)}
       disabled={isSurcharge}
       className="mb-3 flex-row items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800"
     >
@@ -122,6 +124,24 @@ export function OrderItemRow({
           >
             {item.notes}
           </Text>
+        )}
+
+        {!isSurcharge && onEdit && (
+          <TouchableOpacity
+            onPress={() => onEdit(item)}
+            activeOpacity={0.75}
+            className="mt-2 self-start rounded-md border border-slate-300 px-3 py-1.5 dark:border-slate-700"
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="create-outline" size={14} color={colors.tint} />
+              <Text
+                style={{ fontSize: responsive.captionFontSize }}
+                className="ml-1 font-semibold text-orange-500 dark:text-orange-400"
+              >
+                Edit
+              </Text>
+            </View>
+          </TouchableOpacity>
         )}
       </View>
 

@@ -23,7 +23,7 @@ export type OrderItem = {
   nameCN?: string;
   price: number;
   quantity: number;
-  count?: number;
+  count?: number | string;
   imageUrl?: string;
   attributesArr?: Record<
     string,

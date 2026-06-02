@@ -13,7 +13,7 @@ export type WebCartItem = {
   quantity: number;
   attributeSelected: Record<string, string | string[]>;
   attributesArr?: MenuItem["attributesArr"];
-  count: number;
+  count: number | string;
   itemTotalPrice: number;
   CHI?: string;
   availability?: boolean;
@@ -189,11 +189,15 @@ function sumSelectionAdjustments({
 
 export const SURCHARGE_ITEM_ID = "SURCHARGE_ITEM";
 
+export function getCartProductKey(product: Pick<WebCartItem, "id" | "count"> | Record<string, any>): string {
+  return String(product.count ?? product.id);
+}
+
 export function isSurchargeCartItem(item: Pick<WebCartItem, "id" | "name"> | Record<string, any>): boolean {
   return item.id === SURCHARGE_ITEM_ID;
 }
 
-export function createSurchargeCartItem(amount: number, count = Date.now()): WebCartItem {
+export function createSurchargeCartItem(amount: number, count: number | string = Date.now()): WebCartItem {
   const value = roundMoney(Math.max(0, amount));
   return {
     id: SURCHARGE_ITEM_ID,
@@ -448,7 +452,7 @@ export function createWebCartItem({
 }: {
   orderItem: OrderItem;
   menuItem?: MenuItem;
-  count?: number;
+  count?: number | string;
 }): WebCartItem {
   const attributeSelected =
     orderItem.attributeSelected ??
