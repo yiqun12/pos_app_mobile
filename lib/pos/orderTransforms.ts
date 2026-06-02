@@ -1,5 +1,9 @@
-import type { OrderItem } from "../../components/seats/types";
-import type { MenuItem } from "../../types/menu";
+import type {
+  OrderItem,
+  SelectedGlobalCustomization,
+  SelectedOption,
+} from "../../components/seats/types";
+import type { GlobalCustomization, MenuItem } from "../../types/menu";
 
 export type WebCartItem = {
   id: string;
@@ -13,6 +17,9 @@ export type WebCartItem = {
   itemTotalPrice: number;
   CHI?: string;
   availability?: boolean;
+  selectedOptions?: SelectedOption[];
+  selectedIngredients?: OrderItem["selectedIngredients"];
+  selectedGlobalCustomizations?: SelectedGlobalCustomization[];
 };
 
 export type OrderTotalsInput = {
@@ -85,6 +92,23 @@ export type CashPaymentBreakdown = {
   isFullPayment: boolean;
 };
 
+export type EditableCartSelections = {
+  selectedOptions: SelectedOption[];
+  selectedIngredients: NonNullable<OrderItem["selectedIngredients"]>;
+  selectedGlobalCustomizations: SelectedGlobalCustomization[];
+};
+
+export type CartItemToEditableSelectionsInput = {
+  product: Record<string, any>;
+  menuItem?: MenuItem;
+  globalCustomizations?: GlobalCustomization[];
+};
+
+export type BuildEditedWebCartItemInput = EditableCartSelections & {
+  product: Record<string, any>;
+  menuItem?: MenuItem;
+};
+
 export function cleanProductData<T extends Record<string, any>>(products: T[] | null | undefined): T[] {
   if (!Array.isArray(products)) return [];
 
@@ -127,6 +151,40 @@ function parseMoney(value: unknown): number {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+}
+
+function normalizeSelectionValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .filter(Boolean);
+  }
+  if (typeof value === "string" && value.length > 0) return [value];
+  return [];
+}
+
+function sumSelectionAdjustments({
+  selectedOptions,
+  selectedIngredients,
+  selectedGlobalCustomizations,
+}: EditableCartSelections): number {
+  const optionTotal = selectedOptions.reduce(
+    (sum, group) =>
+      sum + group.selectedChoices.reduce(
+        (choiceSum, choice) => choiceSum + (choice.priceAdjustment ?? 0),
+        0
+      ),
+    0
+  );
+  const ingredientTotal = selectedIngredients.reduce(
+    (sum, ingredient) => sum + (ingredient.priceAdjustment ?? 0),
+    0
+  );
+  const globalTotal = selectedGlobalCustomizations.reduce(
+    (sum, customization) => sum + (customization.price ?? 0),
+    0
+  );
+  return optionTotal + ingredientTotal + globalTotal;
 }
 
 export const SURCHARGE_ITEM_ID = "SURCHARGE_ITEM";
@@ -237,6 +295,109 @@ export function calculateCashGratuityFromPercent({
   return roundMoney(Math.max(0, subtotal) * (Math.max(0, percent) / 100));
 }
 
+export function cartItemToEditableSelections({
+  product,
+  menuItem,
+  globalCustomizations = [],
+}: CartItemToEditableSelectionsInput): EditableCartSelections {
+  const existingOptions = Array.isArray(product.selectedOptions)
+    ? product.selectedOptions as SelectedOption[]
+    : [];
+  const existingIngredients = Array.isArray(product.selectedIngredients)
+    ? product.selectedIngredients as NonNullable<OrderItem["selectedIngredients"]>
+    : [];
+  const existingGlobals = Array.isArray(product.selectedGlobalCustomizations)
+    ? product.selectedGlobalCustomizations as SelectedGlobalCustomization[]
+    : [];
+
+  if (existingOptions.length > 0 || existingIngredients.length > 0 || existingGlobals.length > 0) {
+    return {
+      selectedOptions: existingOptions,
+      selectedIngredients: existingIngredients,
+      selectedGlobalCustomizations: existingGlobals,
+    };
+  }
+
+  const rawSelected = product.attributeSelected && typeof product.attributeSelected === "object"
+    ? product.attributeSelected as Record<string, unknown>
+    : {};
+  const selectedOptions = (menuItem?.optionGroups ?? [])
+    .map((group) => {
+      const selectedNames = normalizeSelectionValue(rawSelected[group.name] ?? rawSelected[group.id]);
+      const selectedChoices = group.choices.filter((choice) => selectedNames.includes(choice.name));
+      return {
+        groupId: group.id,
+        groupName: group.name,
+        selectedChoices,
+      };
+    })
+    .filter((group) => group.selectedChoices.length > 0);
+
+  const selectedGlobalCustomizations = globalCustomizations.filter((customization) =>
+    normalizeSelectionValue(rawSelected[customization.typeCategory]).includes(customization.type)
+  ).map((customization) => ({
+    id: customization.id,
+    type: customization.type,
+    price: customization.price,
+    typeCategory: customization.typeCategory,
+  }));
+
+  return {
+    selectedOptions,
+    selectedIngredients: [],
+    selectedGlobalCustomizations,
+  };
+}
+
+export function buildEditedWebCartItem({
+  product,
+  menuItem,
+  selectedOptions,
+  selectedIngredients,
+  selectedGlobalCustomizations,
+}: BuildEditedWebCartItemInput): WebCartItem {
+  const quantity = typeof product.quantity === "number" ? product.quantity : 1;
+  const basePrice = parseMoney(menuItem?.price ?? product.subtotal);
+  const unitPrice = roundMoney(
+    basePrice + sumSelectionAdjustments({
+      selectedOptions,
+      selectedIngredients,
+      selectedGlobalCustomizations,
+    })
+  );
+  const orderItem: OrderItem = {
+    id: String(product.count ?? product.id ?? Date.now()),
+    menuItemId: menuItem?.id ?? product.id,
+    name: menuItem?.name ?? product.name ?? "Untitled",
+    rawName: menuItem?.rawName ?? product.name,
+    nameCN: menuItem?.nameCN ?? product.CHI,
+    price: unitPrice,
+    quantity,
+    count: product.count,
+    imageUrl: menuItem?.imageUrl ?? product.image,
+    attributesArr: menuItem?.attributesArr ?? product.attributesArr,
+    selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
+    selectedIngredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
+    selectedGlobalCustomizations: selectedGlobalCustomizations.length > 0
+      ? selectedGlobalCustomizations
+      : undefined,
+  };
+  return {
+    ...product,
+    ...createWebCartItem({
+      orderItem,
+      menuItem,
+      count: product.count,
+    }),
+    availability: product.availability,
+    selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
+    selectedIngredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
+    selectedGlobalCustomizations: selectedGlobalCustomizations.length > 0
+      ? selectedGlobalCustomizations
+      : undefined,
+  };
+}
+
 function stableAttributeSignature(value: unknown): string {
   if (!value || typeof value !== "object") return "{}";
   const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
@@ -311,6 +472,9 @@ export function createWebCartItem({
     count: itemCount,
     itemTotalPrice: roundMoney(subtotal * orderItem.quantity),
     CHI: nameCN,
+    selectedOptions: orderItem.selectedOptions,
+    selectedIngredients: orderItem.selectedIngredients,
+    selectedGlobalCustomizations: orderItem.selectedGlobalCustomizations,
   };
 }
 

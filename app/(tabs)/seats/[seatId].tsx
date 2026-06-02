@@ -1,3 +1,4 @@
+import { ItemOptionsModal } from "@/components/menu/modals/ItemOptionsModal";
 import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal";
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { CashPaymentModal } from "@/components/seats/modals/CashPaymentModal";
@@ -17,13 +18,16 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "@/context/auth";
+import { useMenu } from "@/context/menu";
 import { useStoreSelection } from "@/context/store";
 import { useStore } from "@/hooks/firestore/useStore";
 import { db, functions } from "@/lib/firebase";
 import {
   calculateWebOrderTotals,
   applyTargetTotalAdjustment,
+  buildEditedWebCartItem,
   buildCashPaymentBreakdown,
+  cartItemToEditableSelections,
   cartItemSignature,
   cleanProductData,
   createWebCartItem,
@@ -33,6 +37,7 @@ import {
   isSurchargeCartItem,
 } from "@/lib/pos/orderTransforms";
 import { formatWebDate } from "@/lib/pos/webDate";
+import type { MenuItem } from "@/types/menu";
 import { httpsCallable } from "firebase/functions";
 import { addDoc, collection, doc, onSnapshot, setDoc } from "firebase/firestore";
 
@@ -46,6 +51,7 @@ export default function SeatScreen() {
   const { user } = useAuth();
   const { currentStoreId } = useStoreSelection();
   const { data: store } = useStore();
+  const { items: menuItems, globalCustomizations } = useMenu();
 
   const [items, setItems] = useState<OrderItem[]>([]);
   const [rawProducts, setRawProducts] = useState<any[]>([]);
@@ -58,11 +64,21 @@ export default function SeatScreen() {
   const [paidAmount, setPaidAmount] = useState(0);
 
   const [priceEditItem, setPriceEditItem] = useState<OrderItem | null>(null);
+  const [optionEditContext, setOptionEditContext] = useState<{
+    orderItem: OrderItem;
+    rawProduct: any;
+    menuItem: MenuItem;
+  } | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [cashPaymentModalVisible, setCashPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
   const [serviceFeeModalVisible, setServiceFeeModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
+
+  const availableMenuItems = useMemo(
+    () => (menuItems.length > 0 ? menuItems : ((store?.menu?.items ?? []) as MenuItem[])),
+    [menuItems, store?.menu?.items]
+  );
 
   // Find the tableName matching the seatId
   const tableName = useMemo(() => {
@@ -98,6 +114,12 @@ export default function SeatScreen() {
                 const priceVal = item.subtotal ?? item.price;
                 const price = typeof priceVal === "number" ? priceVal : parseFloat(priceVal || "0");
                 const count = typeof item.count === "number" ? item.count : undefined;
+                const menuItem = availableMenuItems.find((menuItem) => menuItem.id === item.id);
+                const editableSelections = cartItemToEditableSelections({
+                  product: item,
+                  menuItem,
+                  globalCustomizations,
+                });
                 return {
                   id: count ? String(count) : (item.id || `item-${Date.now()}-${Math.random()}`),
                   menuItemId: item.id,
@@ -110,6 +132,15 @@ export default function SeatScreen() {
                   imageUrl: item.image,
                   attributesArr: item.attributesArr,
                   attributeSelected: item.attributeSelected,
+                  selectedOptions: editableSelections.selectedOptions.length > 0
+                    ? editableSelections.selectedOptions
+                    : undefined,
+                  selectedIngredients: editableSelections.selectedIngredients.length > 0
+                    ? editableSelections.selectedIngredients
+                    : undefined,
+                  selectedGlobalCustomizations: editableSelections.selectedGlobalCustomizations.length > 0
+                    ? editableSelections.selectedGlobalCustomizations
+                    : undefined,
                 } as OrderItem;
               });
               setItems(uiItems);
@@ -132,7 +163,7 @@ export default function SeatScreen() {
     });
 
     return () => unsubscribe();
-  }, [user, currentStoreId, tableName]);
+  }, [user, currentStoreId, tableName, availableMenuItems, globalCustomizations]);
 
   useEffect(() => {
     if (!user || !currentStoreId) return;
@@ -535,8 +566,7 @@ export default function SeatScreen() {
   }, [items, rawProducts, serviceFeeAmount, manualAdjustment, paidAmount, seatId, store?.taxRate, taxExempt, tipAmount]);
 
   const handleAddItem = (orderItem: OrderItem) => {
-    const menuItems = store?.menu?.items || [];
-    const menuItem = menuItems.find((i) => i.id === orderItem.menuItemId);
+    const menuItem = availableMenuItems.find((i) => i.id === orderItem.menuItemId);
     const newProduct = createWebCartItem({
       orderItem,
       menuItem,
@@ -614,6 +644,64 @@ export default function SeatScreen() {
       });
       saveToFirestore(newRaw);
     }
+  };
+
+  const findRawProductForOrderItem = (orderItem: OrderItem) =>
+    rawProducts.find((product) => String(product.count ?? product.id) === orderItem.id);
+
+  const handleOpenOptionsEdit = (orderItem: OrderItem) => {
+    const rawProduct = findRawProductForOrderItem(orderItem);
+    if (!rawProduct) {
+      Alert.alert(t("common.error"), "Unable to find this item in the current table order.");
+      return;
+    }
+
+    const menuItem = availableMenuItems.find((item) => item.id === rawProduct.id);
+    if (!menuItem) {
+      Alert.alert(t("common.error"), "Unable to find this item in the current menu.");
+      return;
+    }
+
+    setOptionEditContext({
+      orderItem,
+      rawProduct,
+      menuItem,
+    });
+  };
+
+  const handleOrderItemPress = (orderItem: OrderItem) => {
+    if (orderItem.menuItemId === "SURCHARGE_ITEM") return;
+    Alert.alert(
+      "Edit Item",
+      orderItem.name,
+      [
+        { text: "Edit Options", onPress: () => handleOpenOptionsEdit(orderItem) },
+        { text: "Edit Price", onPress: () => setPriceEditItem(orderItem) },
+        { text: t("common.cancel"), style: "cancel" },
+      ]
+    );
+  };
+
+  const handleOptionsEditSave = (
+    selectedOptions: NonNullable<OrderItem["selectedOptions"]>,
+    selectedIngredients: NonNullable<OrderItem["selectedIngredients"]>,
+    selectedGlobalCustomizations?: NonNullable<OrderItem["selectedGlobalCustomizations"]>
+  ) => {
+    if (!optionEditContext) return;
+
+    const newRaw = rawProducts.map((product) => {
+      if (String(product.count ?? product.id) !== optionEditContext.orderItem.id) return product;
+      return buildEditedWebCartItem({
+        product,
+        menuItem: optionEditContext.menuItem,
+        selectedOptions,
+        selectedIngredients,
+        selectedGlobalCustomizations: selectedGlobalCustomizations ?? [],
+      });
+    });
+
+    void saveToFirestore(newRaw);
+    setOptionEditContext(null);
   };
 
   const handleAdjustTotal = (amountDifference: number, nextTaxExempt = taxExempt) => {
@@ -802,10 +890,7 @@ export default function SeatScreen() {
                     item={item}
                     onIncrement={handleIncrement}
                     onDecrement={handleDecrement}
-                    onPress={(nextItem) => {
-                      if (nextItem.menuItemId === "SURCHARGE_ITEM") return;
-                      setPriceEditItem(nextItem);
-                    }}
+                    onPress={handleOrderItemPress}
                   />
                 ))
               )}
@@ -937,6 +1022,26 @@ export default function SeatScreen() {
         onClose={() => setMenuModalVisible(false)}
         onSelect={handleAddItem}
       />
+
+      {optionEditContext && (() => {
+        const selections = cartItemToEditableSelections({
+          product: optionEditContext.rawProduct,
+          menuItem: optionEditContext.menuItem,
+          globalCustomizations,
+        });
+        return (
+          <ItemOptionsModal
+            visible={!!optionEditContext}
+            item={optionEditContext.menuItem}
+            initialSelectedOptions={selections.selectedOptions}
+            initialSelectedIngredients={selections.selectedIngredients}
+            initialSelectedGlobalCustomizations={selections.selectedGlobalCustomizations}
+            confirmLabel="Save Changes"
+            onClose={() => setOptionEditContext(null)}
+            onConfirm={handleOptionsEditSave}
+          />
+        );
+      })()}
 
       {priceEditItem && (
         <PriceEditModal

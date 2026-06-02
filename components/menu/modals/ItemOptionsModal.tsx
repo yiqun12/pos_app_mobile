@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import type { SelectedGlobalCustomization, SelectedOption } from "@/components/seats/types";
 import { Colors } from "@/constants/theme";
 import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -18,26 +19,17 @@ import {
 const ADD_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求添加";
 const REMOVE_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求减少";
 
-interface SelectedOption {
-  groupId: string;
-  groupName: string;
-  selectedChoices: {
+interface ItemOptionsModalProps {
+  visible: boolean;
+  item: MenuItem | null;
+  initialSelectedOptions?: SelectedOption[];
+  initialSelectedIngredients?: {
     id: string;
     name: string;
     priceAdjustment?: number;
   }[];
-}
-
-interface SelectedGlobalCustomization {
-  id: string;
-  type: string;
-  price: number;
-  typeCategory: GlobalCustomization["typeCategory"];
-}
-
-interface ItemOptionsModalProps {
-  visible: boolean;
-  item: MenuItem | null;
+  initialSelectedGlobalCustomizations?: SelectedGlobalCustomization[];
+  confirmLabel?: string;
   onClose: () => void;
   onConfirm: (
     selectedOptions: SelectedOption[],
@@ -53,6 +45,10 @@ interface ItemOptionsModalProps {
 export function ItemOptionsModal({
   visible,
   item,
+  initialSelectedOptions,
+  initialSelectedIngredients,
+  initialSelectedGlobalCustomizations,
+  confirmLabel,
   onClose,
   onConfirm,
 }: ItemOptionsModalProps) {
@@ -79,11 +75,11 @@ export function ItemOptionsModal({
   // Reset selections whenever the modal opens for a new item.
   useEffect(() => {
     if (visible && item) {
-      setSelectedOptions([]);
-      setSelectedIngredients([]);
-      setSelectedGlobalCustomizations([]);
+      setSelectedOptions(initialSelectedOptions ?? []);
+      setSelectedIngredients(initialSelectedIngredients ?? []);
+      setSelectedGlobalCustomizations(initialSelectedGlobalCustomizations ?? []);
     }
-  }, [visible, item]);
+  }, [visible, item?.id]);
 
   if (!item) return null;
 
@@ -467,7 +463,7 @@ export function ItemOptionsModal({
             </View>
             <View className="flex-1">
               <Button
-                label={t("menu.options.addToOrder")}
+                label={confirmLabel ?? t("menu.options.addToOrder")}
                 onPress={() => {
                   onConfirm(selectedOptions, selectedIngredients, selectedGlobalCustomizations);
                   onClose();
