@@ -1,9 +1,9 @@
 import { db } from "@/lib/firebase";
+import { transformGlobalModifications } from "@/lib/pos/globalModificationTransforms";
 import { transformWebMenuItem } from "@/lib/pos/menuTransforms";
 import { collection, doc, onSnapshot, type Unsubscribe } from "firebase/firestore";
 import { storeListPath, storePath } from "../paths";
 import type {
-  RawGlobalModItem,
   RawGlobalModifications,
   RawMenuCategory,
   RawMenuItem,
@@ -13,10 +13,8 @@ import type {
 } from "../raw-types";
 import {
   parseJsonField,
-  parseNumericField,
 } from "../serialize";
 import type {
-  GlobalModification,
   Menu,
   MenuCategory,
   MenuItem,
@@ -90,7 +88,7 @@ function transformStore(id: string, raw: RawStoreDoc): Store {
       parseJsonField<RawSeatLayout>(raw.restaurant_seat_arrangement, {})
     ),
     menu: transformMenu(parseJsonField<any>(raw.key, [])),
-    globalModifications: transformGlobalMods(
+    globalModifications: transformGlobalModifications(
       parseJsonField<RawGlobalModifications>(raw.globalModification, {})
     ),
     dailyPayout: raw.dailyPayout ?? false,
@@ -156,19 +154,6 @@ function transformMenu(raw: any): Menu {
   });
 
   return { categories, items };
-}
-
-function transformGlobalMods(raw: RawGlobalModifications): GlobalModification[] {
-  const list = (raw.list ?? []) as RawGlobalModItem[];
-  return list.map((m, i): GlobalModification => {
-    const cat = m.typeCategory === "要求减少" ? "要求减少" : "要求添加";
-    return {
-      id: `gm-${i}`,
-      type: m.type ?? "",
-      price: typeof m.price === "number" ? m.price : parseNumericField(m.price, 0),
-      typeCategory: cat,
-    };
-  });
 }
 
 // Write API (P1 — not implemented)

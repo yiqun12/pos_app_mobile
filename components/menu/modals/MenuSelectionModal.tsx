@@ -58,6 +58,28 @@ export function MenuSelectionModal({
     return result;
   }, [items, selectedCategory, searchQuery]);
 
+  const buildPlainOrderItem = (item: MenuItem): OrderItem => ({
+    id: `item-${Date.now()}`,
+    menuItemId: item.id,
+    name: item.name,
+    rawName: item.rawName,
+    nameCN: item.nameCN,
+    price: item.price,
+    quantity: 1,
+    imageUrl: item.imageUrl,
+    attributesArr: item.attributesArr,
+  });
+
+  const handleQuickAddItem = (item: MenuItem) => {
+    onSelect(buildPlainOrderItem(item));
+    onClose();
+  };
+
+  const handleItemEditPress = (item: MenuItem) => {
+    setSelectedMenuItem(item);
+    setShowOptionsModal(true);
+  };
+
   const handleItemPress = (item: MenuItem) => {
     const hasWebAttributes = Object.values(item.attributesArr ?? {}).some(
       (group) => (group.variations?.length ?? 0) > 0
@@ -75,19 +97,7 @@ export function MenuSelectionModal({
       setShowOptionsModal(true);
     } else {
       // No options, add directly
-      const orderItem: OrderItem = {
-        id: `item-${Date.now()}`,
-        menuItemId: item.id,
-        name: item.name,
-        rawName: item.rawName,
-        nameCN: item.nameCN,
-        price: item.price,
-        quantity: 1,
-        imageUrl: item.imageUrl,
-        attributesArr: item.attributesArr,
-      };
-      onSelect(orderItem);
-      onClose();
+      handleQuickAddItem(item);
     }
   };
 
@@ -317,6 +327,32 @@ export function MenuSelectionModal({
                       >
                         ${item.price.toFixed(2)}
                       </Text>
+                      <View className="mt-3 flex-row items-center justify-between">
+                        <TouchableOpacity
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            handleItemEditPress(item);
+                          }}
+                          className="flex-row items-center rounded-md border border-slate-400 px-2.5 py-1.5 dark:border-slate-600"
+                        >
+                          <Ionicons name="create-outline" size={14} color={colors.text} />
+                          <Text
+                            style={{ fontSize: responsive.captionFontSize }}
+                            className="ml-1 font-semibold text-slate-800 dark:text-slate-200"
+                          >
+                            Edit
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            handleQuickAddItem(item);
+                          }}
+                          className="h-8 w-8 items-center justify-center rounded-full border border-slate-400 dark:border-slate-600"
+                        >
+                          <Ionicons name="add" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                      </View>
                       {(item.optionGroups?.length || 0) > 0 && (
                         <View className="mt-2 flex-row items-center">
                           <Ionicons
