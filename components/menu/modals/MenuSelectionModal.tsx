@@ -59,12 +59,18 @@ export function MenuSelectionModal({
   }, [items, selectedCategory, searchQuery]);
 
   const handleItemPress = (item: MenuItem) => {
+    const hasWebAttributes = Object.values(item.attributesArr ?? {}).some(
+      (group) => (group.variations?.length ?? 0) > 0
+    );
     if (item.optionGroups && item.optionGroups.length > 0) {
       // Show options modal if item has customization options
       setSelectedMenuItem(item);
       setShowOptionsModal(true);
     } else if (item.ingredients && item.ingredients.length > 0) {
       // Show options modal if item has ingredients
+      setSelectedMenuItem(item);
+      setShowOptionsModal(true);
+    } else if (hasWebAttributes) {
       setSelectedMenuItem(item);
       setShowOptionsModal(true);
     } else {

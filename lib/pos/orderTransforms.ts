@@ -163,6 +163,10 @@ function normalizeSelectionValue(value: unknown): string[] {
   return [];
 }
 
+function createWebAttributeChoiceId(attributeName: string, variationType: string): string {
+  return `${attributeName}:${variationType}`;
+}
+
 function sumSelectionAdjustments({
   selectedOptions,
   selectedIngredients,
@@ -325,13 +329,32 @@ export function cartItemToEditableSelections({
   const rawSelected = product.attributeSelected && typeof product.attributeSelected === "object"
     ? product.attributeSelected as Record<string, unknown>
     : {};
-  const selectedOptions = (menuItem?.optionGroups ?? [])
+  const optionGroupSelections = (menuItem?.optionGroups ?? [])
     .map((group) => {
       const selectedNames = normalizeSelectionValue(rawSelected[group.name] ?? rawSelected[group.id]);
       const selectedChoices = group.choices.filter((choice) => selectedNames.includes(choice.name));
       return {
         groupId: group.id,
         groupName: group.name,
+        selectedChoices,
+      };
+    })
+    .filter((group) => group.selectedChoices.length > 0);
+  const optionGroupNames = new Set((menuItem?.optionGroups ?? []).map((group) => group.name));
+  const webAttributeSelections = Object.entries(menuItem?.attributesArr ?? {})
+    .filter(([attributeName]) => !optionGroupNames.has(attributeName))
+    .map(([attributeName, attributeDetails]) => {
+      const selectedNames = normalizeSelectionValue(rawSelected[attributeName]);
+      const selectedChoices = (attributeDetails.variations ?? [])
+        .filter((variation) => typeof variation.type === "string" && selectedNames.includes(variation.type))
+        .map((variation) => ({
+          id: createWebAttributeChoiceId(attributeName, variation.type ?? ""),
+          name: variation.type ?? "",
+          priceAdjustment: parseMoney(variation.price),
+        }));
+      return {
+        groupId: attributeName,
+        groupName: attributeName,
         selectedChoices,
       };
     })
@@ -347,7 +370,7 @@ export function cartItemToEditableSelections({
   }));
 
   return {
-    selectedOptions,
+    selectedOptions: [...optionGroupSelections, ...webAttributeSelections],
     selectedIngredients: [],
     selectedGlobalCustomizations,
   };

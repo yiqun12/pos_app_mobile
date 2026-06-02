@@ -19,6 +19,37 @@ import {
 const ADD_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求添加";
 const REMOVE_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求减少";
 
+function parseOptionPrice(value: number | string | undefined): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function createWebAttributeOptionGroups(item: MenuItem): OptionGroup[] {
+  const optionGroupNames = new Set((item.optionGroups ?? []).map((group) => group.name));
+  const webAttributeGroups = Object.entries(item.attributesArr ?? {})
+    .filter(([attributeName, attributeDetails]) =>
+      !optionGroupNames.has(attributeName) && (attributeDetails.variations?.length ?? 0) > 0
+    )
+    .map(([attributeName, attributeDetails]) => ({
+      id: attributeName,
+      name: attributeName,
+      type: attributeDetails.isSingleSelected ? "single" as const : "multi" as const,
+      required: false,
+      choices: (attributeDetails.variations ?? [])
+        .filter((variation) => typeof variation.type === "string" && variation.type.length > 0)
+        .map((variation) => ({
+          id: `${attributeName}:${variation.type}`,
+          name: variation.type ?? "",
+          priceAdjustment: parseOptionPrice(variation.price),
+        })),
+    }));
+  return [...(item.optionGroups ?? []), ...webAttributeGroups];
+}
+
 interface ItemOptionsModalProps {
   visible: boolean;
   item: MenuItem | null;
@@ -82,6 +113,7 @@ export function ItemOptionsModal({
   }, [visible, item?.id]);
 
   if (!item) return null;
+  const optionGroups = createWebAttributeOptionGroups(item);
 
   const handleOptionGroupChange = (
     groupId: string,
@@ -199,8 +231,7 @@ export function ItemOptionsModal({
   };
 
   const allRequiredOptionsSelected = () => {
-    if (!item?.optionGroups) return true;
-    return item.optionGroups.every((group) => {
+    return optionGroups.every((group) => {
       if (!group.required) return true;
       return selectedOptions.some((o) => o.groupId === group.id && o.selectedChoices.length > 0);
     });
@@ -261,14 +292,14 @@ export function ItemOptionsModal({
         {/* Content */}
         <ScrollView className="flex-1 p-4">
           {/* Option Groups */}
-          {item.optionGroups && item.optionGroups.length > 0 && (
+          {optionGroups.length > 0 && (
             <View className="mb-6">
               <Text
                 style={{ fontSize: responsive.subheadingFontSize }}
                 className="mb-3 font-bold text-slate-900 dark:text-white"
               >{t("menu.options.customization")}</Text>
 
-              {item.optionGroups.map((group: OptionGroup) => (
+              {optionGroups.map((group: OptionGroup) => (
                 <View key={group.id} className="mb-6">
                   <Text
                     style={{ fontSize: responsive.baseFontSize }}

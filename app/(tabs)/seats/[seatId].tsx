@@ -647,7 +647,10 @@ export default function SeatScreen() {
     setOptionEditContext({
       orderItem,
       rawProduct,
-      menuItem,
+      menuItem: {
+        ...menuItem,
+        attributesArr: menuItem.attributesArr ?? rawProduct.attributesArr,
+      },
     });
   };
 
