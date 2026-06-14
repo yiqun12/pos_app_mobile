@@ -163,6 +163,50 @@ function normalizeSelectionValue(value: unknown): string[] {
   return [];
 }
 
+function cloneAttributesArr(attributesArr?: MenuItem["attributesArr"]): MenuItem["attributesArr"] {
+  const cloned: MenuItem["attributesArr"] = {};
+  Object.entries(attributesArr ?? {}).forEach(([groupName, group]) => {
+    cloned[groupName] = {
+      ...group,
+      variations: (group.variations ?? []).map((variation) => ({ ...variation })),
+    };
+  });
+  return cloned;
+}
+
+function selectedOptionsToAttributesArr(
+  selectedOptions: SelectedOption[] | undefined,
+  attributesArr?: MenuItem["attributesArr"]
+): MenuItem["attributesArr"] {
+  const nextAttributes = cloneAttributesArr(attributesArr);
+
+  (selectedOptions ?? []).forEach((group) => {
+    if (!nextAttributes[group.groupName]) {
+      nextAttributes[group.groupName] = {
+        isSingleSelected: false,
+        variations: [],
+      };
+    }
+
+    const variations = nextAttributes[group.groupName]?.variations ?? [];
+    group.selectedChoices.forEach((choice) => {
+      const existingIndex = variations.findIndex((variation) => variation.type === choice.name);
+      const nextVariation = {
+        type: choice.name,
+        price: choice.priceAdjustment ?? 0,
+      };
+      if (existingIndex >= 0) variations[existingIndex] = nextVariation;
+      else variations.push(nextVariation);
+    });
+    nextAttributes[group.groupName] = {
+      ...nextAttributes[group.groupName],
+      variations,
+    };
+  });
+
+  return nextAttributes;
+}
+
 function createWebAttributeChoiceId(attributeName: string, variationType: string): string {
   return `${attributeName}:${variationType}`;
 }
@@ -477,11 +521,15 @@ export function createWebCartItem({
   menuItem?: MenuItem;
   count?: number | string;
 }): WebCartItem {
+  const attributesArr = selectedOptionsToAttributesArr(
+    orderItem.selectedOptions,
+    menuItem?.attributesArr ?? orderItem.attributesArr
+  );
   const attributeSelected =
     orderItem.attributeSelected ??
     selectedOptionsToWebAttributes(
       orderItem,
-      menuItem?.attributesArr ?? orderItem.attributesArr
+      attributesArr
     );
   const rawName = menuItem?.rawName ?? orderItem.rawName ?? orderItem.name;
   const nameCN = menuItem?.nameCN ?? orderItem.nameCN;
@@ -495,7 +543,7 @@ export function createWebCartItem({
     image: menuItem?.imageUrl ?? orderItem.imageUrl,
     quantity: orderItem.quantity,
     attributeSelected,
-    attributesArr: menuItem?.attributesArr ?? orderItem.attributesArr,
+    attributesArr,
     count: itemCount,
     itemTotalPrice: roundMoney(subtotal * orderItem.quantity),
     CHI: nameCN,

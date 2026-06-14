@@ -12,12 +12,14 @@ import {
     Modal,
     ScrollView,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from "react-native";
 
 const ADD_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求添加";
 const REMOVE_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求减少";
+const CUSTOMIZED_OPTION_GROUP = "Customized Option";
 
 function parseOptionPrice(value: number | string | undefined): number | undefined {
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
@@ -99,6 +101,8 @@ export function ItemOptionsModal({
   const [selectedGlobalCustomizations, setSelectedGlobalCustomizations] = useState<
     SelectedGlobalCustomization[]
   >([]);
+  const [customReason, setCustomReason] = useState("改价");
+  const [customAmount, setCustomAmount] = useState("");
 
   // Global customization groups come from the MenuProvider (firestore-backed).
   const { globalCustomizationGroups } = useMenu();
@@ -109,6 +113,15 @@ export function ItemOptionsModal({
       setSelectedOptions(initialSelectedOptions ?? []);
       setSelectedIngredients(initialSelectedIngredients ?? []);
       setSelectedGlobalCustomizations(initialSelectedGlobalCustomizations ?? []);
+      const customChoice = (initialSelectedOptions ?? [])
+        .find((option) => option.groupName === CUSTOMIZED_OPTION_GROUP)
+        ?.selectedChoices[0];
+      setCustomReason(customChoice?.name ?? "改价");
+      setCustomAmount(
+        customChoice?.priceAdjustment !== undefined
+          ? Math.abs(customChoice.priceAdjustment).toString()
+          : ""
+      );
     }
   }, [visible, item?.id]);
 
@@ -230,6 +243,30 @@ export function ItemOptionsModal({
     return selectedGlobalCustomizations.some((c) => c.id === id);
   };
 
+  const handleCustomPriceChange = (increase: boolean) => {
+    const amount = parseFloat(customAmount);
+    const reason = customReason.trim() || "改价";
+    if (!Number.isFinite(amount)) return;
+    const priceAdjustment = increase ? Math.abs(amount) : -Math.abs(amount);
+    setSelectedOptions((prev) => {
+      const withoutCustom = prev.filter((option) => option.groupName !== CUSTOMIZED_OPTION_GROUP);
+      return [
+        ...withoutCustom,
+        {
+          groupId: CUSTOMIZED_OPTION_GROUP,
+          groupName: CUSTOMIZED_OPTION_GROUP,
+          selectedChoices: [
+            {
+              id: `${CUSTOMIZED_OPTION_GROUP}:${reason}`,
+              name: reason,
+              priceAdjustment,
+            },
+          ],
+        },
+      ];
+    });
+  };
+
   const allRequiredOptionsSelected = () => {
     return optionGroups.every((group) => {
       if (!group.required) return true;
@@ -291,6 +328,69 @@ export function ItemOptionsModal({
 
         {/* Content */}
         <ScrollView className="flex-1 p-4">
+          <View className="mb-6 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+            <View className="gap-3 md:flex-row">
+              <View className="flex-1">
+                <Text
+                  style={{ fontSize: responsive.baseFontSize }}
+                  className="mb-2 font-semibold text-slate-700 dark:text-slate-300"
+                >
+                  Update Reason (E.g. add garlic)
+                </Text>
+                <TextInput
+                  value={customReason}
+                  onChangeText={setCustomReason}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:text-white"
+                  placeholder="改价"
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
+              <View className="flex-1">
+                <Text
+                  style={{ fontSize: responsive.baseFontSize }}
+                  className="mb-2 font-semibold text-slate-700 dark:text-slate-300"
+                >
+                  Amount Update (Enter "0" if no change)
+                </Text>
+                <TextInput
+                  value={customAmount}
+                  onChangeText={(value) => {
+                    const normalized = value.replace(/。/g, ".");
+                    if (/^\d*\.?\d*$/.test(normalized)) setCustomAmount(normalized);
+                  }}
+                  keyboardType="decimal-pad"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:text-white"
+                  placeholder="0"
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
+            </View>
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              <TouchableOpacity
+                onPress={() => handleCustomPriceChange(true)}
+                className="rounded-lg bg-orange-500 px-4 py-3"
+              >
+                <Text
+                  style={{ fontSize: responsive.baseFontSize - 1 }}
+                  className="font-semibold text-white"
+                >
+                  Add ${customAmount || "0"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleCustomPriceChange(false)}
+                className="rounded-lg bg-cyan-500 px-4 py-3"
+              >
+                <Text
+                  style={{ fontSize: responsive.baseFontSize - 1 }}
+                  className="font-semibold text-slate-900"
+                >
+                  Subtract ${customAmount || "0"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Option Groups */}
           {optionGroups.length > 0 && (
             <View className="mb-6">

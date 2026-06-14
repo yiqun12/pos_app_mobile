@@ -13,6 +13,7 @@ import type {
 } from "../raw-types";
 import {
   parseJsonField,
+  parseNumericField,
 } from "../serialize";
 import type {
   Menu,
