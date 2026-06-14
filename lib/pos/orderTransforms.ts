@@ -5,6 +5,8 @@ import type {
 } from "../../components/seats/types";
 import type { GlobalCustomization, MenuItem } from "../../types/menu";
 
+type WebAttributesArr = NonNullable<MenuItem["attributesArr"]>;
+
 export type WebCartItem = {
   id: string;
   name: string;
@@ -109,6 +111,15 @@ export type BuildEditedWebCartItemInput = EditableCartSelections & {
   menuItem?: MenuItem;
 };
 
+export type CustomPriceReviseInput<T extends Record<string, any>> = {
+  product: T;
+  reason: string;
+  amount: number;
+  increase: boolean;
+};
+
+const CUSTOMIZED_OPTION_GROUP = "Customized Option";
+
 export function cleanProductData<T extends Record<string, any>>(products: T[] | null | undefined): T[] {
   if (!Array.isArray(products)) return [];
 
@@ -163,8 +174,8 @@ function normalizeSelectionValue(value: unknown): string[] {
   return [];
 }
 
-function cloneAttributesArr(attributesArr?: MenuItem["attributesArr"]): MenuItem["attributesArr"] {
-  const cloned: MenuItem["attributesArr"] = {};
+function cloneAttributesArr(attributesArr?: MenuItem["attributesArr"]): WebAttributesArr {
+  const cloned: WebAttributesArr = {};
   Object.entries(attributesArr ?? {}).forEach(([groupName, group]) => {
     cloned[groupName] = {
       ...group,
@@ -174,10 +185,20 @@ function cloneAttributesArr(attributesArr?: MenuItem["attributesArr"]): MenuItem
   return cloned;
 }
 
+function mergeAttributesArr(
+  baseAttributes?: MenuItem["attributesArr"],
+  overrideAttributes?: MenuItem["attributesArr"]
+): WebAttributesArr {
+  return {
+    ...cloneAttributesArr(baseAttributes),
+    ...cloneAttributesArr(overrideAttributes),
+  };
+}
+
 function selectedOptionsToAttributesArr(
   selectedOptions: SelectedOption[] | undefined,
   attributesArr?: MenuItem["attributesArr"]
-): MenuItem["attributesArr"] {
+): WebAttributesArr {
   const nextAttributes = cloneAttributesArr(attributesArr);
 
   (selectedOptions ?? []).forEach((group) => {
@@ -347,6 +368,64 @@ export function calculateCashGratuityFromPercent({
   return roundMoney(Math.max(0, subtotal) * (Math.max(0, percent) / 100));
 }
 
+export function applyCustomPriceReviseToProduct<T extends Record<string, any>>({
+  product,
+  reason,
+  amount,
+  increase,
+}: CustomPriceReviseInput<T>): T {
+  const name = reason.trim() || "改价";
+  const value = roundMoney(Math.abs(amount));
+  const priceAdjustment = increase ? value : -value;
+  const quantity = typeof product.quantity === "number" && product.quantity > 0 ? product.quantity : 1;
+  const baseSubtotal = parseMoney(product.subtotal);
+  const currentSelected = product.attributeSelected && typeof product.attributeSelected === "object"
+    ? { ...product.attributeSelected }
+    : {};
+  const nextAttributes = cloneAttributesArr(product.attributesArr);
+
+  const existingGroup = nextAttributes?.[CUSTOMIZED_OPTION_GROUP] ?? {
+    isSingleSelected: false,
+    variations: [],
+  };
+  const existingVariations = existingGroup.variations ?? [];
+  const existingIndex = existingVariations.findIndex((variation) => variation.type === name);
+  const nextVariation = { type: name, price: priceAdjustment };
+  const nextVariations = [...existingVariations];
+  if (existingIndex >= 0) nextVariations[existingIndex] = nextVariation;
+  else nextVariations.push(nextVariation);
+
+  const existingSelected = normalizeSelectionValue(currentSelected[CUSTOMIZED_OPTION_GROUP]);
+  const nextSelected = existingSelected.includes(name)
+    ? existingSelected
+    : [...existingSelected, name].sort();
+  const optionAdjustment = nextSelected.reduce((sum, selectedName) => {
+    const variation = nextVariations.find((item) => item.type === selectedName);
+    return sum + parseMoney(variation?.price);
+  }, 0);
+  const nextUnitPrice = roundMoney(baseSubtotal + optionAdjustment);
+  if (nextUnitPrice < 0) {
+    throw new Error("custom price revise would make product total negative");
+  }
+
+  return {
+    ...product,
+    attributesArr: {
+      ...nextAttributes,
+      [CUSTOMIZED_OPTION_GROUP]: {
+        ...existingGroup,
+        isSingleSelected: false,
+        variations: nextVariations,
+      },
+    },
+    attributeSelected: {
+      ...currentSelected,
+      [CUSTOMIZED_OPTION_GROUP]: nextSelected,
+    },
+    itemTotalPrice: roundMoney(nextUnitPrice * quantity),
+  };
+}
+
 export function cartItemToEditableSelections({
   product,
   menuItem,
@@ -373,6 +452,11 @@ export function cartItemToEditableSelections({
   const rawSelected = product.attributeSelected && typeof product.attributeSelected === "object"
     ? product.attributeSelected as Record<string, unknown>
     : {};
+  const productAttributes = product.attributesArr && typeof product.attributesArr === "object"
+    ? product.attributesArr as MenuItem["attributesArr"]
+    : undefined;
+  const effectiveAttributes = mergeAttributesArr(menuItem?.attributesArr, productAttributes);
+
   const optionGroupSelections = (menuItem?.optionGroups ?? [])
     .map((group) => {
       const selectedNames = normalizeSelectionValue(rawSelected[group.name] ?? rawSelected[group.id]);
@@ -385,7 +469,7 @@ export function cartItemToEditableSelections({
     })
     .filter((group) => group.selectedChoices.length > 0);
   const optionGroupNames = new Set((menuItem?.optionGroups ?? []).map((group) => group.name));
-  const webAttributeSelections = Object.entries(menuItem?.attributesArr ?? {})
+  const webAttributeSelections = Object.entries(effectiveAttributes ?? {})
     .filter(([attributeName]) => !optionGroupNames.has(attributeName))
     .map(([attributeName, attributeDetails]) => {
       const selectedNames = normalizeSelectionValue(rawSelected[attributeName]);
@@ -446,7 +530,7 @@ export function buildEditedWebCartItem({
     quantity,
     count: product.count,
     imageUrl: menuItem?.imageUrl ?? product.image,
-    attributesArr: menuItem?.attributesArr ?? product.attributesArr,
+    attributesArr: mergeAttributesArr(menuItem?.attributesArr, product.attributesArr),
     selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
     selectedIngredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
     selectedGlobalCustomizations: selectedGlobalCustomizations.length > 0

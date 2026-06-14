@@ -4,6 +4,7 @@ import { Colors } from "@/constants/theme";
 import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { appendAmountKey, normalizeAmountInput } from "@/lib/pos/amountInput";
 import { GlobalCustomization, MenuItem, OptionGroup } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -16,10 +17,21 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  initialWindowMetrics,
+} from "react-native-safe-area-context";
 
 const ADD_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求添加";
 const REMOVE_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求减少";
 const CUSTOMIZED_OPTION_GROUP = "Customized Option";
+const AMOUNT_KEYPAD_ROWS = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  [".", "0", "00"],
+];
 
 function parseOptionPrice(value: number | string | undefined): number | undefined {
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
@@ -73,6 +85,11 @@ interface ItemOptionsModalProps {
     }[],
     selectedGlobalCustomizations?: SelectedGlobalCustomization[]
   ) => void;
+  onCustomPriceChange?: (input: {
+    reason: string;
+    amount: number;
+    increase: boolean;
+  }) => boolean | void;
 }
 
 export function ItemOptionsModal({
@@ -84,6 +101,7 @@ export function ItemOptionsModal({
   confirmLabel,
   onClose,
   onConfirm,
+  onCustomPriceChange,
 }: ItemOptionsModalProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
@@ -247,24 +265,58 @@ export function ItemOptionsModal({
     const amount = parseFloat(customAmount);
     const reason = customReason.trim() || "改价";
     if (!Number.isFinite(amount)) return;
+    const handled = onCustomPriceChange?.({ reason, amount: Math.abs(amount), increase });
+    if (handled === false) return;
     const priceAdjustment = increase ? Math.abs(amount) : -Math.abs(amount);
     setSelectedOptions((prev) => {
-      const withoutCustom = prev.filter((option) => option.groupName !== CUSTOMIZED_OPTION_GROUP);
-      return [
-        ...withoutCustom,
-        {
-          groupId: CUSTOMIZED_OPTION_GROUP,
-          groupName: CUSTOMIZED_OPTION_GROUP,
-          selectedChoices: [
-            {
-              id: `${CUSTOMIZED_OPTION_GROUP}:${reason}`,
-              name: reason,
-              priceAdjustment,
-            },
-          ],
-        },
-      ];
+      const existingCustomGroup = prev.find(
+        (option) => option.groupName === CUSTOMIZED_OPTION_GROUP
+      );
+      const nextChoice = {
+        id: `${CUSTOMIZED_OPTION_GROUP}:${reason}`,
+        name: reason,
+        priceAdjustment,
+      };
+
+      if (!existingCustomGroup) {
+        return [
+          ...prev,
+          {
+            groupId: CUSTOMIZED_OPTION_GROUP,
+            groupName: CUSTOMIZED_OPTION_GROUP,
+            selectedChoices: [nextChoice],
+          },
+        ];
+      }
+
+      return prev.map((option) => {
+        if (option.groupName !== CUSTOMIZED_OPTION_GROUP) return option;
+        const existingChoiceIndex = option.selectedChoices.findIndex(
+          (choice) => choice.name === reason
+        );
+        const selectedChoices = [...option.selectedChoices];
+        if (existingChoiceIndex >= 0) {
+          selectedChoices[existingChoiceIndex] = nextChoice;
+        } else {
+          selectedChoices.push(nextChoice);
+        }
+        return {
+          ...option,
+          selectedChoices,
+        };
+      });
     });
+    setCustomReason("改价");
+    setCustomAmount("");
+  };
+
+  const handleCustomPriceChoicePress = (choice: SelectedOption["selectedChoices"][number]) => {
+    setCustomReason(choice.name);
+    setCustomAmount(Math.abs(choice.priceAdjustment ?? 0).toString());
+  };
+
+  const handleAmountKeyPress = (key: string) => {
+    setCustomAmount((current) => appendAmountKey(current, key));
   };
 
   const allRequiredOptionsSelected = () => {
@@ -301,30 +353,31 @@ export function ItemOptionsModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-white dark:bg-slate-950">
-        {/* Header */}
-        <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-slate-800">
-          <View className="flex-1">
-            <Text
-              style={{ fontSize: responsive.headingFontSize }}
-              className="font-bold text-slate-900 dark:text-white"
+      <SafeAreaProvider initialMetrics={initialWindowMetrics} style={{ flex: 1 }}>
+        <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-white dark:bg-slate-950">
+          {/* Header */}
+          <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-slate-800">
+            <View className="flex-1">
+              <Text
+                style={{ fontSize: responsive.headingFontSize }}
+                className="font-bold text-slate-900 dark:text-white"
+              >
+                {item.name}
+              </Text>
+              <Text
+                style={{ fontSize: responsive.baseFontSize }}
+                className="mt-1 text-slate-600 dark:text-slate-400"
+              >
+                ${finalPrice.toFixed(2)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onClose}
+              className="rounded-full bg-slate-100 p-2 dark:bg-slate-800"
             >
-              {item.name}
-            </Text>
-            <Text
-              style={{ fontSize: responsive.baseFontSize }}
-              className="mt-1 text-slate-600 dark:text-slate-400"
-            >
-              ${finalPrice.toFixed(2)}
-            </Text>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={onClose}
-            className="rounded-full bg-slate-100 p-2 dark:bg-slate-800"
-          >
-            <Ionicons name="close" size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
 
         {/* Content */}
         <ScrollView className="flex-1 p-4">
@@ -355,8 +408,8 @@ export function ItemOptionsModal({
                 <TextInput
                   value={customAmount}
                   onChangeText={(value) => {
-                    const normalized = value.replace(/。/g, ".");
-                    if (/^\d*\.?\d*$/.test(normalized)) setCustomAmount(normalized);
+                    const normalized = normalizeAmountInput(value);
+                    if (normalized !== null) setCustomAmount(normalized);
                   }}
                   keyboardType="decimal-pad"
                   className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:text-white"
@@ -365,10 +418,49 @@ export function ItemOptionsModal({
                 />
               </View>
             </View>
+            <View className="mt-3 gap-2">
+              {AMOUNT_KEYPAD_ROWS.map((row) => (
+                <View key={row.join("-")} className="flex-row gap-2">
+                  {row.map((key) => (
+                    <TouchableOpacity
+                      key={key}
+                      onPress={() => handleAmountKeyPress(key)}
+                      className="min-h-[42px] flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <Text
+                        style={{ fontSize: responsive.baseFontSize }}
+                        className="font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        {key}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  onPress={() => handleAmountKeyPress("clear")}
+                  className="min-h-[42px] flex-1 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30"
+                >
+                  <Text
+                    style={{ fontSize: responsive.baseFontSize }}
+                    className="font-semibold text-red-600"
+                  >
+                    C
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleAmountKeyPress("backspace")}
+                  className="min-h-[42px] flex-1 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30"
+                >
+                  <Ionicons name="backspace-outline" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
             <View className="mt-3 flex-row flex-wrap gap-2">
               <TouchableOpacity
                 onPress={() => handleCustomPriceChange(true)}
-                className="rounded-lg bg-orange-500 px-4 py-3"
+                className="min-h-[44px] items-center justify-center rounded-lg bg-orange-500 px-4"
               >
                 <Text
                   style={{ fontSize: responsive.baseFontSize - 1 }}
@@ -379,7 +471,7 @@ export function ItemOptionsModal({
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handleCustomPriceChange(false)}
-                className="rounded-lg bg-cyan-500 px-4 py-3"
+                className="min-h-[44px] items-center justify-center rounded-lg bg-cyan-500 px-4"
               >
                 <Text
                   style={{ fontSize: responsive.baseFontSize - 1 }}
@@ -411,61 +503,78 @@ export function ItemOptionsModal({
                     )}
                   </Text>
                   <View className="gap-2">
-                    {group.choices.map((choice) => (
-                      <TouchableOpacity
-                        key={choice.id}
-                        onPress={() =>
-                          handleOptionGroupChange(
-                            group.id,
-                            group.name,
-                            choice.id,
-                            choice.name,
-                            choice.priceAdjustment,
-                            group.type === "single"
-                          )
-                        }
-                        className={`flex-row items-center rounded-lg border-2 p-3 ${
-                          isOptionGroupSelected(group.id, choice.id)
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
-                            : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
-                        }`}
-                      >
-                        <View
-                          className={`h-5 w-5 rounded-full border-2 ${
-                            isOptionGroupSelected(group.id, choice.id)
-                              ? "border-blue-500 bg-blue-500"
-                              : "border-slate-300 dark:border-slate-600"
+                    {group.choices.map((choice) => {
+                      const isSelected = isOptionGroupSelected(group.id, choice.id);
+                      const isCustomPriceChoice = group.name === CUSTOMIZED_OPTION_GROUP;
+                      const handleChoicePress = () => {
+                        handleOptionGroupChange(
+                          group.id,
+                          group.name,
+                          choice.id,
+                          choice.name,
+                          choice.priceAdjustment,
+                          group.type === "single"
+                        );
+                      };
+                      return (
+                        <TouchableOpacity
+                          key={choice.id}
+                          onPress={handleChoicePress}
+                          activeOpacity={0.75}
+                          className={`flex-row items-center rounded-lg border-2 p-3 ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                              : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
                           }`}
                         >
-                          {isOptionGroupSelected(group.id, choice.id) && (
-                            <View className="flex-1 items-center justify-center">
-                              <Ionicons
-                                name="checkmark"
-                                size={12}
-                                color="white"
-                              />
+                          <View className="flex-1 flex-row items-center">
+                            <View
+                              className={`h-5 w-5 rounded-full border-2 ${
+                                isSelected
+                                  ? "border-blue-500 bg-blue-500"
+                                  : "border-slate-300 dark:border-slate-600"
+                              }`}
+                            >
+                              {isSelected && (
+                                <View className="flex-1 items-center justify-center">
+                                  <Ionicons
+                                    name="checkmark"
+                                    size={12}
+                                    color="white"
+                                  />
+                                </View>
+                              )}
                             </View>
+                            <View className="ml-3 flex-1">
+                              <Text
+                                style={{ fontSize: responsive.baseFontSize }}
+                                className="font-medium text-slate-900 dark:text-white"
+                              >
+                                {choice.name}
+                              </Text>
+                            </View>
+                          </View>
+                          {choice.priceAdjustment !== undefined && choice.priceAdjustment !== 0 && (
+                            <Text
+                              style={{ fontSize: responsive.baseFontSize - 2 }}
+                              className="font-semibold text-slate-600 dark:text-slate-400"
+                            >
+                              {choice.priceAdjustment > 0 ? "+" : ""}
+                              ${choice.priceAdjustment.toFixed(2)}
+                            </Text>
                           )}
-                        </View>
-                        <View className="ml-3 flex-1">
-                          <Text
-                            style={{ fontSize: responsive.baseFontSize }}
-                            className="font-medium text-slate-900 dark:text-white"
-                          >
-                            {choice.name}
-                          </Text>
-                        </View>
-                        {choice.priceAdjustment !== undefined && choice.priceAdjustment !== 0 && (
-                          <Text
-                            style={{ fontSize: responsive.baseFontSize - 2 }}
-                            className="font-semibold text-slate-600 dark:text-slate-400"
-                          >
-                            {choice.priceAdjustment > 0 ? "+" : ""}
-                            ${choice.priceAdjustment.toFixed(2)}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+                          {isCustomPriceChoice && (
+                            <TouchableOpacity
+                              onPress={() => handleCustomPriceChoicePress(choice)}
+                              hitSlop={8}
+                              className="ml-3 h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700"
+                            >
+                              <Ionicons name="create-outline" size={16} color={colors.text} />
+                            </TouchableOpacity>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
               ))}
@@ -604,7 +713,8 @@ export function ItemOptionsModal({
             </View>
           </View>
         </View>
-      </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

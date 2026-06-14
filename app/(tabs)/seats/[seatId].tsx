@@ -24,6 +24,7 @@ import { db, functions } from "@/lib/firebase";
 import {
   calculateWebOrderTotals,
   applyTargetTotalAdjustment,
+  applyCustomPriceReviseToProduct,
   buildEditedWebCartItem,
   buildCashPaymentBreakdown,
   cartItemToEditableSelections,
@@ -649,7 +650,10 @@ export default function SeatScreen() {
       rawProduct,
       menuItem: {
         ...menuItem,
-        attributesArr: menuItem.attributesArr ?? rawProduct.attributesArr,
+        attributesArr: {
+          ...(menuItem.attributesArr ?? {}),
+          ...(rawProduct.attributesArr ?? {}),
+        },
       },
     });
   };
@@ -679,6 +683,60 @@ export default function SeatScreen() {
 
     void saveToFirestore(newRaw);
     setOptionEditContext(null);
+  };
+
+  const handleOptionEditCustomPriceChange = ({
+    reason,
+    amount,
+    increase,
+  }: {
+    reason: string;
+    amount: number;
+    increase: boolean;
+  }) => {
+    if (!optionEditContext) return false;
+
+    try {
+      let nextRawProduct: any | null = null;
+      const newRaw = rawProducts.map((product) => {
+        if (getCartProductKey(product) !== optionEditContext.orderItem.id) return product;
+        nextRawProduct = applyCustomPriceReviseToProduct({
+          product,
+          reason,
+          amount,
+          increase,
+        });
+        return nextRawProduct;
+      });
+
+      if (!nextRawProduct) {
+        Alert.alert(t("common.error"), "Unable to update this item in the current table order.");
+        return false;
+      }
+
+      setOptionEditContext((current) => current
+        ? {
+            ...current,
+            rawProduct: nextRawProduct,
+            menuItem: {
+              ...current.menuItem,
+              attributesArr: {
+                ...(current.menuItem.attributesArr ?? {}),
+                ...(nextRawProduct?.attributesArr ?? {}),
+              },
+            },
+          }
+        : current
+      );
+      void saveToFirestore(newRaw);
+      return true;
+    } catch (error) {
+      Alert.alert(
+        t("common.error"),
+        error instanceof Error ? error.message : "Failed to update custom price"
+      );
+      return false;
+    }
   };
 
   const handleAdjustTotal = (amountDifference: number, nextTaxExempt = taxExempt) => {
@@ -1017,6 +1075,7 @@ export default function SeatScreen() {
             confirmLabel="Save Changes"
             onClose={() => setOptionEditContext(null)}
             onConfirm={handleOptionsEditSave}
+            onCustomPriceChange={handleOptionEditCustomPriceChange}
           />
         );
       })()}
