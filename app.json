@@ -47,7 +47,24 @@
       ],
       "expo-web-browser",
       "@react-native-community/datetimepicker",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              {
+                "name": "GoogleUtilities",
+                "modular_headers": true
+              },
+              {
+                "name": "RecaptchaInterop",
+                "modular_headers": true
+              }
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -60,7 +77,7 @@
       },
       "googleAuth": {
         "webClientId": "579212375301-m68l020er9v91lhg225cv1me5pm86tsi.apps.googleusercontent.com",
-        "iosClientId": "",
+        "iosClientId": "579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en.apps.googleusercontent.com",
         "androidClientId": "579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en.apps.googleusercontent.com"
       }
     }
