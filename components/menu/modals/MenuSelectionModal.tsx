@@ -3,6 +3,7 @@ import { Colors } from "@/constants/theme";
 import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { isTableTimingMenuItem } from "@/lib/pos/tableTiming";
 import { MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
@@ -76,11 +77,20 @@ export function MenuSelectionModal({
   };
 
   const handleItemEditPress = (item: MenuItem) => {
+    if (isTableTimingMenuItem(item)) {
+      handleQuickAddItem(item);
+      return;
+    }
     setSelectedMenuItem(item);
     setShowOptionsModal(true);
   };
 
   const handleItemPress = (item: MenuItem) => {
+    if (isTableTimingMenuItem(item)) {
+      handleQuickAddItem(item);
+      return;
+    }
+
     const hasWebAttributes = Object.values(item.attributesArr ?? {}).some(
       (group) => (group.variations?.length ?? 0) > 0
     );
@@ -301,12 +311,14 @@ export function MenuSelectionModal({
                 contentContainerStyle={{ paddingBottom: 40 }}
               >
                 <View className="flex-row flex-wrap justify-between gap-y-4">
-                  {filteredItems.map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      onPress={() => handleItemPress(item)}
-                      className="w-[48%] rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:opacity-70 dark:border-slate-800 dark:bg-slate-900"
-                    >
+                  {filteredItems.map((item) => {
+                    const isTableTimingItem = isTableTimingMenuItem(item);
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => handleItemPress(item)}
+                        className="w-[48%] rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:opacity-70 dark:border-slate-800 dark:bg-slate-900"
+                      >
                       <View className="mb-2 h-24 w-full items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800">
                         <Ionicons
                           name="fast-food-outline"
@@ -331,16 +343,29 @@ export function MenuSelectionModal({
                         <TouchableOpacity
                           onPress={(event) => {
                             event.stopPropagation();
-                            handleItemEditPress(item);
+                            if (isTableTimingItem) handleQuickAddItem(item);
+                            else handleItemEditPress(item);
                           }}
-                          className="flex-row items-center rounded-md border border-slate-400 px-2.5 py-1.5 dark:border-slate-600"
+                          className={`flex-row items-center rounded-md border px-2.5 py-1.5 ${
+                            isTableTimingItem
+                              ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
+                              : "border-slate-400 dark:border-slate-600"
+                          }`}
                         >
-                          <Ionicons name="create-outline" size={14} color={colors.text} />
+                          <Ionicons
+                            name={isTableTimingItem ? "time-outline" : "create-outline"}
+                            size={14}
+                            color={isTableTimingItem ? "#2563eb" : colors.text}
+                          />
                           <Text
                             style={{ fontSize: responsive.captionFontSize }}
-                            className="ml-1 font-semibold text-slate-800 dark:text-slate-200"
+                            className={`ml-1 font-semibold ${
+                              isTableTimingItem
+                                ? "text-blue-700 dark:text-blue-300"
+                                : "text-slate-800 dark:text-slate-200"
+                            }`}
                           >
-                            Edit
+                            {isTableTimingItem ? "Start Table" : "Edit"}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -353,7 +378,7 @@ export function MenuSelectionModal({
                           <Ionicons name="add" size={18} color={colors.text} />
                         </TouchableOpacity>
                       </View>
-                      {(item.optionGroups?.length || 0) > 0 && (
+                      {!isTableTimingItem && (item.optionGroups?.length || 0) > 0 && (
                         <View className="mt-2 flex-row items-center">
                           <Ionicons
                             name="settings-outline"
@@ -368,8 +393,9 @@ export function MenuSelectionModal({
                           </Text>
                         </View>
                       )}
-                    </TouchableOpacity>
-                  ))}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 {filteredItems.length === 0 && (

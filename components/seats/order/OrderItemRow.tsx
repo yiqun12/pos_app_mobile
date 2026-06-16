@@ -1,6 +1,7 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { formatTableTimingCartAttributes } from "@/lib/pos/tableTiming";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +12,7 @@ interface OrderItemRowProps {
   item: OrderItem;
   onIncrement: (id: string) => void;
   onDecrement: (id: string) => void;
+  onDelete?: (id: string) => void;
   onPress?: (item: OrderItem) => void;
   onEdit?: (item: OrderItem) => void;
 }
@@ -19,6 +21,7 @@ export function OrderItemRow({
   item,
   onIncrement,
   onDecrement,
+  onDelete,
   onPress,
   onEdit,
 }: OrderItemRowProps) {
@@ -27,30 +30,57 @@ export function OrderItemRow({
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
   const isSurcharge = item.menuItemId === "SURCHARGE_ITEM";
+  const isTableItem = Boolean(item.isTableItem || item.attributeSelected?.["开台商品"]);
+  const tableAttributeText = isTableItem
+    ? formatTableTimingCartAttributes(item.attributeSelected)
+    : "";
+  const displayName = isTableItem
+    ? (item.nameCN ?? item.rawName ?? item.name)
+    : item.name;
+  const canOpenTiming = isTableItem && !item.tableTimingEndedAt;
+  const isRowDisabled = isSurcharge || (isTableItem && Boolean(item.tableTimingEndedAt));
 
   return (
     <TouchableOpacity
-      activeOpacity={isSurcharge ? 1 : 0.7}
+      activeOpacity={isRowDisabled ? 1 : 0.7}
       onPress={() => onPress?.(item)}
-      disabled={isSurcharge}
+      disabled={isRowDisabled}
       className="mb-3 flex-row items-start justify-between border-b border-slate-100 pb-3 dark:border-slate-800"
     >
-      {/* Food Image Placeholder */}
-      <View className="mr-3 h-12 w-12 rounded-lg bg-slate-200 dark:bg-slate-700" />
+      {isTableItem && onDelete ? (
+        <TouchableOpacity
+          onPress={() => onDelete(item.id)}
+          className="mr-3 mt-1 h-8 w-8 items-center justify-center"
+        >
+          <Ionicons name="close" size={24} color="#94a3b8" />
+        </TouchableOpacity>
+      ) : (
+        <View className="mr-3 h-12 w-12 rounded-lg bg-slate-200 dark:bg-slate-700" />
+      )}
 
       <View className="flex-1">
         <Text
           style={{ fontSize: responsive.baseFontSize }}
           className="font-semibold text-slate-900 dark:text-white"
         >
-          {item.name}
+          {displayName}
         </Text>
-        <Text
-          style={{ fontSize: responsive.baseFontSize - 2 }}
-          className="text-slate-500 dark:text-slate-400"
-        >
-          ${item.price.toFixed(2)}
-        </Text>
+        {!isTableItem && (
+          <Text
+            style={{ fontSize: responsive.baseFontSize - 2 }}
+            className="text-slate-500 dark:text-slate-400"
+          >
+            ${item.price.toFixed(2)}
+          </Text>
+        )}
+        {tableAttributeText.length > 0 && (
+          <Text
+            style={{ fontSize: responsive.captionFontSize }}
+            className="mt-1 text-slate-600 dark:text-slate-400"
+          >
+            {tableAttributeText}
+          </Text>
+        )}
 
         {/* Selected Options */}
         {item.selectedOptions && item.selectedOptions.length > 0 && (
@@ -117,7 +147,7 @@ export function OrderItemRow({
           </View>
         )}
 
-        {item.notes && (
+        {!isTableItem && item.notes && (
           <Text
             style={{ fontSize: responsive.captionFontSize }}
             className="mt-1 italic text-slate-400"
@@ -126,7 +156,7 @@ export function OrderItemRow({
           </Text>
         )}
 
-        {!isSurcharge && onEdit && (
+        {!isSurcharge && !isTableItem && onEdit && (
           <TouchableOpacity
             onPress={() => onEdit(item)}
             activeOpacity={0.75}
@@ -143,6 +173,23 @@ export function OrderItemRow({
             </View>
           </TouchableOpacity>
         )}
+        {canOpenTiming && onEdit && (
+          <TouchableOpacity
+            onPress={() => onEdit(item)}
+            activeOpacity={0.75}
+            className="mt-2 self-start rounded-md border border-red-400 px-3 py-1.5 dark:border-red-500"
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="stop-circle-outline" size={14} color="#f43f5e" />
+              <Text
+                style={{ fontSize: responsive.captionFontSize }}
+                className="ml-1 font-semibold text-rose-500"
+              >
+                End Table
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View className="ml-3 flex-col items-end gap-3">
@@ -153,6 +200,15 @@ export function OrderItemRow({
               className="font-semibold text-orange-600"
             >
               Surcharge
+            </Text>
+          </View>
+        ) : isTableItem ? (
+          <View className="min-h-[34px] min-w-[48px] items-center justify-center rounded-lg bg-slate-100 px-3 dark:bg-slate-800">
+            <Text
+              style={{ fontSize: responsive.baseFontSize }}
+              className="text-center font-bold text-slate-900 dark:text-white"
+            >
+              {item.quantity}
             </Text>
           </View>
         ) : (

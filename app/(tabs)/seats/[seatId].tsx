@@ -4,6 +4,7 @@ import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { CashPaymentModal } from "@/components/seats/modals/CashPaymentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
 import { ServiceFeeModal } from "@/components/seats/modals/ServiceFeeModal";
+import { TableTimingModal } from "@/components/seats/modals/TableTimingModal";
 import { OrderItemRow } from "@/components/seats/order/OrderItemRow";
 import { OrderSummary } from "@/components/seats/order/OrderSummary";
 import { Order, OrderItem } from "@/components/seats/types";
@@ -15,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, AppState, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "@/context/auth";
 import { useMenu } from "@/context/menu";
 import { useStoreSelection } from "@/context/store";
@@ -37,6 +38,26 @@ import {
   getSurchargeTotal,
   isSurchargeCartItem,
 } from "@/lib/pos/orderTransforms";
+import {
+  BILLING_RULES,
+  calculateTableTimingFee,
+  createTableTimingProduct,
+  endTableTimingProduct,
+  getTableTimingBasePrice,
+  getTableTimingElapsedMinutes,
+  getTableTimingStartTimestamp,
+  isActiveTableTimingProduct,
+  isTableTimingMenuItem,
+  type BillingRuleId,
+  type CustomBillingRule,
+  type TimerAction,
+} from "@/lib/pos/tableTiming";
+import {
+  loadTableTimingTimers,
+  removeTableTimingTimer,
+  removeTableTimingTimersForProduct,
+  saveTableTimingTimer,
+} from "@/lib/pos/tableTimingStorage";
 import { formatWebDate } from "@/lib/pos/webDate";
 import type { MenuItem } from "@/types/menu";
 import { httpsCallable } from "firebase/functions";
@@ -74,6 +95,10 @@ export default function SeatScreen() {
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
   const [serviceFeeModalVisible, setServiceFeeModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
+  const [tableTimingContext, setTableTimingContext] = useState<{
+    menuItem: MenuItem;
+    product?: any;
+  } | null>(null);
 
   const availableMenuItems = useMemo(
     () => (menuItems.length > 0 ? menuItems : ((store?.menu?.items ?? []) as MenuItem[])),
@@ -141,6 +166,11 @@ export default function SeatScreen() {
                   selectedGlobalCustomizations: editableSelections.selectedGlobalCustomizations.length > 0
                     ? editableSelections.selectedGlobalCustomizations
                     : undefined,
+                  isTableItem: Boolean(item.isTableItem),
+                  tableRemarks: item.tableRemarks,
+                  tableTimingStartedAt: item.tableTimingStartedAt,
+                  tableTimingEndedAt: item.tableTimingEndedAt,
+                  notes: item.tableRemarks,
                 } as OrderItem;
               });
               setItems(uiItems);
@@ -567,6 +597,12 @@ export default function SeatScreen() {
 
   const handleAddItem = (orderItem: OrderItem) => {
     const menuItem = availableMenuItems.find((i) => i.id === orderItem.menuItemId);
+    if (menuItem && isTableTimingMenuItem(menuItem)) {
+      setTableTimingContext({ menuItem });
+      setMenuModalVisible(false);
+      return;
+    }
+
     const newProduct = createWebCartItem({
       orderItem,
       menuItem,
@@ -596,7 +632,7 @@ export default function SeatScreen() {
 
   const handleIncrement = (id: string) => {
     const newRaw = rawProducts.map((p) => {
-      if (isSurchargeCartItem(p)) return p;
+      if (isSurchargeCartItem(p) || p.isTableItem || isActiveTableTimingProduct(p)) return p;
       if (String(p.count) === id) {
         const newQty = (p.quantity ?? 1) + 1;
         const basePrice = parseFloat(p.subtotal || "0");
@@ -613,7 +649,7 @@ export default function SeatScreen() {
 
   const handleDecrement = (id: string) => {
     const newRaw = rawProducts.map((p) => {
-      if (isSurchargeCartItem(p)) return p;
+      if (isSurchargeCartItem(p) || p.isTableItem || isActiveTableTimingProduct(p)) return p;
       if (String(p.count) === id) {
         const newQty = (p.quantity ?? 1) - 1;
         if (newQty <= 0) return null;
@@ -629,6 +665,23 @@ export default function SeatScreen() {
     saveToFirestore(newRaw);
   };
 
+  const handleDeleteItem = async (id: string) => {
+    const removedProducts = rawProducts.filter((product) => getCartProductKey(product) === id);
+    const newRaw = rawProducts.filter((product) => getCartProductKey(product) !== id);
+    await saveToFirestore(newRaw);
+    if (currentStoreId && tableName) {
+      await Promise.all(removedProducts
+        .filter((product) => product.isTableItem || product.attributeSelected?.["开台商品"])
+        .map((product) => removeTableTimingTimersForProduct({
+          storeId: currentStoreId,
+          tableName,
+          itemId: String(product.id),
+          count: product.count,
+        }))
+      );
+    }
+  };
+
   const findRawProductForOrderItem = (orderItem: OrderItem) =>
     rawProducts.find((product) => getCartProductKey(product) === orderItem.id);
 
@@ -640,6 +693,23 @@ export default function SeatScreen() {
     }
 
     const menuItem = availableMenuItems.find((item) => item.id === rawProduct.id);
+    if ((isActiveTableTimingProduct(rawProduct) || rawProduct.isTableItem) && !rawProduct.tableTimingEndedAt) {
+      setTableTimingContext({
+        product: rawProduct,
+        menuItem: menuItem ?? {
+          id: rawProduct.id,
+          categoryId: "",
+          name: rawProduct.name ?? "Table Timing",
+          rawName: rawProduct.name,
+          nameCN: rawProduct.CHI,
+          price: getTableTimingBasePrice(rawProduct),
+          imageUrl: rawProduct.image,
+          attributesArr: rawProduct.attributesArr,
+        },
+      });
+      return;
+    }
+
     if (!menuItem) {
       Alert.alert(t("common.error"), "Unable to find this item in the current menu.");
       return;
@@ -660,6 +730,7 @@ export default function SeatScreen() {
 
   const handleOrderItemPress = (orderItem: OrderItem) => {
     if (orderItem.menuItemId === "SURCHARGE_ITEM") return;
+    if (orderItem.isTableItem && orderItem.tableTimingEndedAt) return;
     handleOpenOptionsEdit(orderItem);
   };
 
@@ -762,8 +833,232 @@ export default function SeatScreen() {
     setServiceFeeAmount(0);
   };
 
+  const activeTableTimingProducts = useMemo(
+    () => rawProducts.filter((product) => isActiveTableTimingProduct(product)),
+    [rawProducts]
+  );
+
+  const confirmProceedWithActiveTiming = () => {
+    if (activeTableTimingProducts.length === 0) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(
+        "Table Timing",
+        "There are active table timing items that have not been ended. End table first for accurate billing.",
+        [
+          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+          { text: "Continue", style: "destructive", onPress: () => resolve(true) },
+        ]
+      );
+    });
+  };
+
+  const handleStartTableTiming = async ({
+    remarks,
+    billingRule,
+    customRule,
+    timerDurationMinutes,
+    timerAction,
+  }: {
+    remarks: string;
+    billingRule: BillingRuleId;
+    customRule?: CustomBillingRule;
+    timerDurationMinutes?: number;
+    timerAction: TimerAction;
+  }) => {
+    if (!tableTimingContext?.menuItem || !currentStoreId || !tableName) return;
+    const startedAt = Date.now();
+    const product = createTableTimingProduct({
+      menuItem: tableTimingContext.menuItem,
+      count: startedAt + Math.floor(Math.random() * 1000),
+      startedAt,
+      remarks,
+      billingRule,
+      customRule,
+    });
+    if (timerDurationMinutes && timerDurationMinutes > 0 && timerAction !== "No Action") {
+      product.tableTimingTimer = {
+        durationMinutes: timerDurationMinutes,
+        action: timerAction,
+        timerSetAt: startedAt,
+        absoluteEndTime: startedAt + timerDurationMinutes * 60000,
+      };
+    }
+    await saveToFirestore([product, ...rawProducts]);
+
+    if (timerDurationMinutes && timerDurationMinutes > 0 && timerAction !== "No Action") {
+      await saveTableTimingTimer({
+        storeId: currentStoreId,
+        tableName,
+        itemId: product.id,
+        count: product.count,
+        action: timerAction,
+        billingRule,
+        customRule,
+        timerSetAt: startedAt,
+        durationMs: timerDurationMinutes * 60000,
+        absoluteEndTime: startedAt + timerDurationMinutes * 60000,
+      });
+    }
+
+    setTableTimingContext(null);
+  };
+
+  const handleEndTableTiming = async ({
+    finalFee,
+    endedAt,
+    remarks,
+    billingRule,
+    customRule,
+  }: {
+    finalFee: number;
+    endedAt: number;
+    remarks: string;
+    billingRule: BillingRuleId;
+    customRule?: CustomBillingRule;
+  }) => {
+    if (!tableTimingContext?.product) return;
+    const target = tableTimingContext.product;
+    const newRaw = rawProducts.map((product) => {
+      if (getCartProductKey(product) !== getCartProductKey(target)) return product;
+      const attributeSelected = {
+        ...(product.attributeSelected ?? {}),
+        ...(remarks.trim().length > 0 ? { "备注": [remarks.trim()] } : {}),
+      };
+      if (remarks.trim().length === 0) {
+        delete attributeSelected["备注"];
+      }
+      return endTableTimingProduct({
+        product: {
+          ...product,
+          attributeSelected,
+          tableRemarks: remarks,
+          tableTimingBillingRule: billingRule,
+          tableTimingCustomRule: customRule,
+          tableTimingTimer: undefined,
+        },
+        finalFee,
+        endedAt,
+      });
+    });
+    await saveToFirestore(newRaw);
+    if (currentStoreId && tableName) {
+      await removeTableTimingTimersForProduct({
+        storeId: currentStoreId,
+        tableName,
+        itemId: String(target.id),
+        count: target.count,
+      });
+    }
+    setTableTimingContext(null);
+  };
+
+  const processExpiredTableTimingTimers = async () => {
+    if (!currentStoreId || !tableName || rawProducts.length === 0) return;
+    const entries = await loadTableTimingTimers();
+    const now = Date.now();
+    let nextProducts = rawProducts;
+    let changedProducts = false;
+
+    for (const entry of entries) {
+      const timer = entry.timer;
+      if (timer.storeId !== currentStoreId || timer.tableName !== tableName) continue;
+      if (timer.absoluteEndTime > now) continue;
+
+      const target = nextProducts.find((product) =>
+        String(product.id) === String(timer.itemId)
+        && String(product.count) === String(timer.count)
+      );
+
+      if (target && timer.action === "Auto Checkout" && isActiveTableTimingProduct(target)) {
+        const startedAt = getTableTimingStartTimestamp(target);
+        const basePrice = getTableTimingBasePrice(target);
+        const totalMinutes = getTableTimingElapsedMinutes(startedAt, now);
+        const finalFee = calculateTableTimingFee({
+          totalMinutes,
+          hourlyRate: basePrice,
+          ruleId: timer.billingRule,
+          customRule: timer.customRule,
+        });
+        nextProducts = nextProducts.map((product) =>
+          String(product.id) === String(timer.itemId)
+          && String(product.count) === String(timer.count)
+            ? endTableTimingProduct({
+                product: { ...product, tableTimingTimer: undefined },
+                finalFee,
+                endedAt: now,
+              })
+            : product
+        );
+        changedProducts = true;
+      }
+
+      await removeTableTimingTimer(entry.key);
+    }
+
+    for (const product of nextProducts) {
+      const timer = product.tableTimingTimer;
+      if (!timer || timer.absoluteEndTime > now || !isActiveTableTimingProduct(product)) continue;
+
+      if (timer.action === "Auto Checkout") {
+        const startedAt = getTableTimingStartTimestamp(product);
+        const basePrice = getTableTimingBasePrice(product);
+        const totalMinutes = getTableTimingElapsedMinutes(startedAt, now);
+        const finalFee = calculateTableTimingFee({
+          totalMinutes,
+          hourlyRate: basePrice,
+          ruleId: product.tableTimingBillingRule ?? BILLING_RULES.RULE_6,
+          customRule: product.tableTimingCustomRule,
+        });
+        nextProducts = nextProducts.map((candidate) =>
+          String(candidate.id) === String(product.id)
+          && String(candidate.count) === String(product.count)
+            ? endTableTimingProduct({
+                product: { ...candidate, tableTimingTimer: undefined },
+                finalFee,
+                endedAt: now,
+              })
+            : candidate
+        );
+        changedProducts = true;
+      } else if (timer.action === "Continue Billing") {
+        nextProducts = nextProducts.map((candidate) =>
+          String(candidate.id) === String(product.id)
+          && String(candidate.count) === String(product.count)
+            ? { ...candidate, tableTimingTimer: undefined }
+            : candidate
+        );
+        changedProducts = true;
+      }
+    }
+
+    if (changedProducts) {
+      await saveToFirestore(nextProducts);
+    }
+  };
+
+  useEffect(() => {
+    void processExpiredTableTimingTimers();
+  }, [currentStoreId, tableName, rawProducts]);
+
+  useEffect(() => {
+    if (!currentStoreId || !tableName || rawProducts.length === 0) return undefined;
+    const interval = setInterval(() => {
+      void processExpiredTableTimingTimers();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [currentStoreId, tableName, rawProducts]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void processExpiredTableTimingTimers();
+    });
+    return () => subscription.remove();
+  }, [currentStoreId, tableName, rawProducts]);
+
   const handleCashPayment = async (breakdown: ReturnType<typeof buildCashPaymentBreakdown>) => {
     try {
+      const canProceed = await confirmProceedWithActiveTiming();
+      if (!canProceed) return;
       await writeCashSuccessPayment(breakdown.basePayment, order, breakdown.gratuity);
       const nextPaidAmount = paidAmount + breakdown.basePayment;
       if (breakdown.isFullPayment || nextPaidAmount >= order.total) {
@@ -783,6 +1078,9 @@ export default function SeatScreen() {
   };
 
   const handlePayment = async (method: "cash" | "card" | "split", amount: number) => {
+    const canProceed = await confirmProceedWithActiveTiming();
+    if (!canProceed) return;
+
     if (method === "cash") {
       try {
         const breakdown = buildCashPaymentBreakdown({
@@ -832,6 +1130,8 @@ export default function SeatScreen() {
     }
 
     try {
+      const canProceed = await confirmProceedWithActiveTiming();
+      if (!canProceed) return;
       await writeUnpaidSuccessPayment(order);
       await clearTableInFirestore();
       setPaidAmount(0);
@@ -925,6 +1225,7 @@ export default function SeatScreen() {
                     item={item}
                     onIncrement={handleIncrement}
                     onDecrement={handleDecrement}
+                    onDelete={(id) => void handleDeleteItem(id)}
                     onPress={handleOrderItemPress}
                     onEdit={handleOpenOptionsEdit}
                   />
@@ -1096,6 +1397,16 @@ export default function SeatScreen() {
         onClose={() => setCashPaymentModalVisible(false)}
         onPayment={(breakdown) => void handleCashPayment(breakdown)}
         onOpenCashDrawer={() => void writeOpenCashDrawerEvent()}
+      />
+
+      <TableTimingModal
+        visible={!!tableTimingContext}
+        tableName={tableName ?? ""}
+        menuItem={tableTimingContext?.menuItem ?? null}
+        product={tableTimingContext?.product}
+        onClose={() => setTableTimingContext(null)}
+        onStart={(payload) => void handleStartTableTiming(payload)}
+        onEnd={(payload) => void handleEndTableTiming(payload)}
       />
     </View>
   );

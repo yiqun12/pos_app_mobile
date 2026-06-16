@@ -33,6 +33,10 @@ export type OrderItem = {
     }
   >;
   attributeSelected?: Record<string, string | string[]>;
+  isTableItem?: boolean;
+  tableRemarks?: string;
+  tableTimingStartedAt?: number;
+  tableTimingEndedAt?: number;
   notes?: string;
   originalPrice?: number; // In case of manual override
   selectedOptions?: SelectedOption[]; // User-selected options

@@ -15,6 +15,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from "react-native";
 import {
@@ -26,6 +27,7 @@ import {
 const ADD_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求添加";
 const REMOVE_REQUEST_CATEGORY: GlobalCustomization["typeCategory"] = "要求减少";
 const CUSTOMIZED_OPTION_GROUP = "Customized Option";
+const CUSTOM_TAX_EXEMPT_OPTION = "Tax Exempt";
 const AMOUNT_KEYPAD_ROWS = [
   ["1", "2", "3"],
   ["4", "5", "6"],
@@ -106,6 +108,8 @@ export function ItemOptionsModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
   const { t } = useTranslation();
 
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
@@ -121,6 +125,7 @@ export function ItemOptionsModal({
   >([]);
   const [customReason, setCustomReason] = useState("改价");
   const [customAmount, setCustomAmount] = useState("");
+  const [customTaxExempt, setCustomTaxExempt] = useState(false);
 
   // Global customization groups come from the MenuProvider (firestore-backed).
   const { globalCustomizationGroups } = useMenu();
@@ -139,6 +144,12 @@ export function ItemOptionsModal({
         customChoice?.priceAdjustment !== undefined
           ? Math.abs(customChoice.priceAdjustment).toString()
           : ""
+      );
+      setCustomTaxExempt(
+        (initialSelectedOptions ?? []).some((option) =>
+          option.groupName === CUSTOMIZED_OPTION_GROUP
+          && option.selectedChoices.some((choice) => choice.name === CUSTOM_TAX_EXEMPT_OPTION)
+        )
       );
     }
   }, [visible, item?.id]);
@@ -261,6 +272,38 @@ export function ItemOptionsModal({
     return selectedGlobalCustomizations.some((c) => c.id === id);
   };
 
+  const upsertCustomChoice = (
+    choiceName: string,
+    priceAdjustment: number,
+    selected = true
+  ) => {
+    setSelectedOptions((prev) => {
+      const existingGroup = prev.find((option) => option.groupName === CUSTOMIZED_OPTION_GROUP);
+      const otherGroups = prev.filter((option) => option.groupName !== CUSTOMIZED_OPTION_GROUP);
+      const existingChoices = existingGroup?.selectedChoices ?? [];
+      const nextChoices = selected
+        ? [
+            ...existingChoices.filter((choice) => choice.name !== choiceName),
+            {
+              id: `${CUSTOMIZED_OPTION_GROUP}:${choiceName}`,
+              name: choiceName,
+              priceAdjustment,
+            },
+          ]
+        : existingChoices.filter((choice) => choice.name !== choiceName);
+
+      if (nextChoices.length === 0) return otherGroups;
+      return [
+        ...otherGroups,
+        {
+          groupId: CUSTOMIZED_OPTION_GROUP,
+          groupName: CUSTOMIZED_OPTION_GROUP,
+          selectedChoices: nextChoices,
+        },
+      ];
+    });
+  };
+
   const handleCustomPriceChange = (increase: boolean) => {
     const amount = parseFloat(customAmount);
     const reason = customReason.trim() || "改价";
@@ -268,44 +311,7 @@ export function ItemOptionsModal({
     const handled = onCustomPriceChange?.({ reason, amount: Math.abs(amount), increase });
     if (handled === false) return;
     const priceAdjustment = increase ? Math.abs(amount) : -Math.abs(amount);
-    setSelectedOptions((prev) => {
-      const existingCustomGroup = prev.find(
-        (option) => option.groupName === CUSTOMIZED_OPTION_GROUP
-      );
-      const nextChoice = {
-        id: `${CUSTOMIZED_OPTION_GROUP}:${reason}`,
-        name: reason,
-        priceAdjustment,
-      };
-
-      if (!existingCustomGroup) {
-        return [
-          ...prev,
-          {
-            groupId: CUSTOMIZED_OPTION_GROUP,
-            groupName: CUSTOMIZED_OPTION_GROUP,
-            selectedChoices: [nextChoice],
-          },
-        ];
-      }
-
-      return prev.map((option) => {
-        if (option.groupName !== CUSTOMIZED_OPTION_GROUP) return option;
-        const existingChoiceIndex = option.selectedChoices.findIndex(
-          (choice) => choice.name === reason
-        );
-        const selectedChoices = [...option.selectedChoices];
-        if (existingChoiceIndex >= 0) {
-          selectedChoices[existingChoiceIndex] = nextChoice;
-        } else {
-          selectedChoices.push(nextChoice);
-        }
-        return {
-          ...option,
-          selectedChoices,
-        };
-      });
-    });
+    upsertCustomChoice(reason, priceAdjustment);
     setCustomReason("改价");
     setCustomAmount("");
   };
@@ -313,6 +319,12 @@ export function ItemOptionsModal({
   const handleCustomPriceChoicePress = (choice: SelectedOption["selectedChoices"][number]) => {
     setCustomReason(choice.name);
     setCustomAmount(Math.abs(choice.priceAdjustment ?? 0).toString());
+  };
+
+  const handleCustomTaxExemptToggle = () => {
+    const nextValue = !customTaxExempt;
+    setCustomTaxExempt(nextValue);
+    upsertCustomChoice(CUSTOM_TAX_EXEMPT_OPTION, 0, nextValue);
   };
 
   const handleAmountKeyPress = (key: string) => {
@@ -382,104 +394,125 @@ export function ItemOptionsModal({
         {/* Content */}
         <ScrollView className="flex-1 p-4">
           <View className="mb-6 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-            <View className="gap-3 md:flex-row">
-              <View className="flex-1">
-                <Text
-                  style={{ fontSize: responsive.baseFontSize }}
-                  className="mb-2 font-semibold text-slate-700 dark:text-slate-300"
-                >
-                  Update Reason (E.g. add garlic)
-                </Text>
-                <TextInput
-                  value={customReason}
-                  onChangeText={setCustomReason}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:text-white"
-                  placeholder="改价"
-                  placeholderTextColor="#94a3b8"
-                />
+            <View className={isTablet ? "flex-row gap-4" : "gap-4"}>
+              <View className="min-w-0 flex-1">
+                <View className="gap-3 md:flex-row">
+                  <View className="flex-1">
+                    <Text
+                      style={{ fontSize: responsive.baseFontSize }}
+                      className="mb-2 font-semibold text-slate-700 dark:text-slate-300"
+                    >
+                      Update Reason (E.g. add garlic)
+                    </Text>
+                    <TextInput
+                      value={customReason}
+                      onChangeText={setCustomReason}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:text-white"
+                      placeholder="改价"
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      style={{ fontSize: responsive.baseFontSize }}
+                      className="mb-2 font-semibold text-slate-700 dark:text-slate-300"
+                    >
+                      Amount Update (Enter "0" if no change)
+                    </Text>
+                    <TextInput
+                      value={customAmount}
+                      onChangeText={(value) => {
+                        const normalized = normalizeAmountInput(value);
+                        if (normalized !== null) setCustomAmount(normalized);
+                      }}
+                      keyboardType="decimal-pad"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:text-white"
+                      placeholder="0"
+                      placeholderTextColor="#94a3b8"
+                    />
+                  </View>
+                </View>
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  <TouchableOpacity
+                    onPress={() => handleCustomPriceChange(true)}
+                    className="min-h-[44px] flex-1 basis-[30%] items-center justify-center rounded-lg bg-orange-500 px-4"
+                  >
+                    <Text
+                      style={{ fontSize: responsive.baseFontSize - 1 }}
+                      className="font-semibold text-white"
+                    >
+                      Add ${customAmount || "0"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleCustomPriceChange(false)}
+                    className="min-h-[44px] flex-1 basis-[30%] items-center justify-center rounded-lg bg-cyan-500 px-4"
+                  >
+                    <Text
+                      style={{ fontSize: responsive.baseFontSize - 1 }}
+                      className="font-semibold text-slate-900"
+                    >
+                      Subtract ${customAmount || "0"}
+                    </Text>
+                  </TouchableOpacity>
+                  {/*
+                  <TouchableOpacity
+                    onPress={handleCustomTaxExemptToggle}
+                    className={`min-h-[44px] flex-1 basis-[30%] items-center justify-center rounded-lg px-4 ${
+                      customTaxExempt ? "bg-blue-600" : "bg-indigo-500"
+                    }`}
+                  >
+                    <Text
+                      style={{ fontSize: responsive.baseFontSize - 1 }}
+                      className="font-semibold text-white"
+                    >
+                      {customTaxExempt ? "✓ Tax Exempt" : "Tax Exempt"}
+                    </Text>
+                  </TouchableOpacity>
+                  */}
+                </View>
               </View>
-              <View className="flex-1">
-                <Text
-                  style={{ fontSize: responsive.baseFontSize }}
-                  className="mb-2 font-semibold text-slate-700 dark:text-slate-300"
-                >
-                  Amount Update (Enter "0" if no change)
-                </Text>
-                <TextInput
-                  value={customAmount}
-                  onChangeText={(value) => {
-                    const normalized = normalizeAmountInput(value);
-                    if (normalized !== null) setCustomAmount(normalized);
-                  }}
-                  keyboardType="decimal-pad"
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 dark:border-slate-700 dark:text-white"
-                  placeholder="0"
-                  placeholderTextColor="#94a3b8"
-                />
-              </View>
-            </View>
-            <View className="mt-3 gap-2">
-              {AMOUNT_KEYPAD_ROWS.map((row) => (
-                <View key={row.join("-")} className="flex-row gap-2">
-                  {row.map((key) => (
+              <View className={isTablet ? "w-[360px]" : "w-full"}>
+                <View className="gap-2">
+                  {AMOUNT_KEYPAD_ROWS.map((row) => (
+                    <View key={row.join("-")} className="flex-row gap-2">
+                      {row.map((key) => (
+                        <TouchableOpacity
+                          key={key}
+                          onPress={() => handleAmountKeyPress(key)}
+                          className="min-h-[44px] flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          <Text
+                            style={{ fontSize: responsive.baseFontSize }}
+                            className="font-semibold text-slate-700 dark:text-slate-200"
+                          >
+                            {key}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ))}
+                  <View className="flex-row gap-2">
                     <TouchableOpacity
-                      key={key}
-                      onPress={() => handleAmountKeyPress(key)}
-                      className="min-h-[42px] flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                      onPress={() => handleAmountKeyPress("clear")}
+                      className="min-h-[44px] flex-1 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30"
                     >
                       <Text
                         style={{ fontSize: responsive.baseFontSize }}
-                        className="font-semibold text-slate-700 dark:text-slate-200"
+                        className="font-semibold text-red-600"
                       >
-                        {key}
+                        C
                       </Text>
                     </TouchableOpacity>
-                  ))}
+                    <TouchableOpacity
+                      onPress={() => handleAmountKeyPress("backspace")}
+                      className="min-h-[44px] flex-1 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30"
+                    >
+                      <Ionicons name="backspace-outline" size={20} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              ))}
-              <View className="flex-row gap-2">
-                <TouchableOpacity
-                  onPress={() => handleAmountKeyPress("clear")}
-                  className="min-h-[42px] flex-1 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30"
-                >
-                  <Text
-                    style={{ fontSize: responsive.baseFontSize }}
-                    className="font-semibold text-red-600"
-                  >
-                    C
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleAmountKeyPress("backspace")}
-                  className="min-h-[42px] flex-1 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30"
-                >
-                  <Ionicons name="backspace-outline" size={20} color={colors.text} />
-                </TouchableOpacity>
               </View>
-            </View>
-            <View className="mt-3 flex-row flex-wrap gap-2">
-              <TouchableOpacity
-                onPress={() => handleCustomPriceChange(true)}
-                className="min-h-[44px] items-center justify-center rounded-lg bg-orange-500 px-4"
-              >
-                <Text
-                  style={{ fontSize: responsive.baseFontSize - 1 }}
-                  className="font-semibold text-white"
-                >
-                  Add ${customAmount || "0"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleCustomPriceChange(false)}
-                className="min-h-[44px] items-center justify-center rounded-lg bg-cyan-500 px-4"
-              >
-                <Text
-                  style={{ fontSize: responsive.baseFontSize - 1 }}
-                  className="font-semibold text-slate-900"
-                >
-                  Subtract ${customAmount || "0"}
-                </Text>
-              </TouchableOpacity>
             </View>
           </View>
 
