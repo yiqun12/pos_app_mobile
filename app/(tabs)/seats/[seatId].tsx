@@ -4,6 +4,7 @@ import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { CashPaymentModal } from "@/components/seats/modals/CashPaymentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
 import { ServiceFeeModal } from "@/components/seats/modals/ServiceFeeModal";
+import { SplitPaymentModal, type SplitPaymentPayload } from "@/components/seats/modals/SplitPaymentModal";
 import { TableTimingModal } from "@/components/seats/modals/TableTimingModal";
 import { OrderItemRow } from "@/components/seats/order/OrderItemRow";
 import { OrderSummary } from "@/components/seats/order/OrderSummary";
@@ -16,12 +17,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, AppState, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, AppState, Modal, ScrollView, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { useAuth } from "@/context/auth";
 import { useMenu } from "@/context/menu";
 import { useStoreSelection } from "@/context/store";
 import { useStore } from "@/hooks/firestore/useStore";
+import { useTableStatus } from "@/hooks/firestore/useTableStatus";
 import { db, functions } from "@/lib/firebase";
+import {
+  buildChangeDeskProducts,
+  buildMigratedTableTimingTimer,
+  parseTableProducts,
+} from "@/lib/pos/changeDesk";
 import {
   calculateWebOrderTotals,
   applyTargetTotalAdjustment,
@@ -38,6 +45,10 @@ import {
   getSurchargeTotal,
   isSurchargeCartItem,
 } from "@/lib/pos/orderTransforms";
+import {
+  buildSplitPaymentBreakdown,
+  type SplitPaymentBreakdown,
+} from "@/lib/pos/splitPayment";
 import {
   BILLING_RULES,
   calculateTableTimingFee,
@@ -61,18 +72,20 @@ import {
 import { formatWebDate } from "@/lib/pos/webDate";
 import type { MenuItem } from "@/types/menu";
 import { httpsCallable } from "firebase/functions";
-import { addDoc, collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, onSnapshot, setDoc, writeBatch } from "firebase/firestore";
 
 export default function SeatScreen() {
   const { seatId } = useLocalSearchParams<{ seatId: string; openModal?: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const { height: screenHeight } = useWindowDimensions();
   const colors = Colors[colorScheme ?? "light"];
   const { t } = useTranslation();
 
   const { user } = useAuth();
   const { currentStoreId } = useStoreSelection();
   const { data: store } = useStore();
+  const { data: tableStatus } = useTableStatus();
   const { items: menuItems, globalCustomizations } = useMenu();
 
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -92,9 +105,13 @@ export default function SeatScreen() {
   } | null>(null);
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [cashPaymentModalVisible, setCashPaymentModalVisible] = useState(false);
+  const [splitPaymentModalVisible, setSplitPaymentModalVisible] = useState(false);
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
   const [serviceFeeModalVisible, setServiceFeeModalVisible] = useState(false);
   const [menuModalVisible, setMenuModalVisible] = useState(false);
+  const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
+  const [changeDeskVisible, setChangeDeskVisible] = useState(false);
+  const [changeDeskProcessing, setChangeDeskProcessing] = useState(false);
   const [tableTimingContext, setTableTimingContext] = useState<{
     menuItem: MenuItem;
     product?: any;
@@ -111,6 +128,21 @@ export default function SeatScreen() {
     const seatObj = store.seatLayout.tables.find((t) => t.id === seatId);
     return seatObj ? seatObj.name : seatId;
   }, [store, seatId]);
+  const hasOrderItems = rawProducts.length > 0;
+
+  const targetTables = useMemo(() => {
+    const statusByName = new Map((tableStatus ?? []).map((table) => [table.name, table]));
+    return (store?.seatLayout?.tables ?? [])
+      .filter((table) => table.name !== tableName)
+      .map((table) => {
+        const status = statusByName.get(table.name);
+        return {
+          ...table,
+          status: status?.status ?? table.status ?? "vacant",
+          itemCount: status?.itemCount ?? table.itemCount ?? 0,
+        };
+      });
+  }, [store?.seatLayout?.tables, tableName, tableStatus]);
 
   // Firestore listener
   useEffect(() => {
@@ -347,6 +379,73 @@ export default function SeatScreen() {
     );
   };
 
+  const writeSplitSuccessPayment = async (
+    breakdown: SplitPaymentBreakdown,
+    receiptProducts: Array<Record<string, any>>
+  ) => {
+    if (!user || !currentStoreId || !store || !tableName) return;
+    const dateStr = formatWebDate();
+    const paymentTotal = breakdown.basePayment;
+
+    await addDoc(
+      collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment"),
+      {
+        amount: Math.round(paymentTotal * 100),
+        amount_capturable: 0,
+        amount_details: { tip: { amount: 0 } },
+        amount_received: Math.round(paymentTotal * 100),
+        application: "",
+        application_fee_amount: 0,
+        automatic_payment_methods: null,
+        canceled_at: null,
+        cancellation_reason: null,
+        capture_method: "automatic",
+        client_secret: "pi_none",
+        confirmation_method: "automatic",
+        created: 0,
+        currency: "usd",
+        customer: null,
+        dateTime: dateStr,
+        description: null,
+        id: "pi_none",
+        invoice: null,
+        last_payment_error: null,
+        latest_charge: "ch_none",
+        livemode: true,
+        metadata: breakdown.metadata,
+        next_action: null,
+        object: "payment_intent",
+        on_behalf_of: null,
+        payment_method: "pm_none",
+        payment_method_configuration_details: null,
+        payment_method_options: {},
+        card_present: {},
+        request_extended_authorization: false,
+        request_incremental_authorization_support: false,
+        payment_method_types: ["Split_Payment"],
+        powerBy: "Split Payment",
+        processing: null,
+        receiptData: JSON.stringify(cleanProductData(receiptProducts)),
+        receipt_email: null,
+        review: null,
+        setup_future_usage: null,
+        shipping: null,
+        source: null,
+        statement_descriptor: null,
+        statement_descriptor_suffix: null,
+        status: "succeeded",
+        store: currentStoreId,
+        storeOwnerId: user.uid,
+        stripe_store_acct: store.stripeStoreAcct ?? "",
+        tableNum: tableName,
+        transfer_data: null,
+        transfer_group: null,
+        uid: user.uid,
+        user_email: user.email,
+      }
+    );
+  };
+
   const writeUnpaidSuccessPayment = async (currentOrder: Order) => {
     if (!user || !currentStoreId || !store || !tableName) return;
     const dateStr = formatWebDate();
@@ -436,7 +535,7 @@ export default function SeatScreen() {
     );
   };
 
-  const writeKitchenEvents = async () => {
+  const writeKitchenEvents = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!user || !currentStoreId || !tableName) return;
     const { added, deleted } = diffKitchenChanges(sentProducts, rawProducts);
     const date = formatWebDate();
@@ -449,14 +548,6 @@ export default function SeatScreen() {
         date,
         data: cleanedAdded,
         selectedTable: tableName,
-      }));
-      writes.push(writeStoreEvent("listOrder", {
-        date,
-        data: cleanedAdded,
-        selectedTable: tableName,
-        discount: order.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0),
-        service_fee: order.serviceFee,
-        total: order.total,
       }));
     }
 
@@ -473,7 +564,23 @@ export default function SeatScreen() {
     writes.push(setDoc(sentRef, { product: JSON.stringify(rawProducts), date }, { merge: true }));
 
     await Promise.all(writes);
-    Alert.alert("Kitchen", cleanedAdded.length || cleanedDeleted.length ? "Order sent to kitchen" : "No kitchen changes to send");
+    if (!silent) {
+      Alert.alert("Kitchen", cleanedAdded.length || cleanedDeleted.length ? "Order sent to kitchen" : "No kitchen changes to send");
+    }
+  };
+
+  const writeListOrderEvent = async () => {
+    const date = formatWebDate();
+    const data = cleanProductData(rawProducts);
+    await writeStoreEvent("listOrder", {
+      date,
+      data,
+      selectedTable: tableName,
+      discount: order.discount ?? (manualAdjustment < 0 ? Math.abs(manualAdjustment) : 0),
+      service_fee: order.serviceFee,
+      total: order.total,
+    });
+    Alert.alert(t("seats.printing"), t("seats.printingTypeForSeat", { type: "order", seatId: tableName ?? seatId ?? "-" }));
   };
 
   const writeReceiptEvents = async () => {
@@ -492,7 +599,7 @@ export default function SeatScreen() {
       writeStoreEvent("MerchantReceipt", payload),
       writeStoreEvent("CustomerReceipt", payload),
     ]);
-    Alert.alert(t("seats.printing"), t("seats.printingTypeForSeat", { type: "receipt", seatId: seatId ?? "-" }));
+    Alert.alert(t("seats.printing"), t("seats.printingTypeForSeat", { type: "receipt", seatId: tableName ?? seatId ?? "-" }));
   };
 
   const writeOpenCashDrawerEvent = async () => {
@@ -1059,6 +1166,7 @@ export default function SeatScreen() {
     try {
       const canProceed = await confirmProceedWithActiveTiming();
       if (!canProceed) return;
+      await writeKitchenEvents({ silent: true });
       await writeCashSuccessPayment(breakdown.basePayment, order, breakdown.gratuity);
       const nextPaidAmount = paidAmount + breakdown.basePayment;
       if (breakdown.isFullPayment || nextPaidAmount >= order.total) {
@@ -1083,6 +1191,7 @@ export default function SeatScreen() {
 
     if (method === "cash") {
       try {
+        await writeKitchenEvents({ silent: true });
         const breakdown = buildCashPaymentBreakdown({
           amountDue: Math.max(0, order.total - paidAmount),
           cashReceived: amount,
@@ -1108,6 +1217,7 @@ export default function SeatScreen() {
 
     if (method === "card") {
       try {
+        await writeKitchenEvents({ silent: true });
         await requestTerminalPayment(amount);
       } catch (e) {
         console.error("Error starting terminal payment:", e);
@@ -1123,8 +1233,52 @@ export default function SeatScreen() {
     );
   };
 
+  const handleOpenSplitPayment = async () => {
+    if (rawProducts.length === 0) return;
+    try {
+      await writeKitchenEvents({ silent: true });
+      setSplitPaymentModalVisible(true);
+    } catch (e) {
+      console.error("Error preparing split payment:", e);
+      Alert.alert(t("common.error"), "Failed to prepare split payment");
+    }
+  };
+
+  const handleSplitPayment = async (payload: SplitPaymentPayload): Promise<boolean> => {
+    try {
+      const canProceed = await confirmProceedWithActiveTiming();
+      if (!canProceed) return false;
+      const breakdown = buildSplitPaymentBreakdown({
+        order: { ...order, tips: tipAmount },
+        amount: payload.amount,
+        paidAmount,
+      });
+      if (breakdown.basePayment <= 0) return false;
+
+      await writeSplitSuccessPayment(breakdown, payload.products);
+
+      if (breakdown.isFullPayment) {
+        await clearTableInFirestore();
+        resetPaymentState();
+        setSplitPaymentModalVisible(false);
+      } else {
+        setPaidAmount(breakdown.nextPaidAmount);
+      }
+
+      Alert.alert(
+        t("seats.paymentSuccessful"),
+        t("seats.paidViaMethod", { amount: breakdown.basePayment.toFixed(2), method: "split" })
+      );
+      return true;
+    } catch (e) {
+      console.error("Error writing split payment:", e);
+      Alert.alert(t("common.error"), "Failed to write split payment");
+      return false;
+    }
+  };
+
   const handleMarkAsUnpaid = async () => {
-    if (rawProducts.length === 0) {
+    if (!hasOrderItems) {
       setPaidAmount(0);
       return;
     }
@@ -1132,6 +1286,7 @@ export default function SeatScreen() {
     try {
       const canProceed = await confirmProceedWithActiveTiming();
       if (!canProceed) return;
+      await writeKitchenEvents({ silent: true });
       await writeUnpaidSuccessPayment(order);
       await clearTableInFirestore();
       setPaidAmount(0);
@@ -1147,9 +1302,10 @@ export default function SeatScreen() {
   };
 
   const handlePrint = async (type: "order" | "receipt") => {
+    if (!hasOrderItems) return;
     try {
       if (type === "order") {
-        await writeKitchenEvents();
+        await writeListOrderEvent();
       } else {
         await writeReceiptEvents();
       }
@@ -1158,6 +1314,197 @@ export default function SeatScreen() {
       Alert.alert(t("common.error"), `Failed to print ${type}`);
     }
   };
+
+  const handleChangeDesk = async (target: { id: string; name: string }) => {
+    if (!user || !currentStoreId || !tableName) return;
+    if (rawProducts.length === 0) {
+      Alert.alert(t("common.error"), "Current table has no items to move.");
+      return;
+    }
+    if (target.name === tableName) return;
+
+    setChangeDeskProcessing(true);
+    try {
+      await writeKitchenEvents({ silent: true });
+
+      const date = formatWebDate();
+      const sourceTableDocId = `${currentStoreId}-${tableName}`;
+      const targetTableDocId = `${currentStoreId}-${target.name}`;
+      const basePath = ["stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId] as const;
+      const sourceTableRef = doc(db, ...basePath, "Table", sourceTableDocId);
+      const targetTableRef = doc(db, ...basePath, "Table", targetTableDocId);
+      const sourceSentRef = doc(db, ...basePath, "TableIsSent", `${sourceTableDocId}-isSent`);
+      const targetSentRef = doc(db, ...basePath, "TableIsSent", `${targetTableDocId}-isSent`);
+
+      const [targetTableSnap, targetSentSnap] = await Promise.all([
+        getDoc(targetTableRef),
+        getDoc(targetSentRef),
+      ]);
+      const targetProducts = parseTableProducts(targetTableSnap.data()?.product);
+      const targetSentProducts = parseTableProducts(targetSentSnap.data()?.product);
+      const nextTargetProducts = buildChangeDeskProducts({
+        sourceProducts: rawProducts,
+        targetProducts,
+      });
+      const nextTargetSentProducts = buildChangeDeskProducts({
+        sourceProducts: rawProducts,
+        targetProducts: targetSentProducts,
+      });
+
+      const batch = writeBatch(db);
+      batch.set(targetTableRef, { product: JSON.stringify(nextTargetProducts), date }, { merge: true });
+      batch.set(sourceTableRef, { product: "[]", date }, { merge: true });
+      batch.set(targetSentRef, { product: JSON.stringify(nextTargetSentProducts), date }, { merge: true });
+      batch.set(sourceSentRef, { product: "[]", date }, { merge: true });
+      await batch.commit();
+
+      const activeProductKeys = new Set(
+        rawProducts
+          .filter((product) => product.isTableItem || product.attributeSelected?.["开台商品"])
+          .map((product) => `${product.id}-${product.count}`)
+      );
+      const timers = await loadTableTimingTimers();
+      await Promise.all(timers
+        .filter(({ timer }) =>
+          timer.storeId === currentStoreId
+          && timer.tableName === tableName
+          && activeProductKeys.has(`${timer.itemId}-${timer.count}`)
+        )
+        .map(async ({ key, timer }) => {
+          await removeTableTimingTimer(key);
+          await saveTableTimingTimer(buildMigratedTableTimingTimer(timer, target.name));
+        })
+      );
+
+      setChangeDeskVisible(false);
+      resetPaymentState();
+      router.replace(`/(tabs)/seats/${target.id}` as any);
+    } catch (error) {
+      console.error("Error changing desk:", error);
+      Alert.alert(t("common.error"), "Failed to change desk");
+    } finally {
+      setChangeDeskProcessing(false);
+    }
+  };
+
+  const closeMobileActions = () => {
+    setMobileActionsVisible(false);
+  };
+
+  const renderOrderActions = () => (
+    <ScrollView
+      className="flex-1"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 24 }}
+    >
+      <OrderSummary order={order} />
+
+      <View className="mt-4">
+        <Button
+          label={taxExempt ? "✓ Tax Exempt" : "Tax Exempt"}
+          variant={taxExempt ? "primary" : "outline"}
+          icon="pricetag"
+          onPress={() => setTaxExempt((enabled) => !enabled)}
+          disabled={!hasOrderItems}
+        />
+      </View>
+
+      <View className="mt-4 flex-row gap-2">
+        <View className="flex-1">
+          <Button
+            label={serviceFeeAmount > 0 ? `Service Fee $${serviceFeeAmount.toFixed(2)}` : "Service Fee"}
+            variant={serviceFeeAmount > 0 ? "primary" : "outline"}
+            icon="receipt"
+            onPress={() => {
+              closeMobileActions();
+              setServiceFeeModalVisible(true);
+            }}
+            disabled={!hasOrderItems}
+          />
+        </View>
+        <View className="flex-1">
+          <Button
+            label="Adjust Total"
+            variant="outline"
+            icon="create"
+            onPress={() => {
+              closeMobileActions();
+              setAdjustmentModalVisible(true);
+            }}
+            disabled={!hasOrderItems}
+          />
+        </View>
+      </View>
+
+      <View className="mt-3 flex-row gap-2">
+        <View className="flex-1">
+          <Button
+            label="Print Order"
+            variant="outline"
+            icon="restaurant"
+            onPress={() => {
+              closeMobileActions();
+              void handlePrint("order");
+            }}
+            disabled={!hasOrderItems}
+          />
+        </View>
+        <View className="flex-1">
+          <Button
+            label="Print Receipt"
+            variant="outline"
+            icon="print"
+            onPress={() => {
+              closeMobileActions();
+              void handlePrint("receipt");
+            }}
+            disabled={!hasOrderItems}
+          />
+        </View>
+      </View>
+
+      <View className="mt-3 flex-row gap-2">
+        <View className="flex-1">
+          <Button
+            label="Split Payment"
+            variant="outline"
+            icon="git-branch"
+            onPress={() => {
+              closeMobileActions();
+              void handleOpenSplitPayment();
+            }}
+            disabled={!hasOrderItems}
+          />
+        </View>
+        <View className="flex-1">
+          <Button
+            label={t("seats.markUnpaid")}
+            variant="outline"
+            icon="alert-circle"
+            onPress={() => {
+              closeMobileActions();
+              void handleMarkAsUnpaid();
+            }}
+            disabled={!hasOrderItems}
+          />
+        </View>
+      </View>
+
+      <View className="mt-4">
+        <Button
+          label={t("seats.payNow")}
+          variant="primary"
+          size="lg"
+          icon="card"
+          onPress={() => {
+            closeMobileActions();
+            setPaymentModalVisible(true);
+          }}
+          disabled={!hasOrderItems || order.status === "paid"}
+        />
+      </View>
+    </ScrollView>
+  );
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
@@ -1169,21 +1516,23 @@ export default function SeatScreen() {
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-slate-900 dark:text-white">
-          {t("seats.seatOrder", { seatId: seatId ?? "-" })}
+          {t("seats.seatOrder", { seatId: tableName ?? seatId ?? "-" })}
         </Text>
         <TouchableOpacity
           onPress={() => {
             Alert.alert(
               t("seats.options"),
               t("seats.selectAction"),
-              [
-                {
-                  text: t("seats.changeSeat"),
-                  onPress: () => console.log("Change Seat"),
-                },
-                { text: t("seats.markUnpaid"), onPress: () => void handleMarkAsUnpaid() },
-                { text: t("common.cancel"), style: "cancel" },
-              ]
+              hasOrderItems
+                ? [
+                    {
+                      text: t("seats.changeSeat"),
+                      onPress: () => setChangeDeskVisible(true),
+                    },
+                    { text: t("seats.markUnpaid"), onPress: () => void handleMarkAsUnpaid() },
+                    { text: t("common.cancel"), style: "cancel" },
+                  ]
+                : [{ text: t("common.cancel"), style: "cancel" }]
             );
           }}
           className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
@@ -1243,93 +1592,65 @@ export default function SeatScreen() {
           </View>
         </View>
 
-        <View className="w-full bg-slate-50 p-3 pt-0 dark:bg-slate-950 md:h-full md:w-[380px] md:pt-3">
-          <ScrollView
-            className="flex-1"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 24 }}
-          >
-            <OrderSummary order={order} />
-
-            <View className="mt-4">
-              <Button
-                label={taxExempt ? "✓ Tax Exempt" : "Tax Exempt"}
-                variant={taxExempt ? "primary" : "outline"}
-                icon="pricetag"
-                onPress={() => setTaxExempt((enabled) => !enabled)}
-              />
-            </View>
-
-            <View className="mt-4 flex-row gap-2">
-              <View className="flex-1">
-                <Button
-                  label={serviceFeeAmount > 0 ? `Service Fee $${serviceFeeAmount.toFixed(2)}` : "Service Fee"}
-                  variant={serviceFeeAmount > 0 ? "primary" : "outline"}
-                  icon="receipt"
-                  onPress={() => setServiceFeeModalVisible(true)}
-                />
-              </View>
-              <View className="flex-1">
-                <Button
-                  label="Adjust Total"
-                  variant="outline"
-                  icon="create"
-                  onPress={() => setAdjustmentModalVisible(true)}
-                />
-              </View>
-            </View>
-
-            <View className="mt-3 flex-row gap-2">
-              <View className="flex-1">
-                <Button
-                  label="Print Order"
-                  variant="outline"
-                  icon="restaurant"
-                  onPress={() => void handlePrint("order")}
-                />
-              </View>
-              <View className="flex-1">
-                <Button
-                  label="Print Receipt"
-                  variant="outline"
-                  icon="print"
-                  onPress={() => void handlePrint("receipt")}
-                />
-              </View>
-            </View>
-
-            <View className="mt-3 flex-row gap-2">
-              <View className="flex-1">
-                <Button
-                  label="Split Payment"
-                  variant="outline"
-                  icon="git-branch"
-                  onPress={() => setPaymentModalVisible(true)}
-                />
-              </View>
-              <View className="flex-1">
-                <Button
-                  label={t("seats.markUnpaid")}
-                  variant="outline"
-                  icon="alert-circle"
-                  onPress={() => void handleMarkAsUnpaid()}
-                />
-              </View>
-            </View>
-
-            <View className="mt-4">
-              <Button
-                label={t("seats.payNow")}
-                variant="primary"
-                size="lg"
-                icon="card"
-                onPress={() => setPaymentModalVisible(true)}
-                disabled={order.status === "paid"}
-              />
-            </View>
-          </ScrollView>
+        <View className="hidden bg-slate-50 p-3 pt-0 dark:bg-slate-950 md:flex md:h-full md:w-[380px] md:pt-3">
+          {renderOrderActions()}
         </View>
       </View>
+
+      <View className="border-t border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950 md:hidden">
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setMobileActionsVisible(true)}
+          className="flex-row items-center justify-between rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 dark:border-orange-900 dark:bg-orange-950/30"
+        >
+          <View>
+            <Text className="text-sm font-semibold text-slate-900 dark:text-white">
+              Order Actions
+            </Text>
+            <Text className="mt-1 text-xs text-slate-500">
+              {items.length} items · tap to expand
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-2">
+            <Text className="text-base font-bold text-orange-600">
+              ${order.total.toFixed(2)}
+            </Text>
+            <Ionicons name="chevron-up" size={18} color="#f97316" />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={mobileActionsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeMobileActions}
+      >
+        <View className="flex-1 justify-center bg-black/45 px-3 md:hidden">
+          <View
+            className="rounded-2xl bg-white p-3 shadow-lg dark:bg-slate-900"
+            style={{ height: Math.min(screenHeight * 0.78, 640) }}
+          >
+            <View className="mb-3 flex-row items-center justify-between">
+              <View>
+                <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                  Order Actions
+                </Text>
+                <Text className="mt-1 text-sm text-slate-500">
+                  {t("seats.seatOrder", { seatId: tableName ?? seatId ?? "-" })}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={closeMobileActions}
+                className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            {renderOrderActions()}
+          </View>
+        </View>
+      </Modal>
 
       <AdjustmentModal
         visible={adjustmentModalVisible}
@@ -1359,6 +1680,93 @@ export default function SeatScreen() {
         onClose={() => setMenuModalVisible(false)}
         onSelect={handleAddItem}
       />
+
+      <Modal
+        visible={changeDeskVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!changeDeskProcessing) setChangeDeskVisible(false);
+        }}
+      >
+        <View className="flex-1 justify-center bg-black/50 px-4">
+          <View className="max-h-[80%] rounded-xl bg-white p-4 shadow-lg dark:bg-slate-900">
+            <View className="mb-3 flex-row items-center justify-between">
+              <View>
+                <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                  Change Desk
+                </Text>
+                <Text className="mt-1 text-sm text-slate-500">
+                  Current: {tableName}
+                </Text>
+              </View>
+              <TouchableOpacity
+                disabled={changeDeskProcessing}
+                onPress={() => setChangeDeskVisible(false)}
+                className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {targetTables.length === 0 ? (
+              <View className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+                <Text className="text-center text-sm text-slate-500">
+                  No target desks available.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 8 }}
+              >
+                {targetTables.map((table) => {
+                  const occupied = table.status === "occupied" || (table.itemCount ?? 0) > 0;
+                  return (
+                    <TouchableOpacity
+                      key={table.id}
+                      disabled={changeDeskProcessing}
+                      onPress={() => void handleChangeDesk({ id: table.id, name: table.name })}
+                      className={`mb-2 rounded-lg border p-3 ${
+                        occupied
+                          ? "border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30"
+                          : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
+                      }`}
+                    >
+                      <View className="flex-row items-center justify-between">
+                        <View>
+                          <Text className="text-base font-semibold text-slate-900 dark:text-white">
+                            {table.name}
+                          </Text>
+                          <Text className="mt-1 text-sm text-slate-500">
+                            {occupied ? "In use" : "Empty"} · {table.itemCount ?? 0} items
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={20}
+                          color={occupied ? "#f97316" : colors.tabIconDefault}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            <View className="mt-3 flex-row gap-2">
+              <View className="flex-1">
+                <Button
+                  label={changeDeskProcessing ? "Moving..." : t("common.cancel")}
+                  variant="outline"
+                  onPress={() => setChangeDeskVisible(false)}
+                  disabled={changeDeskProcessing}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {optionEditContext && (() => {
         const selections = cartItemToEditableSelections({
@@ -1397,6 +1805,15 @@ export default function SeatScreen() {
         onClose={() => setCashPaymentModalVisible(false)}
         onPayment={(breakdown) => void handleCashPayment(breakdown)}
         onOpenCashDrawer={() => void writeOpenCashDrawerEvent()}
+      />
+
+      <SplitPaymentModal
+        visible={splitPaymentModalVisible}
+        products={rawProducts}
+        total={order.total}
+        remaining={Math.max(0, order.total - order.paidAmount)}
+        onClose={() => setSplitPaymentModalVisible(false)}
+        onConfirm={handleSplitPayment}
       />
 
       <TableTimingModal

@@ -48,9 +48,6 @@ export default function SeatsScreen() {
   const router = useRouter();
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
-  const isTablet = responsive.isTablet;
-  const adminTextSize = isTablet ? 14 : 12;
-  const areaTabTextSize = isTablet ? 15 : 14;
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -135,38 +132,8 @@ export default function SeatsScreen() {
       <ScreenHeader
         title={t("seats.headerTitle")}
         subtitle={t("seats.headerSubtitle")}
-        rightElement={
-          <View className="flex-row items-center gap-3">
-            <View className="mr-2 flex-row items-center gap-2">
-              <Text className="text-slate-500" style={{ fontSize: adminTextSize }}>
-                {t("seats.adminMode")}
-              </Text>
-              <View className="h-6 w-10 items-start justify-center rounded-full bg-slate-200 p-1">
-                <View className="h-4 w-4 rounded-full bg-white shadow-sm" />
-              </View>
-            </View>
-            <View className="mr-4 hidden flex-row rounded-lg bg-slate-100 p-1 md:flex">
-              <View className="rounded-md bg-white px-3 py-1 shadow-sm">
-                <Text
-                  className="font-medium text-orange-600"
-                  style={{ fontSize: areaTabTextSize }}
-                >
-                  {t("seats.mainHall")}
-                </Text>
-              </View>
-              <View className="px-3 py-1">
-                <Text className="text-slate-500" style={{ fontSize: areaTabTextSize }}>
-                  {t("seats.vipRooms")}
-                </Text>
-              </View>
-              <View className="px-3 py-1">
-                <Text className="text-slate-500" style={{ fontSize: areaTabTextSize }}>
-                  {t("seats.terrace")}
-                </Text>
-              </View>
-            </View>
-          </View>
-        }
+        // Admin mode and area tabs are placeholders until those flows are wired.
+        rightElement={null}
       >
         <View className="flex-row" style={{ gap: buttonContainerGap }}>
           <Button
