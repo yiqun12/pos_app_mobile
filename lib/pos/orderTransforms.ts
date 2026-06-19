@@ -18,7 +18,7 @@ export type WebCartItem = {
   count: number | string;
   itemTotalPrice: number;
   CHI?: string;
-  availability?: boolean;
+  availability?: MenuItem["availability"];
   selectedOptions?: SelectedOption[];
   selectedIngredients?: OrderItem["selectedIngredients"];
   selectedGlobalCustomizations?: SelectedGlobalCustomization[];

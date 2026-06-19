@@ -1,7 +1,13 @@
 import { db } from "@/lib/firebase";
 import { transformGlobalModifications } from "@/lib/pos/globalModificationTransforms";
 import { transformWebMenuItem } from "@/lib/pos/menuTransforms";
-import { collection, doc, onSnapshot, type Unsubscribe } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  type Unsubscribe,
+} from "firebase/firestore";
 import { storeListPath, storePath } from "../paths";
 import type {
   RawGlobalModifications,
@@ -69,6 +75,12 @@ export function subscribeStore(
   );
 }
 
+export async function fetchStore(uid: string, storeId: string): Promise<Store | null> {
+  const ref = doc(db, ...storePath(uid, storeId));
+  const snap = await getDoc(ref);
+  return snap.exists() ? transformStore(snap.id, snap.data() as RawStoreDoc) : null;
+}
+
 function transformStore(id: string, raw: RawStoreDoc): Store {
   return {
     id,
@@ -131,6 +143,7 @@ function transformMenu(raw: any): Menu {
       categories.push({
         id: catId,
         name: c.name ?? `Category ${i + 1}`,
+        nameCN: c.nameCN ?? c.categoryCHI,
       });
       categoryIds.add(catId);
     });
@@ -141,12 +154,10 @@ function transformMenu(raw: any): Menu {
     const catId = m.categoryId ?? m.category ?? "uncategorized";
 
     if (!categoryIds.has(catId)) {
-      const catDisplayName = m.categoryCHI && m.categoryCHI !== m.category 
-        ? `${m.category} / ${m.categoryCHI}` 
-        : catName;
       categories.push({
         id: catId,
-        name: catDisplayName,
+        name: catName,
+        nameCN: m.categoryCHI,
       });
       categoryIds.add(catId);
     }

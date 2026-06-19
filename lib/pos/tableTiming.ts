@@ -8,6 +8,14 @@ export const BILLING_RULES = {
   CUSTOM_RULE: "custom_rule",
 } as const;
 
+export const TABLE_TIMING_CHINESE_KEYWORD = "开台";
+
+export type TableTimingMenuHint = {
+  enabled: boolean;
+  title: string;
+  body: string;
+};
+
 export type BillingRuleId = typeof BILLING_RULES[keyof typeof BILLING_RULES];
 
 export type TimerAction = "No Action" | "Auto Checkout" | "Continue Billing";
@@ -48,7 +56,7 @@ export type TableTimingMenuLike = {
   price?: string | number;
   image?: string;
   imageUrl?: string;
-  availability?: boolean;
+  availability?: boolean | string | string[];
   attributesArr?: Record<string, unknown>;
 };
 
@@ -177,7 +185,22 @@ export function isTableTimingMenuItem(item: TableTimingMenuLike | null | undefin
   if (!item) return false;
   const source = item as Record<string, any>;
   const webChineseName = source.CHI ?? source.nameCN;
-  return typeof webChineseName === "string" && webChineseName.includes("开台");
+  return typeof webChineseName === "string" && webChineseName.includes(TABLE_TIMING_CHINESE_KEYWORD);
+}
+
+export function getTableTimingMenuHint(nameCN: string | null | undefined): TableTimingMenuHint {
+  const enabled = isTableTimingMenuItem({ nameCN: nameCN ?? "" });
+  return enabled
+    ? {
+        enabled,
+        title: "Table Timing Enabled",
+        body: "This item will open the table timing modal from POS.",
+      }
+    : {
+        enabled,
+        title: "Table Timing Hint",
+        body: `Add ${TABLE_TIMING_CHINESE_KEYWORD} to Chinese Name to make this item open the table timing modal.`,
+      };
 }
 
 export function getTableTimingStartTimestamp(product: Record<string, any>): number | null {

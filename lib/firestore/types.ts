@@ -39,6 +39,7 @@ export interface SeatLayout {
 export interface MenuCategory {
   id: string;
   name: string;
+  nameCN?: string;
 }
 
 export interface MenuItem {
@@ -51,7 +52,7 @@ export interface MenuItem {
   categoryNameCN?: string;
   price: number;
   imageUrl?: string;
-  description?: string;
+  availability?: boolean | string | string[];
   attributesArr?: Record<
     string,
     {

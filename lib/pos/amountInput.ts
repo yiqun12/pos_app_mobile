@@ -4,6 +4,12 @@ export function normalizeAmountInput(value: string): string | null {
   return normalized;
 }
 
+export function normalizeIntegerInput(value: string): string | null {
+  const normalized = value.trim();
+  if (!/^\d*$/.test(normalized)) return null;
+  return normalized;
+}
+
 export function appendAmountKey(currentValue: string, key: string): string {
   const current = normalizeAmountInput(currentValue) ?? "";
   if (key === "backspace") return current.slice(0, -1);

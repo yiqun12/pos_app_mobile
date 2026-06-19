@@ -10,7 +10,9 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     Text,
     TextInput,
@@ -391,8 +393,16 @@ export function ItemOptionsModal({
             </TouchableOpacity>
           </View>
 
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1"
+        >
         {/* Content */}
-        <ScrollView className="flex-1 p-4">
+        <ScrollView
+          className="flex-1 p-4"
+          contentContainerStyle={{ paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View className="mb-6 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
             <View className={isTablet ? "flex-row gap-4" : "gap-4"}>
               <View className="min-w-0 flex-1">
@@ -746,6 +756,7 @@ export function ItemOptionsModal({
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
         </SafeAreaView>
       </SafeAreaProvider>
     </Modal>

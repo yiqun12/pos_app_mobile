@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { normalizeAmountInput, normalizeIntegerInput } from "@/lib/pos/amountInput";
 import {
   BILLING_RULES,
   calculateTableTimingFee,
@@ -12,7 +13,7 @@ import {
   type TimerAction,
 } from "@/lib/pos/tableTiming";
 import React, { memo, useEffect, useMemo, useState } from "react";
-import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 const BILLING_RULE_OPTIONS: Array<{ id: BillingRuleId; label: string }> = [
   { id: BILLING_RULES.RULE_1, label: "Rule: Hour Block / 15-min" },
@@ -79,8 +80,10 @@ function formatMoney(value: number): string {
 }
 
 function normalizePositiveInteger(value: string, fallback: string): string {
-  if (value.trim() === "") return "";
-  const parsed = parseInt(value, 10);
+  const normalized = normalizeIntegerInput(value);
+  if (normalized === null) return fallback;
+  if (normalized === "") return "";
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : fallback;
 }
 
@@ -226,7 +229,10 @@ export function TableTimingModal({
         setCustomDuration(normalizePositiveInteger(value, customDuration));
         break;
       case "finalFee":
-        setFinalFeeInput(value);
+        {
+          const normalized = normalizeAmountInput(value);
+          if (normalized !== null) setFinalFeeInput(normalized);
+        }
         break;
       default:
         break;
@@ -262,6 +268,10 @@ export function TableTimingModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
       <View className="flex-1 justify-center bg-black/60 p-4">
         <View className="max-h-[94%] w-full max-w-5xl self-center overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-slate-900">
           <View className="border-b border-slate-100 p-4 dark:border-slate-800">
@@ -277,6 +287,7 @@ export function TableTimingModal({
             <ScrollView
               className={responsive.isTablet ? "max-h-[640px] flex-1 p-4" : "p-4"}
               contentContainerStyle={{ paddingBottom: 16 }}
+              keyboardShouldPersistTaps="handled"
             >
               <View className="gap-3">
                 <View className="gap-2">
@@ -611,6 +622,7 @@ export function TableTimingModal({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

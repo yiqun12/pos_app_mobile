@@ -57,6 +57,8 @@ export interface RawMenu {
 export interface RawMenuCategory {
   id?: string;
   name?: string;
+  nameCN?: string;
+  categoryCHI?: string;
   [k: string]: unknown;
 }
 
@@ -71,7 +73,7 @@ export interface RawMenuItem {
   categoryId?: string;
   image?: string;
   imageUrl?: string;
-  description?: string;
+  availability?: boolean | string | string[];
   attributesArr?: unknown;
   attributes?: unknown[]; // option groups
   attributes2?: unknown[]; // ingredients

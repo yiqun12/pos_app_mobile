@@ -37,3 +37,36 @@ export function transformGlobalModifications(raw: unknown): AppGlobalModificatio
     };
   });
 }
+
+export function sanitizeGlobalModifications(
+  customizations: AppGlobalModification[]
+): Required<WebGlobalModification>[] {
+  return customizations
+    .map((customization) => ({
+      type: customization.type.trim(),
+      price: Math.max(0, parseNumber(customization.price, 0)),
+      typeCategory: customization.typeCategory === "要求减少" ? "要求减少" : "要求添加",
+    }))
+    .filter((customization) => customization.type.length > 0);
+}
+
+export function buildGlobalModificationPatch(
+  customizations: AppGlobalModification[]
+): { globalModification: string } {
+  return {
+    globalModification: JSON.stringify(sanitizeGlobalModifications(customizations)),
+  };
+}
+
+export function applyGlobalModificationBulkPrice(
+  customizations: AppGlobalModification[],
+  selectedIds: Set<string>,
+  price: number
+): AppGlobalModification[] {
+  const nextPrice = Math.max(0, parseNumber(price, 0));
+  return customizations.map((customization) =>
+    selectedIds.has(customization.id)
+      ? { ...customization, price: nextPrice }
+      : customization
+  );
+}

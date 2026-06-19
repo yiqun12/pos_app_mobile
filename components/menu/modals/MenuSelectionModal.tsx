@@ -260,6 +260,7 @@ export function MenuSelectionModal({
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
                 >
                   <TouchableOpacity
                     onPress={() => setSelectedCategory(null)}
@@ -309,6 +310,7 @@ export function MenuSelectionModal({
               <ScrollView
                 className="flex-1 px-4"
                 contentContainerStyle={{ paddingBottom: 40 }}
+                keyboardShouldPersistTaps="handled"
               >
                 <View className="flex-row flex-wrap justify-between gap-y-4">
                   {filteredItems.map((item) => {

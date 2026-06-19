@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { normalizeAmountInput } from "@/lib/pos/amountInput";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Modal, Text, TextInput, TouchableOpacity, View, ScrollView } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Text, TextInput, TouchableOpacity, View, ScrollView } from "react-native";
 
 interface PaymentModalProps {
   visible: boolean;
@@ -50,6 +51,10 @@ export function PaymentModal({
       animationType="fade"
       onRequestClose={onClose}
     >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
       <View className="flex-1 justify-center items-center bg-black/60 p-4">
         <View className="w-full max-w-lg rounded-2xl bg-white p-0 overflow-hidden shadow-2xl dark:bg-slate-900">
           
@@ -63,7 +68,7 @@ export function PaymentModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView className="p-4">
+          <ScrollView className="p-4" keyboardShouldPersistTaps="handled">
             {/* Amount Display */}
             <View className="items-center mb-6">
                 <Text className="text-slate-500 mb-2 font-medium">
@@ -73,7 +78,10 @@ export function PaymentModal({
                     <Text className="text-3xl font-bold text-orange-600">$</Text>
                     <TextInput
                         value={amount}
-                        onChangeText={setAmount}
+                        onChangeText={(value) => {
+                          const normalized = normalizeAmountInput(value);
+                          if (normalized !== null) setAmount(normalized);
+                        }}
                         keyboardType="decimal-pad"
                         className="ml-1 p-0 text-4xl font-bold text-orange-600"
                         selectTextOnFocus
@@ -120,6 +128,7 @@ export function PaymentModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

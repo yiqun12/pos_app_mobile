@@ -30,6 +30,8 @@ export type WebAttributeGroup = {
 
 export type WebAttributesArr = Record<string, WebAttributeGroup>;
 
+export type MenuAvailability = boolean | string | string[];
+
 export type MenuItem = {
   id: string;
   categoryId: string;
@@ -40,7 +42,7 @@ export type MenuItem = {
   categoryNameCN?: string;
   price: number;
   imageUrl?: string;
-  description?: string;
+  availability?: MenuAvailability;
   attributesArr?: WebAttributesArr; // Raw Web POS attributes, kept for compatible cart writes
   optionGroups?: OptionGroup[]; // Customizable options
   ingredients?: Ingredient[]; // Optional add-ons/ingredients
@@ -49,6 +51,12 @@ export type MenuItem = {
 export type MenuCategory = {
   id: string;
   name: string;
+  nameCN?: string;
+};
+
+export type Menu = {
+  categories: MenuCategory[];
+  items: MenuItem[];
 };
 
 /**
