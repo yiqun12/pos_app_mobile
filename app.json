@@ -10,6 +10,13 @@
       "com.googleusercontent.apps.579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en"
     ],
     "userInterfaceStyle": "automatic",
+    "updates": {
+      "url": "https://u.expo.dev/22d0b918-97fd-441b-b7da-329ff353cb58",
+      "checkAutomatically": "ON_ERROR_RECOVERY"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,

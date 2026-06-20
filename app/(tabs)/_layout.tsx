@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { DemoModeBanner } from "@/components/license";
+import { OtaUpdateBanner } from "@/components/updates";
 import { BottomTabTokens, Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
@@ -22,6 +23,7 @@ export default function TabLayout() {
       <SafeAreaView edges={["top"]} className="bg-white dark:bg-slate-950">
         {/* Demo Mode Banner */}
         <DemoModeBanner />
+        <OtaUpdateBanner />
       </SafeAreaView>
       <Tabs
         screenOptions={{
