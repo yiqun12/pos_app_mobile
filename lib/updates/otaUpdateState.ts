@@ -20,13 +20,12 @@ type OtaCheckInput = {
   status: OtaUpdateStatus;
 };
 
-type OtaBannerInput = {
+type OtaPromptInput = {
   status: OtaUpdateStatus;
-  dismissed: boolean;
   errorMessage?: string | null;
 };
 
-export type OtaUpdateBannerModel =
+export type OtaUpdatePromptModel =
   | { visible: false }
   | {
       visible: true;
@@ -34,7 +33,6 @@ export type OtaUpdateBannerModel =
       message: string;
       actionLabel: string;
       loading: boolean;
-      canDismiss: boolean;
     };
 
 export function canUseOtaUpdates({
@@ -57,21 +55,17 @@ export function shouldCheckForOtaUpdate({
   return now - lastCheckedAt >= minIntervalMs;
 }
 
-export function getOtaUpdateBannerModel({
+export function getOtaUpdatePromptModel({
   status,
-  dismissed,
   errorMessage,
-}: OtaBannerInput): OtaUpdateBannerModel {
-  if (dismissed) return { visible: false };
-
+}: OtaPromptInput): OtaUpdatePromptModel {
   if (status === "available") {
     return {
       visible: true,
-      title: "New update available",
-      message: "Restart to apply the latest app update.",
+      title: "Update required",
+      message: "A new version is available. Update now to continue using the app.",
       actionLabel: "Update Now",
       loading: false,
-      canDismiss: true,
     };
   }
 
@@ -79,10 +73,9 @@ export function getOtaUpdateBannerModel({
     return {
       visible: true,
       title: "Updating...",
-      message: "Downloading the latest app update.",
+      message: "Downloading the latest version.",
       actionLabel: "Updating...",
       loading: true,
-      canDismiss: false,
     };
   }
 
@@ -91,9 +84,8 @@ export function getOtaUpdateBannerModel({
       visible: true,
       title: "Update failed",
       message: errorMessage || "Check your connection and try again.",
-      actionLabel: "Retry",
+      actionLabel: "Retry Update",
       loading: false,
-      canDismiss: true,
     };
   }
 

@@ -22,11 +22,9 @@ const OTA_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 type OtaUpdateContextValue = {
   status: OtaUpdateStatus;
-  dismissed: boolean;
   errorMessage: string | null;
   checkForUpdate: (force?: boolean) => Promise<void>;
   applyUpdate: () => Promise<void>;
-  dismiss: () => void;
 };
 
 const OtaUpdateContext = createContext<OtaUpdateContextValue | null>(null);
@@ -42,7 +40,6 @@ function isExpoGoRuntime(): boolean {
 
 export function OtaUpdateProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<OtaUpdateStatus>("idle");
-  const [dismissed, setDismissed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const statusRef = useRef<OtaUpdateStatus>(status);
   const lastCheckedAtRef = useRef<number | null>(null);
@@ -85,7 +82,6 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
         lastCheckedAtRef.current = now;
 
         if (update.isAvailable) {
-          setDismissed(false);
           setStatus("available");
         } else {
           setStatus("idle");
@@ -102,7 +98,6 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
   const applyUpdate = useCallback(async () => {
     if (!canCheckUpdates || statusRef.current === "downloading") return;
 
-    setDismissed(false);
     setErrorMessage(null);
     setStatus("downloading");
 
@@ -121,10 +116,6 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
       setStatus("error");
     }
   }, [canCheckUpdates]);
-
-  const dismiss = useCallback(() => {
-    setDismissed(true);
-  }, []);
 
   useEffect(() => {
     if (!canCheckUpdates) {
@@ -146,13 +137,11 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
   const value = useMemo<OtaUpdateContextValue>(
     () => ({
       status,
-      dismissed,
       errorMessage,
       checkForUpdate,
       applyUpdate,
-      dismiss,
     }),
-    [status, dismissed, errorMessage, checkForUpdate, applyUpdate, dismiss]
+    [status, errorMessage, checkForUpdate, applyUpdate]
   );
 
   return (

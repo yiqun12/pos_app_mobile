@@ -28,6 +28,7 @@ LogBox.ignoreLogs([
 import AIChat from "@/components/AIChat";
 
 import { ActivationModal } from "@/components/license";
+import { OtaUpdateModal } from "@/components/updates";
 import { AuthProvider } from "@/context/auth";
 import { LanguageProvider } from "@/context/language";
 import { LicenseProvider } from "@/context/license";
@@ -90,6 +91,7 @@ export default function RootLayout() {
 
                     {/* Activation Modal - 全局激活弹窗 */}
                     <ActivationModal />
+                    <OtaUpdateModal />
 
                     {/* === 2. AI 悬浮球在这里！(全剧置顶) === */}
                     <AIChat />

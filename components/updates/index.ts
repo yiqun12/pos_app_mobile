@@ -1,1 +1,1 @@
-export { OtaUpdateBanner } from "./OtaUpdateBanner";
+export { OtaUpdateModal } from "./OtaUpdateModal";

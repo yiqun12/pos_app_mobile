@@ -4,7 +4,7 @@
     "slug": "7dollar-pos-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": [
       "sevendollarposapp",
       "com.googleusercontent.apps.579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en"
