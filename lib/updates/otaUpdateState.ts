@@ -20,6 +20,10 @@ type OtaCheckInput = {
   status: OtaUpdateStatus;
 };
 
+type OtaRunCheckInput = OtaCheckInput & {
+  force: boolean;
+};
+
 type OtaPromptInput = {
   status: OtaUpdateStatus;
   errorMessage?: string | null;
@@ -53,6 +57,24 @@ export function shouldCheckForOtaUpdate({
   if (status === "checking" || status === "downloading") return false;
   if (lastCheckedAt === null) return true;
   return now - lastCheckedAt >= minIntervalMs;
+}
+
+export function shouldRunOtaUpdateCheck({
+  force,
+  now,
+  lastCheckedAt,
+  minIntervalMs,
+  status,
+}: OtaRunCheckInput): boolean {
+  if (status === "checking" || status === "downloading") return false;
+  if (force) return true;
+
+  return shouldCheckForOtaUpdate({
+    now,
+    lastCheckedAt,
+    minIntervalMs,
+    status,
+  });
 }
 
 export function getOtaUpdatePromptModel({

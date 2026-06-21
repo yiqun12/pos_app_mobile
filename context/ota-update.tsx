@@ -15,10 +15,10 @@ import { AppState, Platform } from "react-native";
 import {
   OtaUpdateStatus,
   canUseOtaUpdates,
-  shouldCheckForOtaUpdate,
+  shouldRunOtaUpdateCheck,
 } from "@/lib/updates/otaUpdateState";
 
-const OTA_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const OTA_CHECK_INTERVAL_MS = 60 * 1000;
 
 type OtaUpdateContextValue = {
   status: OtaUpdateStatus;
@@ -63,14 +63,13 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
       }
 
       const now = Date.now();
-      const shouldCheck =
-        force ||
-        shouldCheckForOtaUpdate({
-          now,
-          lastCheckedAt: lastCheckedAtRef.current,
-          minIntervalMs: OTA_CHECK_INTERVAL_MS,
-          status: statusRef.current,
-        });
+      const shouldCheck = shouldRunOtaUpdateCheck({
+        force,
+        now,
+        lastCheckedAt: lastCheckedAtRef.current,
+        minIntervalMs: OTA_CHECK_INTERVAL_MS,
+        status: statusRef.current,
+      });
 
       if (!shouldCheck) return;
 
@@ -123,15 +122,24 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    void checkForUpdate();
+    void checkForUpdate(true);
 
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
-        void checkForUpdate();
+        void checkForUpdate(true);
       }
     });
 
-    return () => subscription.remove();
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") {
+        void checkForUpdate(true);
+      }
+    }, OTA_CHECK_INTERVAL_MS);
+
+    return () => {
+      subscription.remove();
+      clearInterval(interval);
+    };
   }, [canCheckUpdates, checkForUpdate]);
 
   const value = useMemo<OtaUpdateContextValue>(
