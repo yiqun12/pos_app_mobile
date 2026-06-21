@@ -20,7 +20,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sevendollar.pos"
+      "bundleIdentifier": "com.sevendollar.pos",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.sevendollar.pos",
