@@ -11,7 +11,7 @@
     ],
     "userInterfaceStyle": "automatic",
     "updates": {
-      "url": "https://u.expo.dev/22d0b918-97fd-441b-b7da-329ff353cb58",
+      "url": "https://u.expo.dev/3b6fb366-c8c3-4073-8783-455ecfe3a5f2",
       "checkAutomatically": "ON_ERROR_RECOVERY"
     },
     "runtimeVersion": {
@@ -80,7 +80,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "22d0b918-97fd-441b-b7da-329ff353cb58"
+        "projectId": "3b6fb366-c8c3-4073-8783-455ecfe3a5f2"
       },
       "googleAuth": {
         "webClientId": "579212375301-m68l020er9v91lhg225cv1me5pm86tsi.apps.googleusercontent.com",
