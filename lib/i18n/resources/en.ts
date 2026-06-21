@@ -40,7 +40,7 @@ const en = {
     "signInButton": "Sign In",
     "signUp": "Sign Up",
     "subtitle": "Sign in to manage your restaurant",
-    "welcomeBack": "Welcome Back (TEST APP)"
+    "welcomeBack": "Welcome Back"
   },
   "common": {
     "cancel": "Cancel",

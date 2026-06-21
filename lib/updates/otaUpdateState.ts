@@ -29,6 +29,14 @@ type OtaPromptInput = {
   errorMessage?: string | null;
 };
 
+type OtaRouteCheckInput = {
+  currentPath: string | null | undefined;
+  previousPath: string | null | undefined;
+  now: number;
+  lastRouteCheckedAt: number | null;
+  minIntervalMs: number;
+};
+
 export type OtaUpdatePromptModel =
   | { visible: false }
   | {
@@ -75,6 +83,18 @@ export function shouldRunOtaUpdateCheck({
     minIntervalMs,
     status,
   });
+}
+
+export function shouldCheckOtaAfterRouteChange({
+  currentPath,
+  previousPath,
+  now,
+  lastRouteCheckedAt,
+  minIntervalMs,
+}: OtaRouteCheckInput): boolean {
+  if (!currentPath || currentPath === previousPath) return false;
+  if (lastRouteCheckedAt === null) return true;
+  return now - lastRouteCheckedAt >= minIntervalMs;
 }
 
 export function getOtaUpdatePromptModel({

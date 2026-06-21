@@ -1,4 +1,5 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
+import { usePathname } from "expo-router";
 import * as Updates from "expo-updates";
 import React, {
   PropsWithChildren,
@@ -15,10 +16,12 @@ import { AppState, Platform } from "react-native";
 import {
   OtaUpdateStatus,
   canUseOtaUpdates,
+  shouldCheckOtaAfterRouteChange,
   shouldRunOtaUpdateCheck,
 } from "@/lib/updates/otaUpdateState";
 
 const OTA_CHECK_INTERVAL_MS = 60 * 1000;
+const OTA_ROUTE_CHECK_INTERVAL_MS = 5 * 1000;
 
 type OtaUpdateContextValue = {
   status: OtaUpdateStatus;
@@ -43,6 +46,9 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const statusRef = useRef<OtaUpdateStatus>(status);
   const lastCheckedAtRef = useRef<number | null>(null);
+  const lastRouteCheckedAtRef = useRef<number | null>(null);
+  const previousPathRef = useRef<string | null>(null);
+  const pathname = usePathname();
 
   const canCheckUpdates = canUseOtaUpdates({
     isDev: __DEV__,
@@ -141,6 +147,26 @@ export function OtaUpdateProvider({ children }: PropsWithChildren) {
       clearInterval(interval);
     };
   }, [canCheckUpdates, checkForUpdate]);
+
+  useEffect(() => {
+    if (!canCheckUpdates) return;
+
+    const now = Date.now();
+    const shouldCheck = shouldCheckOtaAfterRouteChange({
+      currentPath: pathname,
+      previousPath: previousPathRef.current,
+      now,
+      lastRouteCheckedAt: lastRouteCheckedAtRef.current,
+      minIntervalMs: OTA_ROUTE_CHECK_INTERVAL_MS,
+    });
+
+    previousPathRef.current = pathname;
+
+    if (!shouldCheck) return;
+
+    lastRouteCheckedAtRef.current = now;
+    void checkForUpdate(true);
+  }, [canCheckUpdates, checkForUpdate, pathname]);
 
   const value = useMemo<OtaUpdateContextValue>(
     () => ({
