@@ -92,3 +92,5 @@ venv/
 
 # i18n scan artifacts
 .tmp_i18n_*.json
+
+.cursor/
