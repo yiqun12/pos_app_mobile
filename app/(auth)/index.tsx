@@ -320,7 +320,7 @@ export default function LoginScreen() {
             <Text className="text-slate-500 dark:text-slate-400">
               {t("auth.noAccount")} {" "}
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/sign-up" as any)}>
               <Text className="font-semibold text-orange-600 dark:text-orange-400">
                 {t("auth.signUp")}
               </Text>

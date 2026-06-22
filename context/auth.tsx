@@ -1,5 +1,6 @@
 import { auth } from "@/lib/firebase";
 import {
+  createUserWithEmailAndPassword,
   deleteUser,
   EmailAuthProvider,
   onAuthStateChanged,
@@ -24,6 +25,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   isLoading: boolean;
@@ -58,6 +60,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       console.error("Login failed:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signUp = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      await createUserWithEmailAndPassword(auth, email.trim(), password);
+    } catch (error) {
+      console.error("Sign up failed:", error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -102,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         user,
         login,
+        signUp,
         logout,
         deleteAccount,
         isLoading,
