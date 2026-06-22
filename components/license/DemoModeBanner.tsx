@@ -1,5 +1,6 @@
 import { useLicense } from "@/context/license";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { isLicenseActivationEnabled } from "@/lib/config/featureFlags";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -11,7 +12,7 @@ export function DemoModeBanner() {
   const { t } = useTranslation();
 
   // 已激活则不显示
-  if (isActivated) return null;
+  if (isActivated || !isLicenseActivationEnabled()) return null;
 
   return (
     <TouchableOpacity
@@ -41,4 +42,3 @@ export function DemoModeBanner() {
     </TouchableOpacity>
   );
 }
-

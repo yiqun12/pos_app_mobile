@@ -1,6 +1,7 @@
 import { useLicense } from "@/context/license";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { isLicenseActivationEnabled } from "@/lib/config/featureFlags";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +24,8 @@ export function ActivationModal() {
   const { showActivationModal, setShowActivationModal, activateLicense, isActivating } =
     useLicense();
   const [licenseKey, setLicenseKey] = useState("");
+
+  if (!isLicenseActivationEnabled()) return null;
 
   const handleActivate = async () => {
     if (!licenseKey.trim()) {
@@ -154,4 +157,3 @@ export function ActivationModal() {
     </Modal>
   );
 }
-
