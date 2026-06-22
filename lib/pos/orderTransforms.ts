@@ -4,6 +4,7 @@ import type {
   SelectedOption,
 } from "../../components/seats/types";
 import type { GlobalCustomization, MenuItem } from "../../types/menu";
+import { resolveMenuImageUrl } from "./menuTransforms";
 
 type WebAttributesArr = NonNullable<MenuItem["attributesArr"]>;
 
@@ -12,6 +13,7 @@ export type WebCartItem = {
   name: string;
   subtotal: string;
   image?: string;
+  imageUrl?: string;
   quantity: number;
   attributeSelected: Record<string, string | string[]>;
   attributesArr?: MenuItem["attributesArr"];
@@ -529,7 +531,7 @@ export function buildEditedWebCartItem({
     price: unitPrice,
     quantity,
     count: product.count,
-    imageUrl: menuItem?.imageUrl ?? product.image,
+    imageUrl: resolveMenuImageUrl(menuItem?.imageUrl, product.imageUrl, product.image),
     attributesArr: mergeAttributesArr(menuItem?.attributesArr, product.attributesArr),
     selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
     selectedIngredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
@@ -619,12 +621,14 @@ export function createWebCartItem({
   const nameCN = menuItem?.nameCN ?? orderItem.nameCN;
   const itemCount = orderItem.count ?? count;
   const subtotal = roundMoney(orderItem.price);
+  const imageUrl = resolveMenuImageUrl(menuItem?.imageUrl, orderItem.imageUrl);
 
   return {
     id: menuItem?.id ?? orderItem.menuItemId ?? orderItem.id,
     name: rawName,
     subtotal: subtotal.toFixed(2),
-    image: menuItem?.imageUrl ?? orderItem.imageUrl,
+    image: imageUrl,
+    imageUrl,
     quantity: orderItem.quantity,
     attributeSelected,
     attributesArr,

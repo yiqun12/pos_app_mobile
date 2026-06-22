@@ -1,9 +1,14 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import {
+  DEFAULT_MENU_IMAGE_URL,
+  resolveMenuImageUrl,
+} from "@/lib/pos/menuTransforms";
 import { formatTableTimingCartAttributes } from "@/lib/pos/tableTiming";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import { Image } from "expo-image";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, TouchableOpacity, View } from "react-native";
 import { OrderItem } from "../types";
@@ -29,6 +34,7 @@ export function OrderItemRow({
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
+  const [imageFailed, setImageFailed] = useState(false);
   const isSurcharge = item.menuItemId === "SURCHARGE_ITEM";
   const isTableItem = Boolean(item.isTableItem || item.attributeSelected?.["开台商品"]);
   const tableAttributeText = isTableItem
@@ -39,6 +45,11 @@ export function OrderItemRow({
     : item.name;
   const canOpenTiming = isTableItem && !item.tableTimingEndedAt;
   const isRowDisabled = isSurcharge || (isTableItem && Boolean(item.tableTimingEndedAt));
+  const itemImageUrl = imageFailed ? DEFAULT_MENU_IMAGE_URL : resolveMenuImageUrl(item.imageUrl);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [item.imageUrl]);
 
   return (
     <TouchableOpacity
@@ -55,7 +66,17 @@ export function OrderItemRow({
           <Ionicons name="close" size={24} color="#94a3b8" />
         </TouchableOpacity>
       ) : (
-        <View className="mr-3 h-12 w-12 rounded-lg bg-slate-200 dark:bg-slate-700" />
+        <View className="mr-3 h-12 w-12 overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-700">
+          <Image
+            source={{ uri: itemImageUrl }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+            transition={120}
+            onError={() => {
+              if (itemImageUrl !== DEFAULT_MENU_IMAGE_URL) setImageFailed(true);
+            }}
+          />
+        </View>
       )}
 
       <View className="flex-1">

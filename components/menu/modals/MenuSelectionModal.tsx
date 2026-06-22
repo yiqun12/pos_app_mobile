@@ -3,9 +3,14 @@ import { Colors } from "@/constants/theme";
 import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import {
+  DEFAULT_MENU_IMAGE_URL,
+  resolveMenuImageUrl,
+} from "@/lib/pos/menuTransforms";
 import { isTableTimingMenuItem } from "@/lib/pos/tableTiming";
 import { MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -46,6 +51,7 @@ export function MenuSelectionModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
+  const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set());
 
   const filteredItems = useMemo(() => {
     let result = items;
@@ -315,17 +321,30 @@ export function MenuSelectionModal({
                 <View className="flex-row flex-wrap justify-between gap-y-4">
                   {filteredItems.map((item) => {
                     const isTableTimingItem = isTableTimingMenuItem(item);
+                    const imageKey = `${item.id}:${item.imageUrl ?? ""}`;
+                    const itemImageUrl = failedImageKeys.has(imageKey)
+                      ? DEFAULT_MENU_IMAGE_URL
+                      : resolveMenuImageUrl(item.imageUrl);
                     return (
                       <TouchableOpacity
                         key={item.id}
                         onPress={() => handleItemPress(item)}
                         className="w-[48%] rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:opacity-70 dark:border-slate-800 dark:bg-slate-900"
                       >
-                      <View className="mb-2 h-24 w-full items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800">
-                        <Ionicons
-                          name="fast-food-outline"
-                          size={32}
-                          color={colors.tabIconDefault}
+                      <View className="mb-2 h-24 w-full overflow-hidden rounded-lg bg-slate-50 dark:bg-slate-800">
+                        <Image
+                          source={{ uri: itemImageUrl }}
+                          style={{ width: "100%", height: "100%" }}
+                          contentFit="cover"
+                          transition={120}
+                          onError={() => {
+                            if (itemImageUrl === DEFAULT_MENU_IMAGE_URL) return;
+                            setFailedImageKeys((current) => {
+                              const next = new Set(current);
+                              next.add(imageKey);
+                              return next;
+                            });
+                          }}
                         />
                       </View>
                       <Text

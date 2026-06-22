@@ -45,6 +45,7 @@ import {
   getSurchargeTotal,
   isSurchargeCartItem,
 } from "@/lib/pos/orderTransforms";
+import { resolveMenuImageUrl } from "@/lib/pos/menuTransforms";
 import {
   buildSplitPaymentBreakdown,
   type SplitPaymentBreakdown,
@@ -186,7 +187,7 @@ export default function SeatScreen() {
                   price,
                   quantity: typeof item.quantity === "number" ? item.quantity : 1,
                   count,
-                  imageUrl: item.image,
+                  imageUrl: resolveMenuImageUrl(item.imageUrl, item.image),
                   attributesArr: item.attributesArr,
                   attributeSelected: item.attributeSelected,
                   selectedOptions: editableSelections.selectedOptions.length > 0
@@ -810,7 +811,7 @@ export default function SeatScreen() {
           rawName: rawProduct.name,
           nameCN: rawProduct.CHI,
           price: getTableTimingBasePrice(rawProduct),
-          imageUrl: rawProduct.image,
+          imageUrl: resolveMenuImageUrl(rawProduct.imageUrl, rawProduct.image),
           attributesArr: rawProduct.attributesArr,
         },
       });

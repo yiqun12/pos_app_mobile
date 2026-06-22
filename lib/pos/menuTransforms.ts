@@ -4,6 +4,15 @@ export const DEFAULT_AVAILABILITY_PERIODS = ["Morning", "Afternoon", "Evening"] 
 export const DEFAULT_MENU_IMAGE_URL =
   "https://imagedelivery.net/D2Yu9GcuKDLfOUNdrm2hHQ/b686ebae-7ab0-40ec-9383-4c483dace800/public";
 
+export function resolveMenuImageUrl(...candidates: unknown[]): string {
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const trimmed = candidate.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return DEFAULT_MENU_IMAGE_URL;
+}
+
 export type WebAttributeVariation = {
   type?: string;
   price?: number | string;
@@ -26,6 +35,7 @@ export type WebMenuItem = {
   categoryCHI?: string;
   categoryId?: string;
   image?: string;
+  Image?: string;
   imageUrl?: string;
   availability?: MenuAvailability;
   attributesArr?: unknown;
@@ -185,8 +195,8 @@ export function serializeMenuForWebKey(menu: Menu): WebMenuItem[] {
       category: item.categoryName ?? category.category,
       categoryCHI: item.categoryNameCN ?? category.categoryCHI ?? category.category,
       categoryId: item.categoryId,
-      image: item.imageUrl || DEFAULT_MENU_IMAGE_URL,
-      imageUrl: item.imageUrl || DEFAULT_MENU_IMAGE_URL,
+      image: resolveMenuImageUrl(item.imageUrl),
+      imageUrl: resolveMenuImageUrl(item.imageUrl),
       availability: coerceAvailabilityPeriods(item.availability),
       attributesArr,
     };
@@ -223,7 +233,7 @@ export function transformWebMenuItem(raw: WebMenuItem, index: number): MenuItem 
     rawName,
     nameCN,
     price: parseNumber(priceSource, 0),
-    imageUrl: raw.imageUrl ?? raw.image,
+    imageUrl: resolveMenuImageUrl(raw.imageUrl, raw.image, raw.Image),
     availability: raw.availability ?? [...DEFAULT_AVAILABILITY_PERIODS],
     attributesArr,
     optionGroups: optionGroups.length > 0 ? optionGroups : undefined,
