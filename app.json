@@ -20,6 +20,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "bundleIdentifier": "com.sevendollar.pos",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -55,6 +56,7 @@
           }
         }
       ],
+      "expo-apple-authentication",
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       "@react-native-google-signin/google-signin",

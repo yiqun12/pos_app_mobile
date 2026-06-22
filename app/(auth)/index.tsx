@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuth } from "@/context/auth";
 import { useLanguage } from "@/context/language";
+import {
+  createAppleRawNonce,
+  formatAppleFullName,
+} from "@/lib/auth/appleSignInUtils";
 import { auth } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -10,9 +14,16 @@ import {
   statusCodes,
   isErrorWithCode,
 } from "@react-native-google-signin/google-signin";
+import * as AppleAuthentication from "expo-apple-authentication";
 import Constants from "expo-constants";
+import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";
-import { GoogleAuthProvider, signInWithCredential } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithCredential,
+  updateProfile,
+} from "firebase/auth";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -54,11 +65,29 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
 
   // Suppress unused import warnings if Google flow isn't taken (kept for clarity).
   useEffect(() => {
     void statusCodes;
     void isErrorWithCode;
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (Platform.OS !== "ios") return;
+
+    AppleAuthentication.isAvailableAsync()
+      .then((isAvailable) => {
+        if (isMounted) setAppleSignInAvailable(isAvailable);
+      })
+      .catch(() => {
+        if (isMounted) setAppleSignInAvailable(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const validateEmail = (emailValue: string) => {
@@ -152,6 +181,59 @@ export default function LoginScreen() {
         }
       }
       setError(err?.message ?? t("auth.googleSignInFailed"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    if (loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      const rawNonce = createAppleRawNonce();
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      );
+      const appleCredential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      if (!appleCredential.identityToken) {
+        setError(t("auth.appleMissingToken"));
+        return;
+      }
+
+      const provider = new OAuthProvider("apple.com");
+      const firebaseCredential = provider.credential({
+        idToken: appleCredential.identityToken,
+        rawNonce,
+      });
+      const userCredential = await signInWithCredential(auth, firebaseCredential);
+      const displayName = formatAppleFullName(appleCredential.fullName);
+      if (displayName && !userCredential.user.displayName) {
+        await updateProfile(userCredential.user, { displayName });
+      }
+
+      router.replace("/(tabs)/seats");
+    } catch (err: any) {
+      if (
+        err?.code === "ERR_REQUEST_CANCELED" ||
+        err?.code === "ERR_CANCELED" ||
+        err?.code === "ERR_CANCELED_BY_USER"
+      ) {
+        return;
+      }
+      if (err?.code === "auth/network-request-failed") {
+        setError(t("auth.networkError"));
+      } else {
+        setError(err?.message ?? t("auth.appleSignInFailed"));
+      }
     } finally {
       setLoading(false);
     }
@@ -295,6 +377,22 @@ export default function LoginScreen() {
               <Text className="mx-4 text-sm text-slate-400">{t("common.or")}</Text>
               <View className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
             </View>
+
+            {appleSignInAvailable ? (
+              <View className="mb-3 overflow-hidden rounded-xl">
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                  }
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                  }
+                  cornerRadius={12}
+                  style={{ width: "100%", height: 52, opacity: loading ? 0.55 : 1 }}
+                  onPress={handleAppleSignIn}
+                />
+              </View>
+            ) : null}
 
             <Button
               label={t("auth.googleSignIn")}

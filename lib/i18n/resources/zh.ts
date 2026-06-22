@@ -21,6 +21,8 @@ const zh = {
     "totalRevenue": "Total Revenue"
   },
   "auth": {
+    "appleMissingToken": "Apple sign in did not return an identity token.",
+    "appleSignInFailed": "Apple sign in failed.",
     "email": "Email Address",
     "confirmPassword": "Confirm Password",
     "confirmPasswordPlaceholder": "Enter your password again",
