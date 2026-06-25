@@ -1,7 +1,9 @@
 import { SettingsItem, Store, StoreSelector } from "@/components/profile";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
 import { useLanguage } from "@/context/language";
+import { useStoreSelection } from "@/context/store";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -9,33 +11,15 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
+  Modal,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   useColorScheme,
   View,
 } from "react-native";
-
-const MOCK_USER = {
-  name: "John Smith",
-  email: "john@restaurant.com",
-  avatar: null,
-};
-
-const MOCK_STORES: Store[] = [
-  {
-    id: "1",
-    name: "Golden Dragon",
-    nameCHI: "金龙餐厅",
-    address: "123 Main St, San Francisco, CA",
-  },
-  {
-    id: "2",
-    name: "Lucky Star",
-    nameCHI: "幸运星",
-    address: "456 Oak Ave, Oakland, CA",
-  },
-];
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -53,9 +37,21 @@ export default function ProfileScreen() {
   const versionFontSize = isTablet ? 15 : 14;
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
+  const { user, logout, deleteAccount } = useAuth();
+  const { storeList, currentStoreId, setCurrentStoreId } = useStoreSelection();
 
-  const [currentStore, setCurrentStore] = useState<Store>(MOCK_STORES[0]);
+  const currentStore = storeList.find((s) => s.id === currentStoreId) ?? null;
+  const storesForSelector: Store[] = storeList.map((s) => ({
+    id: s.id,
+    name: s.name,
+    nameCHI: s.nameCN,
+    address: "",
+  }));
+
   const [storeSelectorVisible, setStoreSelectorVisible] = useState(false);
+  const [deleteAccountVisible, setDeleteAccountVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(t("profile.signOutTitle"), t("profile.signOutMessage"), [
@@ -63,21 +59,54 @@ export default function ProfileScreen() {
       {
         text: t("profile.signOut"),
         style: "destructive",
-        onPress: () => {
-          router.replace("/(auth)");
+        onPress: async () => {
+          try {
+            await logout();
+            // Route guard will redirect to (auth)
+          } catch (err) {
+            console.error("Logout failed:", err);
+          }
         },
       },
     ]);
   };
 
-  const handleStoreSelect = (store: Store) => {
-    setCurrentStore(store);
+  const handleStoreSelect = async (store: Store) => {
+    await setCurrentStoreId(store.id);
     setStoreSelectorVisible(false);
   };
 
   const handleCreateStore = () => {
     setStoreSelectorVisible(false);
     router.push("/settings/store");
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword.trim()) {
+      Alert.alert(t("common.error"), t("profile.deleteAccountPasswordRequired"));
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccount(deletePassword);
+      setDeletePassword("");
+      setDeleteAccountVisible(false);
+      Alert.alert(t("common.success"), t("profile.deleteAccountSuccess"));
+    } catch (err: any) {
+      const code = err?.code as string | undefined;
+      let message = err?.message ?? t("profile.deleteAccountFailed");
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        message = t("profile.deleteAccountWrongPassword");
+      } else if (code === "auth/requires-recent-login") {
+        message = t("profile.deleteAccountRecentLoginRequired");
+      } else if (code === "auth/network-request-failed") {
+        message = t("auth.networkError");
+      }
+      Alert.alert(t("common.error"), message);
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -106,13 +135,13 @@ export default function ProfileScreen() {
             </View>
             <View className="flex-1">
               <Text className="font-bold text-white" style={{ fontSize: userNameFontSize }}>
-                {MOCK_USER.name}
+                {user?.email?.split("@")[0] ?? "User"}
               </Text>
               <Text
                 className="mt-1 text-orange-100"
                 style={{ fontSize: userEmailFontSize }}
               >
-                {MOCK_USER.email}
+                {user?.email ?? "—"}
               </Text>
             </View>
             <TouchableOpacity
@@ -144,14 +173,14 @@ export default function ProfileScreen() {
                 className="mt-0.5 font-semibold text-slate-900 dark:text-white"
                 style={{ fontSize: storeNameFontSize }}
               >
-                {currentStore.name}
+                {currentStore?.name ?? t("profile.noStoreSelected")}
               </Text>
-              {currentStore.nameCHI && (
+              {currentStore?.nameCN && (
                 <Text
                   className="text-slate-500 dark:text-slate-400"
                   style={{ fontSize: storeNameChiFontSize }}
                 >
-                  {currentStore.nameCHI}
+                  {currentStore.nameCN}
                 </Text>
               )}
             </View>
@@ -267,6 +296,14 @@ export default function ProfileScreen() {
               danger
               onPress={handleLogout}
             />
+            <SettingsItem
+              icon="trash"
+              title={t("profile.deleteAccount")}
+              subtitle={t("profile.deleteAccountSubtitle")}
+              showArrow={false}
+              danger
+              onPress={() => setDeleteAccountVisible(true)}
+            />
           </View>
         </View>
 
@@ -282,12 +319,96 @@ export default function ProfileScreen() {
 
       <StoreSelector
         visible={storeSelectorVisible}
-        stores={MOCK_STORES}
-        currentStoreId={currentStore.id}
+        stores={storesForSelector}
+        currentStoreId={currentStoreId ?? ""}
         onSelect={handleStoreSelect}
         onClose={() => setStoreSelectorVisible(false)}
         onCreateStore={handleCreateStore}
       />
+
+      <Modal
+        visible={deleteAccountVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDeletingAccount) setDeleteAccountVisible(false);
+        }}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => {
+            if (!isDeletingAccount) setDeleteAccountVisible(false);
+          }}
+        >
+          <View className="flex-1 items-center justify-center bg-black/50 px-5">
+            <TouchableWithoutFeedback>
+              <View className="w-full max-w-md rounded-2xl bg-white p-5 dark:bg-slate-900">
+                <View className="mb-4 flex-row items-center">
+                  <View className="mr-3 h-12 w-12 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/30">
+                    <Ionicons name="trash" size={22} color="#ef4444" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-lg font-bold text-slate-900 dark:text-white">
+                      {t("profile.deleteAccount")}
+                    </Text>
+                    <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {t("profile.deleteAccountModalSubtitle")}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  {t("profile.currentPassword")}
+                </Text>
+                <TextInput
+                  value={deletePassword}
+                  onChangeText={setDeletePassword}
+                  placeholder={t("profile.currentPasswordPlaceholder")}
+                  placeholderTextColor="#94a3b8"
+                  secureTextEntry
+                  editable={!isDeletingAccount}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+
+                <Text className="mt-3 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  {t("profile.deleteAccountWarning")}
+                </Text>
+
+                <View className="mt-5 flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (!isDeletingAccount) {
+                        setDeleteAccountVisible(false);
+                        setDeletePassword("");
+                      }
+                    }}
+                    disabled={isDeletingAccount}
+                    className="min-h-11 flex-1 items-center justify-center rounded-xl border border-orange-500"
+                  >
+                    <Text className="font-semibold text-orange-600">
+                      {t("common.cancel")}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleDeleteAccount}
+                    disabled={isDeletingAccount || !deletePassword.trim()}
+                    className={`min-h-11 flex-1 items-center justify-center rounded-xl ${
+                      isDeletingAccount || !deletePassword.trim()
+                        ? "bg-red-300"
+                        : "bg-red-500"
+                    }`}
+                  >
+                    <Text className="font-semibold text-white">
+                      {isDeletingAccount
+                        ? t("profile.deletingAccount")
+                        : t("profile.deleteAccountConfirm")}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }

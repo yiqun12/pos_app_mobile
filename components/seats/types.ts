@@ -17,9 +17,26 @@ export type SelectedGlobalCustomization = {
 
 export type OrderItem = {
   id: string;
+  menuItemId?: string;
   name: string;
+  rawName?: string;
+  nameCN?: string;
   price: number;
   quantity: number;
+  count?: number | string;
+  imageUrl?: string;
+  attributesArr?: Record<
+    string,
+    {
+      isSingleSelected?: boolean;
+      variations?: { type?: string; price?: number | string }[];
+    }
+  >;
+  attributeSelected?: Record<string, string | string[]>;
+  isTableItem?: boolean;
+  tableRemarks?: string;
+  tableTimingStartedAt?: number;
+  tableTimingEndedAt?: number;
   notes?: string;
   originalPrice?: number; // In case of manual override
   selectedOptions?: SelectedOption[]; // User-selected options
@@ -40,10 +57,14 @@ export type Order = {
   seatId: string;
   items: OrderItem[];
   subtotal: number;
+  taxableSubtotal?: number;
   taxRate: number;
   taxAmount: number;
   serviceFee: number;
   manualAdjustment: number;
+  discount?: number;
+  surcharge?: number;
+  taxExempt?: boolean;
   total: number;
   status: OrderStatus;
   paidAmount: number;

@@ -1,0 +1,1 @@
+export { OtaUpdateModal } from "./OtaUpdateModal";

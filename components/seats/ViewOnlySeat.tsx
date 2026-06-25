@@ -30,21 +30,32 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
   const showStatusText = minSide >= 62;
   const nameLineHeight = Math.round(nameFontSize * 1.12);
 
-  const getStatusColor = (status: string) => {
+  const getStatusStyles = (status: string) => {
     switch (status) {
       case "vacant":
-        return "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700";
+        return {
+          backgroundColor: "#966f33",
+          borderColor: "#805c28",
+        };
       case "reserved":
-        return "bg-orange-200 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700";
+        return {
+          backgroundColor: "#8c2828",
+          borderColor: "#702020",
+        };
       case "occupied":
-        return "bg-orange-600 dark:bg-orange-700 border-orange-700 dark:border-orange-800";
+        return {
+          backgroundColor: "#00008b",
+          borderColor: "#000066",
+        };
       default:
-        return "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700";
+        return {
+          backgroundColor: "#966f33",
+          borderColor: "#805c28",
+        };
     }
   };
 
-  const statusColor = getStatusColor(seat.status);
-  const isOccupied = seat.status === "occupied";
+  const seatStyle = getStatusStyles(seat.status);
   const statusLabelMap: Record<Seat["status"], string> = {
     vacant: t("seats.legend.available"),
     reserved: t("seats.legend.reserved"),
@@ -71,8 +82,10 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
           alignItems: "center",
           justifyContent: "center",
           borderWidth: 1, // Thinner border for cleaner look
+          backgroundColor: seatStyle.backgroundColor,
+          borderColor: seatStyle.borderColor,
         }}
-        className={`${statusColor} shadow-sm`}
+        className="shadow-sm"
       >
         <Text
           style={{
@@ -81,7 +94,7 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
             textAlign: "center",
             paddingHorizontal: 2,
           }}
-          className={`font-bold ${isOccupied ? "text-white" : "text-slate-800 dark:text-slate-100"}`}
+          className="font-bold text-white"
           numberOfLines={2}
           adjustsFontSizeToFit
           minimumFontScale={0.72}
@@ -95,7 +108,7 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
               fontSize: statusFontSize,
               marginTop: minSide < 72 ? 2 : responsive.isTablet ? 6 : 4,
             }}
-            className={`${isOccupied ? "text-orange-100" : "text-slate-500 dark:text-slate-400"}`}
+            className="text-slate-200"
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.8}
@@ -108,7 +121,7 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
               fontSize: statusFontSize,
               marginTop: minSide < 72 ? 2 : responsive.isTablet ? 6 : 4,
             }}
-            className={`${isOccupied ? "text-orange-100" : "text-slate-400 dark:text-slate-500"} font-medium uppercase`}
+            className="text-slate-200 font-medium uppercase"
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.8}

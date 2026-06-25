@@ -1,6 +1,10 @@
 import { auth } from "@/lib/firebase";
 import {
+  createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
@@ -21,7 +25,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -60,6 +66,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signUp = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      await createUserWithEmailAndPassword(auth, email.trim(), password);
+    } catch (error) {
+      console.error("Sign up failed:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -72,13 +90,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteAccount = async (password: string) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) {
+      throw new Error("Not signed in.");
+    }
+
+    setIsLoading(true);
+    try {
+      const credential = EmailAuthProvider.credential(currentUser.email, password);
+      await reauthenticateWithCredential(currentUser, credential);
+      await deleteUser(currentUser);
+      setUser(null);
+    } catch (error) {
+      console.error("Delete account failed:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated: !!user,
         user,
         login,
+        signUp,
         logout,
+        deleteAccount,
         isLoading,
       }}
     >

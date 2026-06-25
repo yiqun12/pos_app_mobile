@@ -1,83 +1,133 @@
-import { Button } from "@/components/ui/Button";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { KeypadAmountModal, KeypadQuickAction } from "@/components/seats/modals/KeypadAmountModal";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 
 interface AdjustmentModalProps {
   visible: boolean;
+  baseAmount?: number;
+  currentAmount?: number;
+  mode?: "adjustment" | "targetTotal";
+  taxExempt?: boolean;
   onClose: () => void;
-  onConfirm: (amount: number) => void;
+  onConfirm: (amount: number, taxExempt?: boolean) => void;
+  onTaxExemptChange?: (enabled: boolean) => void;
 }
 
 export function AdjustmentModal({
   visible,
+  baseAmount = 0,
+  currentAmount,
+  mode = "adjustment",
+  taxExempt = false,
   onClose,
   onConfirm,
+  onTaxExemptChange,
 }: AdjustmentModalProps) {
   const [amount, setAmount] = useState("");
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
+  const [draftTaxExempt, setDraftTaxExempt] = useState(taxExempt);
   const { t } = useTranslation();
+  const targetAmount = currentAmount ?? baseAmount;
 
-  const handleConfirm = () => {
-    const num = parseFloat(amount);
-    if (!isNaN(num)) {
-      onConfirm(num);
-      onClose();
-      setAmount("");
+  useEffect(() => {
+    if (!visible) return;
+    setAmount(mode === "targetTotal" && targetAmount > 0 ? targetAmount.toFixed(2) : "");
+    setDraftTaxExempt(taxExempt);
+  }, [baseAmount, currentAmount, mode, targetAmount, taxExempt, visible]);
+
+  const applyPercentDiscount = (percent: number) => {
+    if (baseAmount <= 0) return;
+    if (mode === "targetTotal") {
+      setAmount((baseAmount * (1 - percent)).toFixed(2));
+      return;
     }
+    setAmount((-(baseAmount * percent)).toFixed(2));
   };
 
+  const difference = mode === "targetTotal" && amount.length > 0
+    ? parseFloat(amount) - baseAmount
+    : 0;
+  const hasDifference = Number.isFinite(difference) && Math.abs(difference) >= 0.01;
+  const quickActions: KeypadQuickAction[] = [0.05, 0.15, 0.25].map((percent) => ({
+    label: `${(percent * 100).toFixed(0)}% Off`,
+    tone: "orange",
+    onPress: () => applyPercentDiscount(percent),
+  }));
+
   return (
-    <Modal
+    <KeypadAmountModal
       visible={visible}
-      transparent
-      animationType="fade"
-      onShow={() => setAmount("")}
+      title={mode === "targetTotal" ? "Adjust Total" : t("seats.adjustment.title")}
+      amount={amount}
+      amountLabel={mode === "targetTotal" ? "New total" : t("seats.adjustment.amountLabel")}
+      confirmLabel={mode === "targetTotal" ? "Adjust Total" : t("seats.adjustment.apply")}
+      quickActions={quickActions}
+      onAmountChange={setAmount}
+      onQuickAmount={(quickAmount) => setAmount(quickAmount.toFixed(2))}
+      onClose={onClose}
+      onConfirm={(nextAmount) => {
+        onConfirm(
+          mode === "targetTotal" ? nextAmount - baseAmount : nextAmount,
+          mode === "targetTotal" ? draftTaxExempt : taxExempt
+        );
+        if (mode === "targetTotal") onTaxExemptChange?.(draftTaxExempt);
+        onClose();
+        setAmount("");
+      }}
     >
-      <View className="flex-1 items-center justify-center bg-black/50 p-4">
-        <View className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-slate-900">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-xl font-bold text-slate-900 dark:text-white">
-              {t("seats.adjustment.title")}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <Text className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-            {t("seats.adjustment.subtitle")}
+      {mode === "targetTotal" && (
+        <View className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
+          <Text className="mb-3 text-sm text-slate-500 dark:text-slate-400">
+            Enter the new subtotal before tax and service fee. Lower becomes discount; higher becomes surcharge.
           </Text>
-
-          <View className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800">
-            <Text className="mb-1 text-xs font-semibold text-slate-500">
-              {t("seats.adjustment.amountLabel")}
+          <View className="mb-2 flex-row justify-between">
+            <Text className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              Original Total
             </Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="numbers-and-punctuation"
-              placeholder={t("seats.adjustment.amountPlaceholder")}
-              placeholderTextColor="#94a3b8"
-              className="text-2xl font-bold text-slate-900 dark:text-white"
-              autoFocus
-            />
+            <Text className="text-base font-semibold text-slate-900 dark:text-white">
+              ${baseAmount.toFixed(2)}
+            </Text>
           </View>
+          <View className="flex-row justify-between">
+            <Text className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              New Total
+            </Text>
+            <Text className="text-base font-semibold text-purple-600">
+              ${Number.isFinite(parseFloat(amount)) ? parseFloat(amount).toFixed(2) : targetAmount.toFixed(2)}
+            </Text>
+          </View>
+          {hasDifference && (
+            <View className="mt-3 flex-row justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
+              <Text className={`text-sm font-semibold ${difference > 0 ? "text-green-600" : "text-red-600"}`}>
+                {difference > 0 ? "Surcharge!" : "Discount"}
+              </Text>
+              <Text className={`text-sm font-semibold ${difference > 0 ? "text-green-600" : "text-red-600"}`}>
+                {difference > 0 ? "+" : "-"}${Math.abs(difference).toFixed(2)}
+              </Text>
+            </View>
+          )}
 
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Button label={t("common.cancel")} variant="ghost" onPress={onClose} />
-            </View>
-            <View className="flex-1">
-              <Button label={t("seats.adjustment.apply")} onPress={handleConfirm} />
-            </View>
-          </View>
-        </View>
+          {onTaxExemptChange && (
+            <TouchableOpacity
+              onPress={() => {
+                if (mode === "targetTotal") setDraftTaxExempt((enabled) => !enabled);
+                else onTaxExemptChange(!taxExempt);
+              }}
+              className={`mt-4 rounded-lg px-4 py-4 ${
+                (mode === "targetTotal" ? draftTaxExempt : taxExempt) ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"
+              }`}
+            >
+              <Text
+                className={`text-center text-base font-semibold ${
+                  (mode === "targetTotal" ? draftTaxExempt : taxExempt) ? "text-white" : "text-slate-800 dark:text-slate-100"
+                }`}
+              >
+                {(mode === "targetTotal" ? draftTaxExempt : taxExempt) ? "✓ Tax Exempt" : "Tax Exempt"}
+              </Text>
+            </TouchableOpacity>
+          )}
       </View>
-    </Modal>
+      )}
+    </KeypadAmountModal>
   );
 }

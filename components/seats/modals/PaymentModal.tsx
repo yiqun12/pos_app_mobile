@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { normalizeAmountInput } from "@/lib/pos/amountInput";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Modal, Text, TextInput, TouchableOpacity, View, ScrollView } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Text, TextInput, TouchableOpacity, View, ScrollView } from "react-native";
 
 interface PaymentModalProps {
   visible: boolean;
@@ -12,6 +13,7 @@ interface PaymentModalProps {
   remaining: number;
   onClose: () => void;
   onPayment: (method: "cash" | "card" | "split", amount: number) => void;
+  onCashPress?: () => void;
 }
 
 export function PaymentModal({
@@ -20,10 +22,9 @@ export function PaymentModal({
   remaining,
   onClose,
   onPayment,
+  onCashPress,
 }: PaymentModalProps) {
   const [amount, setAmount] = useState(remaining.toFixed(2));
-  const [splitMode, setSplitMode] = useState<"full" | "equal" | "item">("full");
-  const [splitCount, setSplitCount] = useState(2);
   
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
@@ -31,22 +32,11 @@ export function PaymentModal({
 
   useEffect(() => {
     if (visible) {
-        setAmount(remaining.toFixed(2));
-        setSplitMode("full");
+      setAmount(remaining.toFixed(2));
     }
   }, [visible, remaining]);
 
-  useEffect(() => {
-    if (splitMode === "equal") {
-        setAmount((remaining / splitCount).toFixed(2));
-    } else if (splitMode === "full") {
-        setAmount(remaining.toFixed(2));
-    }
-  }, [splitMode, splitCount, remaining]);
-
   const handlePay = (method: "cash" | "card" | "split") => {
-    // ...
-    // If split mode, we might handle differently, but for now just pass amount
     const numAmount = parseFloat(amount);
     if (!isNaN(numAmount) && numAmount > 0) {
       onPayment(method, numAmount);
@@ -61,6 +51,10 @@ export function PaymentModal({
       animationType="fade"
       onRequestClose={onClose}
     >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
       <View className="flex-1 justify-center items-center bg-black/60 p-4">
         <View className="w-full max-w-lg rounded-2xl bg-white p-0 overflow-hidden shadow-2xl dark:bg-slate-900">
           
@@ -74,59 +68,22 @@ export function PaymentModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView className="p-6">
-            {/* Split Toggles */}
-            <View className="flex-row bg-slate-100 p-1 rounded-xl mb-6 dark:bg-slate-800">
-                {(["full", "equal", "item"] as const).map((mode) => (
-                    <TouchableOpacity
-                        key={mode}
-                        onPress={() => setSplitMode(mode)}
-                        className={`flex-1 py-2 rounded-lg items-center ${splitMode === mode ? "bg-white shadow-sm dark:bg-slate-700" : ""}`}
-                    >
-                        <Text className={`font-semibold capitalize ${splitMode === mode ? "text-orange-600" : "text-slate-500"}`}>
-                            {mode === "full"
-                              ? t("seats.payment.fullPay")
-                              : mode === "equal"
-                                ? t("seats.payment.splitEqually")
-                                : t("seats.payment.splitByItem")}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Split Controls */}
-            {splitMode === "equal" && (
-                <View className="flex-row items-center justify-center gap-4 mb-6">
-                    <TouchableOpacity 
-                        onPress={() => setSplitCount(Math.max(2, splitCount - 1))}
-                        className="w-10 h-10 rounded-full bg-slate-200 items-center justify-center dark:bg-slate-700"
-                    >
-                        <Ionicons name="remove" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    <Text className="text-lg font-bold text-slate-900 dark:text-white">
-                      {t("seats.payment.peopleCount", { count: splitCount })}
-                    </Text>
-                    <TouchableOpacity 
-                        onPress={() => setSplitCount(splitCount + 1)}
-                        className="w-10 h-10 rounded-full bg-slate-200 items-center justify-center dark:bg-slate-700"
-                    >
-                        <Ionicons name="add" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                </View>
-            )}
-
+          <ScrollView className="p-4" keyboardShouldPersistTaps="handled">
             {/* Amount Display */}
-            <View className="items-center mb-8">
+            <View className="items-center mb-6">
                 <Text className="text-slate-500 mb-2 font-medium">
                   {t("seats.payment.amountToPay")}
                 </Text>
                 <View className="flex-row items-center">
-                    <Text className="text-4xl font-bold text-orange-600">$</Text>
+                    <Text className="text-3xl font-bold text-orange-600">$</Text>
                     <TextInput
                         value={amount}
-                        onChangeText={setAmount}
+                        onChangeText={(value) => {
+                          const normalized = normalizeAmountInput(value);
+                          if (normalized !== null) setAmount(normalized);
+                        }}
                         keyboardType="decimal-pad"
-                        className="text-5xl font-bold text-orange-600 ml-1 p-0"
+                        className="ml-1 p-0 text-4xl font-bold text-orange-600"
                         selectTextOnFocus
                     />
                 </View>
@@ -152,7 +109,14 @@ export function PaymentModal({
                     icon="cash"
                     size="lg"
                     className="bg-green-600 border-green-600"
-                    onPress={() => handlePay("cash")}
+                    onPress={() => {
+                      if (onCashPress) {
+                        onClose();
+                        onCashPress();
+                        return;
+                      }
+                      handlePay("cash");
+                    }}
                 />
                 <Button
                     label={t("seats.payment.otherMethods")}
@@ -164,6 +128,7 @@ export function PaymentModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

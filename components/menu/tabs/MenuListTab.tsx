@@ -1,14 +1,21 @@
 import { CategoryEditorModal } from "@/components/menu/modals/CategoryEditorModal";
-import { MenuEditorModal } from "@/components/menu/modals/MenuEditorModal";
+import { GlobalChangesModal } from "@/components/menu/modals/GlobalChangesModal";
+import {
+  MenuEditorModal,
+  type MenuEditorSavePayload,
+} from "@/components/menu/modals/MenuEditorModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Colors } from "@/constants/theme";
+import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
-import { db } from "@/lib/firebase";
-import { MenuCategory, MenuItem } from "@/types/menu";
+import {
+  coerceAvailabilityPeriods,
+  DEFAULT_MENU_IMAGE_URL,
+} from "@/lib/pos/menuTransforms";
+import { MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -16,6 +23,7 @@ import {
   Alert,
   FlatList,
   Image,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -24,223 +32,42 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface MenuListTabProps {
   onScanPress?: () => void;
+  focusFirstCategoryVersion?: number;
 }
 
-// Mock data for development/testing
-const MOCK_MENU_DATA = [
-  {
-    name: "Filet Mignon",
-    category: "Steak Cuts",
-    price: 45.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      {
-        id: "opt1",
-        name: "Doneness",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-      {
-        id: "opt2",
-        name: "Sauce",
-        type: "single",
-        required: false,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Extra Butter" },
-      { id: "add2", name: "Garlic" },
-      { id: "add3", name: "Truffle Oil" },
-    ],
-  },
-  {
-    name: "Rib Eye Steak",
-    category: "Steak Cuts",
-    price: 52.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      {
-        id: "opt1",
-        name: "Doneness",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Chimichurri" },
-      { id: "add2", name: "Sea Salt Crust" },
-    ],
-  },
-  {
-    name: "Margherita Pizza",
-    category: "Pizza",
-    price: 16.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      { id: "opt1", name: "Size", type: "single", required: true, choices: [] },
-      {
-        id: "opt2",
-        name: "Crust Type",
-        type: "single",
-        required: false,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Extra Cheese" },
-      { id: "add2", name: "Pepperoni" },
-      { id: "add3", name: "Basil" },
-    ],
-  },
-  {
-    name: "Caesar Salad",
-    category: "Salads",
-    price: 14.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [],
-    attributes2: [
-      { id: "add1", name: "Grilled Chicken" },
-      { id: "add2", name: "Shrimp" },
-      { id: "add3", name: "Bacon" },
-      { id: "add4", name: "Croutons" },
-    ],
-  },
-  {
-    name: "Grilled Salmon",
-    category: "Seafood",
-    price: 38.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      {
-        id: "opt1",
-        name: "Temperature",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Lemon Butter" },
-      { id: "add2", name: "Dill" },
-    ],
-  },
-  {
-    name: "Lobster Tail",
-    category: "Seafood",
-    price: 65.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [
-      { id: "opt1", name: "Size", type: "single", required: true, choices: [] },
-      {
-        id: "opt2",
-        name: "Cooking Style",
-        type: "single",
-        required: true,
-        choices: [],
-      },
-    ],
-    attributes2: [
-      { id: "add1", name: "Drawn Butter" },
-      { id: "add2", name: "Garlic" },
-    ],
-  },
-  {
-    name: "Chocolate Lava Cake",
-    category: "Desserts",
-    price: 9.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [],
-    attributes2: [
-      { id: "add1", name: "Vanilla Ice Cream" },
-      { id: "add2", name: "Whipped Cream" },
-      { id: "add3", name: "Berries" },
-    ],
-  },
-  {
-    name: "Tiramisu",
-    category: "Desserts",
-    price: 8.99,
-    image: "https://via.placeholder.com/150",
-    attributes: [],
-    attributes2: [],
-  },
-];
-
-/**
- * Parses menu items from Firestore's "key" field (JSON string)
- * Expected format: [{ name, category, price, image, ... }, ...]
- */
-function parseMenuData(jsonString: string): {
-  categories: MenuCategory[];
-  items: MenuItem[];
-} {
-  try {
-    if (!jsonString) {
-      return { categories: [], items: [] };
-    }
-
-    const parsed = JSON.parse(jsonString);
-    const categoriesMap = new Map<string, MenuCategory>();
-    const items: MenuItem[] = [];
-    let itemId = 1;
-    let categoryCount = 0;
-
-    if (Array.isArray(parsed)) {
-      parsed.forEach((item: any) => {
-        const categoryName = item.category || "Uncategorized";
-
-        if (!categoriesMap.has(categoryName)) {
-          categoriesMap.set(categoryName, {
-            id: `cat-${categoryCount + 1}`,
-            name: categoryName,
-          });
-          categoryCount++;
-        }
-
-        const categoryId = categoriesMap.get(categoryName)!.id;
-
-        items.push({
-          id: `item-${itemId++}`,
-          categoryId,
-          name: item.name || "Unknown Item",
-          price: parseFloat(item.price || 0),
-          description: item.description,
-          imageUrl: item.image,
-          optionGroups: item.attributes || item.optionGroups,
-          ingredients:
-            item.attributes2 || item.attributesArr || item.ingredients,
-        });
-      });
-    }
-
-    const categories = Array.from(categoriesMap.values());
-    return { categories, items };
-  } catch (error) {
-    console.error("Error parsing menu data:", error);
-    return { categories: [], items: [] };
-  }
-}
-
-export function MenuListTab({ onScanPress }: MenuListTabProps) {
+export function MenuListTab({
+  onScanPress,
+  focusFirstCategoryVersion = 0,
+}: MenuListTabProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
   const isTablet = responsive.isTablet;
   const insets = useSafeAreaInsets();
-  const floatingBottomOffset = (responsive.isTablet ? 124 : 116) + insets.bottom;
+  const bottomPadding = (responsive.isTablet ? 92 : 84) + insets.bottom;
 
-  // Menu state
-  const [categories, setCategories] = useState<MenuCategory[]>([]);
-  const [items, setItems] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dataNotice, setDataNotice] = useState<string | null>(null);
+  // Menu state from context
+  const {
+    categories,
+    items,
+    loading,
+    error,
+    saving,
+    saveError,
+    globalCustomizations,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    addItem,
+    updateItem,
+    deleteItem,
+    saveGlobalCustomizations,
+  } = useMenu();
+
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [globalModalVisible, setGlobalModalVisible] = useState(false);
 
   // Consolidated modal state
   const [itemModal, setItemModal] = useState<{
@@ -252,61 +79,33 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
   const [categoryModal, setCategoryModal] = useState<{
     visible: boolean;
     mode: "add" | "edit";
-    category: { id: string; name: string } | null;
+    category: { id: string; name: string; nameCN?: string } | null;
   }>({ visible: false, mode: "add", category: null });
 
-  // Responsive columns
-  const numColumns = responsive.isTablet ? 3 : 1;
+  const firstCategoryId = categories[0]?.id ?? "";
+  const selectedCategoryItem = categories.find((category) => category.id === selectedCategory);
 
-  // Fetch menu data from Firestore
+  // Auto-select the first category once data arrives.
   useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setDataNotice(null);
+    if (categories.length === 0 && selectedCategory) {
+      setSelectedCategory("");
+      return;
+    }
+    if (
+      categories.length > 0 &&
+      (!selectedCategory ||
+        !categories.some((category) => category.id === selectedCategory))
+    ) {
+      setSelectedCategory(categories[0].id);
+    }
+  }, [categories, selectedCategory]);
 
-        const docRef = doc(db, "TitleLogoNameContent", "aapp-sf-90011-38");
-        const docSnap = await getDoc(docRef);
-
-        const data = docSnap.exists()
-          ? (docSnap.data() as { key?: string })
-          : null;
-        const jsonData = data?.key || JSON.stringify(MOCK_MENU_DATA);
-        const usingMock = !docSnap.exists() || !data?.key;
-
-        console.log("jsonData: ", data);
-        const { categories: parsedCategories, items: parsedItems } =
-          parseMenuData(jsonData);
-
-        setCategories(parsedCategories);
-        setItems(parsedItems);
-        setDataNotice(
-          usingMock ? t("menu.menuCloudMissing") : null
-        );
-
-        if (parsedCategories.length > 0) {
-          setSelectedCategory(parsedCategories[0].id);
-        }
-      } catch (err: any) {
-        console.log("Error fetching menu (using mock):", err);
-        const { categories: parsedCategories, items: parsedItems } =
-          parseMenuData(JSON.stringify(MOCK_MENU_DATA));
-
-        setCategories(parsedCategories);
-        setItems(parsedItems);
-        setDataNotice(t("menu.menuDbFailed"));
-
-        if (parsedCategories.length > 0) {
-          setSelectedCategory(parsedCategories[0].id);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchMenu();
-  }, [t]);
+  useEffect(() => {
+    if (focusFirstCategoryVersion > 0 && firstCategoryId) {
+      setSelectedCategory(firstCategoryId);
+      setSearchQuery("");
+    }
+  }, [firstCategoryId, focusFirstCategoryVersion]);
 
   // Memoize filtered items to avoid recalculation
   const filteredItems = items.filter((item) => {
@@ -329,21 +128,24 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
     setItemModal({ visible: true, mode: "edit", item });
   };
 
-  const handleSaveItem = (name: string, price: number) => {
+  const handleSaveItem = async (payload: MenuEditorSavePayload) => {
     if (itemModal.mode === "add" && selectedCategory) {
-      const newItem: MenuItem = {
-        id: `item-${Date.now()}`,
+      const category = categories.find((item) => item.id === selectedCategory);
+      await addItem({
         categoryId: selectedCategory,
-        name,
-        price,
-      };
-      setItems((prev) => [...prev, newItem]);
+        categoryName: category?.name,
+        categoryNameCN: category?.nameCN,
+        ...payload,
+        attributesArr: payload.optionGroups ? undefined : {},
+      });
     } else if (itemModal.mode === "edit" && itemModal.item) {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemModal.item!.id ? { ...item, name, price } : item,
-        ),
-      );
+      const category = categories.find((item) => item.id === itemModal.item?.categoryId);
+      await updateItem(itemModal.item.id, {
+        categoryName: category?.name,
+        categoryNameCN: category?.nameCN,
+        ...payload,
+        attributesArr: payload.optionGroups ? undefined : {},
+      });
     }
     setItemModal({ visible: false, mode: "add", item: null });
   };
@@ -352,23 +154,25 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
     setCategoryModal({ visible: true, mode: "add", category: null });
   };
 
-  const handleEditCategoryPress = (id: string, name: string) => {
-    setCategoryModal({ visible: true, mode: "edit", category: { id, name } });
+  const handleEditCategoryPress = (id: string, name: string, nameCN?: string) => {
+    setCategoryModal({ visible: true, mode: "edit", category: { id, name, nameCN } });
   };
 
-  const handleSaveCategory = (name: string) => {
+  const handleRenameSelectedCategory = () => {
+    if (!selectedCategoryItem) return;
+    handleEditCategoryPress(
+      selectedCategoryItem.id,
+      selectedCategoryItem.name,
+      selectedCategoryItem.nameCN
+    );
+  };
+
+  const handleSaveCategory = async (payload: { name: string; nameCN?: string }) => {
     if (categoryModal.mode === "add") {
-      const newCategory: MenuCategory = {
-        id: `cat-${Date.now()}`,
-        name,
-      };
-      setCategories((prev) => [...prev, newCategory]);
+      const category = await addCategory(payload);
+      setSelectedCategory(category.id);
     } else if (categoryModal.mode === "edit" && categoryModal.category) {
-      setCategories((prev) =>
-        prev.map((cat) =>
-          cat.id === categoryModal.category!.id ? { ...cat, name } : cat,
-        ),
-      );
+      await updateCategory(categoryModal.category.id, payload);
     }
     setCategoryModal({ visible: false, mode: "add", category: null });
   };
@@ -379,8 +183,7 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
       {
         text: t("common.delete"),
         style: "destructive",
-        onPress: () =>
-          setItems((prev) => prev.filter((item) => item.id !== id)),
+        onPress: () => deleteItem(id),
       },
     ]);
   };
@@ -392,9 +195,8 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         text: t("common.delete"),
         style: "destructive",
         onPress: () => {
-          setCategories((prev) => prev.filter((cat) => cat.id !== id));
-          setItems((prev) => prev.filter((item) => item.categoryId !== id));
-          // Auto-select first category if available
+          deleteCategory(id);
+          // Auto-select first remaining category if available
           const remaining = categories.filter((c) => c.id !== id);
           setSelectedCategory(remaining[0]?.id || "");
         },
@@ -427,49 +229,80 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
-      {dataNotice ? (
-        <View className="border-b border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/30">
-          <Text className="text-sm font-medium text-amber-700 dark:text-amber-300">
-            {dataNotice}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Search Bar */}
+      {/* Toolbar */}
       <View 
-        className="py-2 border-b border-slate-100 dark:border-slate-800"
-        style={{ paddingHorizontal: responsive.mediumSpacing }}
+        className="border-b border-slate-100 bg-white py-3 dark:border-slate-800 dark:bg-slate-950"
+        style={{ paddingHorizontal: responsive.baseSpacing }}
       >
-        <Input 
+        {saveError ? (
+          <Text className="mb-2 text-sm font-semibold text-red-600">
+            {saveError}
+          </Text>
+        ) : null}
+        <View className="gap-3">
+          <Input
             placeholder={t("menu.searchPlaceholder")}
             icon="search"
             className="mb-0"
             value={searchQuery}
             onChangeText={setSearchQuery}
-        />
+          />
+          <View className="flex-row items-center justify-between gap-3">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="min-w-0 flex-1"
+              contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+            >
+              <Button
+                label={isTablet ? t("menu.aiScan") : "Scan"}
+                size="sm"
+                variant="outline"
+                icon="scan"
+                onPress={onScanPress}
+              />
+              <Button
+                label={isTablet ? "Global Changes" : "Global"}
+                size="sm"
+                variant="outline"
+                icon="settings-outline"
+                disabled={saving}
+                onPress={() => setGlobalModalVisible(true)}
+              />
+            </ScrollView>
+            <Button
+              label={isTablet ? "Add Item" : "Item"}
+              size="sm"
+              icon="add"
+              disabled={!selectedCategory || saving}
+              onPress={handleAddItemPress}
+            />
+          </View>
+        </View>
       </View>
 
       {/* Categories Sidebar/TopBar */}
-      <View className="border-b border-slate-200 bg-white py-3 dark:border-slate-800 dark:bg-slate-900">
-        <FlatList
-          horizontal
-          data={categories}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: responsive.mediumSpacing, gap: 12 }}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
+      <View className="border-b border-slate-200 bg-white py-2 dark:border-slate-800 dark:bg-slate-900">
+        <View className="flex-row items-center gap-2">
+          <FlatList
+            horizontal
+            data={categories}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingLeft: responsive.baseSpacing, gap: 10 }}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => setSelectedCategory(item.id)}
-              onLongPress={() => handleEditCategoryPress(item.id, item.name)}
+              onLongPress={() => handleEditCategoryPress(item.id, item.name, item.nameCN)}
               delayLongPress={500}
-              className={`pb-2 px-3 ${
+              className={`min-h-[44px] justify-center rounded-full border px-4 ${
                 selectedCategory === item.id
-                  ? "border-b-2 border-orange-500"
-                  : "border-b-2 border-transparent"
+                  ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                  : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
               }`}
             >
               <Text
-                style={{ fontSize: responsive.baseFontSize }}
+                style={{ fontSize: responsive.baseFontSize - 1 }}
                 className={`font-semibold ${
                   selectedCategory === item.id
                     ? "text-orange-600 dark:text-orange-400"
@@ -479,28 +312,37 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
                 {item.name}
               </Text>
             </TouchableOpacity>
-          )}
-          ListFooterComponent={
+            )}
+          />
+          <View className="mr-3 flex-row gap-2">
+            <TouchableOpacity
+              onPress={handleRenameSelectedCategory}
+              disabled={!selectedCategoryItem || saving}
+              className="h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+            >
+              <Ionicons name="create-outline" size={19} color={selectedCategoryItem ? colors.text : "#94a3b8"} />
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={handleAddCategoryPress}
-              className="px-3 pb-2 border-b-2 border-transparent opacity-50"
+              disabled={saving}
+              className="h-11 w-11 items-center justify-center rounded-full border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
             >
-              <Ionicons name="add" size={20} color={colors.text} />
+              <Ionicons name="add" size={21} color={colors.text} />
             </TouchableOpacity>
-          }
-        />
+          </View>
+        </View>
       </View>
 
       {/* Items Grid */}
       <FlatList
-        key={numColumns} // Force re-render on layout change
+        key="menu-list"
         data={filteredItems}
-        numColumns={numColumns}
+        numColumns={1}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{
-          padding: responsive.mediumSpacing,
-          paddingBottom: floatingBottomOffset + 92,
-          gap: numColumns > 1 ? responsive.mediumSpacing : 0,
+          padding: responsive.baseSpacing,
+          paddingBottom: bottomPadding,
+          gap: 10,
         }}
         ListEmptyComponent={
           <View className="items-center py-20">
@@ -520,125 +362,94 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         }
         renderItem={({ item }) => (
           <View 
-            className="rounded-xl border border-slate-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden"
-            style={
-              numColumns > 1
-                ? {
-                    flex: 1,
-                    marginHorizontal: responsive.mediumSpacing / 2,
-                    marginBottom: responsive.mediumSpacing,
-                  }
-                : { marginBottom: 16 }
-            }
+            className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
           >
-            {/* Image Placeholder */}
-            <View className="h-40 w-full items-center justify-center bg-slate-100 dark:bg-slate-800 relative">
-              {item.imageUrl ? (
+            <View
+              className="flex-row items-center p-3"
+              style={{ gap: isTablet ? 14 : 10 }}
+            >
+              <View
+                className="items-center justify-center overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800"
+                style={{
+                  width: isTablet ? 64 : 54,
+                  height: isTablet ? 64 : 54,
+                }}
+              >
                 <Image
-                  source={{ uri: item.imageUrl }}
+                  source={{ uri: item.imageUrl || DEFAULT_MENU_IMAGE_URL }}
                   className="h-full w-full"
                   resizeMode="cover"
                 />
-              ) : (
-                <Ionicons name="fast-food" size={48} color="#cbd5e1" />
-              )}
-              
-              {/* Floating Action Buttons on Card */}
-              <View className="absolute top-2 right-2 flex-row gap-2">
-                 <TouchableOpacity 
-                    className="bg-white/90 p-2 rounded-full shadow-sm dark:bg-slate-800/90"
-                    onPress={() => handleEditItemPress(item)}
-                 >
-                    <Ionicons name="pencil" size={16} color={colors.text} />
-                 </TouchableOpacity>
               </View>
 
-              {/* Stock Badge (Mock) */}
-              {Math.random() > 0.8 && (
-                  <View className="absolute bottom-2 right-2 bg-red-500 px-2 py-1 rounded">
-                      <Text
-                        className="text-white font-bold"
-                        style={{ fontSize: isTablet ? 13 : 12 }}
-                      >
-                        {t("menu.outOfStock")}
-                      </Text>
-                  </View>
-              )}
-            </View>
-
-            <View className="p-4">
-              <View className="flex-row justify-between items-start mb-2">
+              <View className="min-w-0 flex-1">
                 <Text
-                    style={{ fontSize: responsive.subheadingFontSize }}
-                    className="font-bold text-slate-900 dark:text-white flex-1 mr-2"
-                    numberOfLines={1}
+                  style={{ fontSize: isTablet ? 15 : responsive.baseFontSize }}
+                  className="font-bold text-slate-900 dark:text-white"
+                  numberOfLines={1}
                 >
-                    {item.name}
+                  {item.name}
                 </Text>
                 <Text
-                    style={{ fontSize: responsive.subheadingFontSize }}
-                    className="font-bold text-orange-500"
+                  style={{ fontSize: responsive.captionFontSize }}
+                  className="mt-1 text-slate-500 dark:text-slate-400"
+                  numberOfLines={1}
                 >
-                    ${item.price.toFixed(2)}
+                  {categories.find((category) => category.id === item.categoryId)?.name ?? ""}
+                </Text>
+                <Text className="mt-1 text-xs font-semibold text-slate-400" numberOfLines={1}>
+                  {coerceAvailabilityPeriods(item.availability).join(" / ") ||
+                    "Unavailable"}
                 </Text>
               </View>
-              
-              {/* Mock Stock Status */}
-              <View className="flex-row justify-between items-center mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
-                 <Text
-                   className="text-slate-500"
-                   style={{ fontSize: isTablet ? 14 : 12 }}
-                  >
-                    {t("menu.stockStatus")}
-                  </Text>
-                 <View className="flex-row items-center gap-2">
-                    <View className="w-8 h-4 bg-green-100 rounded-full items-end px-1 justify-center">
-                        <View className="w-2 h-2 bg-green-500 rounded-full" />
-                    </View>
-                    <Text
-                      className="text-green-600 font-medium"
-                      style={{ fontSize: isTablet ? 14 : 12 }}
-                    >
-                      {t("menu.inStock")}
-                    </Text>
-                 </View>
+
+              <View
+                className="items-end justify-center"
+                style={{ width: isTablet ? 84 : 62 }}
+              >
+                <Text
+                  style={{ fontSize: isTablet ? 16 : responsive.baseFontSize }}
+                  className="font-bold text-orange-600"
+                >
+                  ${item.price.toFixed(2)}
+                </Text>
+              </View>
+
+              <View className="flex-row justify-center gap-2">
+                <TouchableOpacity
+                  className="h-10 w-10 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800"
+                  disabled={saving}
+                  onPress={() => handleEditItemPress(item)}
+                >
+                  <Ionicons name="pencil" size={16} color={colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="h-10 w-10 items-center justify-center rounded-md bg-red-50 dark:bg-red-900/20"
+                  disabled={saving}
+                  onPress={() => handleDeleteItem(item.id, item.name)}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#dc2626" />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
         )}
       />
 
-      {/* Floating Action Buttons */}
-      <View
-        className="absolute right-6 items-end gap-4"
-        style={{ bottom: floatingBottomOffset }}
-      >
-        {/* AI Scanner FAB */}
-        <TouchableOpacity
-          onPress={onScanPress}
-          className="flex-row items-center rounded-full bg-indigo-600 px-4 py-3 shadow-lg"
-        >
-          <Ionicons name="scan" size={20} color="white" />
-          <Text className="ml-2 font-semibold text-white">{t("menu.aiScan")}</Text>
-        </TouchableOpacity>
-
-        {/* Add Item FAB */}
-        {selectedCategory && (
-          <TouchableOpacity
-            onPress={handleAddItemPress}
-            className="h-14 w-14 items-center justify-center rounded-full bg-orange-500 shadow-lg"
-          >
-            <Ionicons name="add" size={32} color="white" />
-          </TouchableOpacity>
-        )}
-      </View>
-
       {/* Modals */}
       <MenuEditorModal
         visible={itemModal.visible}
         mode={itemModal.mode}
+        initialItemId={itemModal.item?.id}
         initialName={itemModal.item?.name}
+        initialRawName={itemModal.item?.rawName}
+        initialNameCN={itemModal.item?.nameCN}
         initialPrice={itemModal.item?.price}
+        initialImageUrl={itemModal.item?.imageUrl}
+        initialAvailability={itemModal.item?.availability}
+        initialOptionGroups={itemModal.item?.optionGroups}
+        initialIngredients={itemModal.item?.ingredients}
+        saving={saving}
         onClose={() =>
           setItemModal({ visible: false, mode: "add", item: null })
         }
@@ -649,10 +460,20 @@ export function MenuListTab({ onScanPress }: MenuListTabProps) {
         visible={categoryModal.visible}
         mode={categoryModal.mode}
         initialName={categoryModal.category?.name}
+        initialNameCN={categoryModal.category?.nameCN}
+        saving={saving}
         onClose={() =>
           setCategoryModal({ visible: false, mode: "add", category: null })
         }
         onSave={handleSaveCategory}
+      />
+
+      <GlobalChangesModal
+        visible={globalModalVisible}
+        initialItems={globalCustomizations}
+        saving={saving}
+        onClose={() => setGlobalModalVisible(false)}
+        onSave={saveGlobalCustomizations}
       />
     </View>
   );

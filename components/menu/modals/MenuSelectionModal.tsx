@@ -3,8 +3,14 @@ import { Colors } from "@/constants/theme";
 import { useMenu } from "@/context/menu";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import {
+  DEFAULT_MENU_IMAGE_URL,
+  resolveMenuImageUrl,
+} from "@/lib/pos/menuTransforms";
+import { isTableTimingMenuItem } from "@/lib/pos/tableTiming";
 import { MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -29,24 +35,13 @@ export function MenuSelectionModal({
   onClose,
   onSelect,
 }: MenuSelectionModalProps) {
-  const { categories: ctxCategories, items: ctxItems, error } = useMenu();
+  const {
+    categories,
+    items,
+    loading,
+    error,
+  } = useMenu();
   const { t } = useTranslation();
-  
-  // 🌟 强行植入的假数据
-  const mockCategories = [
-    { id: "cat-1", name: "🥩 Steak Cuts" },
-    { id: "cat-2", name: "🍕 Pizza" }
-  ];
-  const mockItems: MenuItem[] = [
-    { id: "item-1", categoryId: "cat-1", name: "Filet Mignon", price: 45.99 },
-    { id: "item-2", categoryId: "cat-1", name: "Rib Eye Steak", price: 52.99 },
-    { id: "item-3", categoryId: "cat-2", name: "Margherita Pizza", price: 16.99 }
-  ];
-
-  // 如果管家没给数据，就用我们的假数据
-  const categories = ctxCategories?.length ? ctxCategories : mockCategories;
-  const items = ctxItems?.length ? ctxItems : mockItems;
-  const loading = false; // 🛑 强行叫停转圈圈！
   
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
@@ -56,6 +51,7 @@ export function MenuSelectionModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
+  const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set());
 
   const filteredItems = useMemo(() => {
     let result = items;
@@ -69,7 +65,41 @@ export function MenuSelectionModal({
     return result;
   }, [items, selectedCategory, searchQuery]);
 
+  const buildPlainOrderItem = (item: MenuItem): OrderItem => ({
+    id: `item-${Date.now()}`,
+    menuItemId: item.id,
+    name: item.name,
+    rawName: item.rawName,
+    nameCN: item.nameCN,
+    price: item.price,
+    quantity: 1,
+    imageUrl: item.imageUrl,
+    attributesArr: item.attributesArr,
+  });
+
+  const handleQuickAddItem = (item: MenuItem) => {
+    onSelect(buildPlainOrderItem(item));
+    onClose();
+  };
+
+  const handleItemEditPress = (item: MenuItem) => {
+    if (isTableTimingMenuItem(item)) {
+      handleQuickAddItem(item);
+      return;
+    }
+    setSelectedMenuItem(item);
+    setShowOptionsModal(true);
+  };
+
   const handleItemPress = (item: MenuItem) => {
+    if (isTableTimingMenuItem(item)) {
+      handleQuickAddItem(item);
+      return;
+    }
+
+    const hasWebAttributes = Object.values(item.attributesArr ?? {}).some(
+      (group) => (group.variations?.length ?? 0) > 0
+    );
     if (item.optionGroups && item.optionGroups.length > 0) {
       // Show options modal if item has customization options
       setSelectedMenuItem(item);
@@ -78,16 +108,12 @@ export function MenuSelectionModal({
       // Show options modal if item has ingredients
       setSelectedMenuItem(item);
       setShowOptionsModal(true);
+    } else if (hasWebAttributes) {
+      setSelectedMenuItem(item);
+      setShowOptionsModal(true);
     } else {
       // No options, add directly
-      const orderItem: OrderItem = {
-        id: `item-${Date.now()}`,
-        name: item.name,
-        price: item.price,
-        quantity: 1,
-      };
-      onSelect(orderItem);
-      onClose();
+      handleQuickAddItem(item);
     }
   };
 
@@ -120,9 +146,14 @@ export function MenuSelectionModal({
     // Create order item with selections
     const orderItem: OrderItem = {
       id: `item-${Date.now()}`,
+      menuItemId: selectedMenuItem.id,
       name: selectedMenuItem.name,
+      rawName: selectedMenuItem.rawName,
+      nameCN: selectedMenuItem.nameCN,
       price: selectedMenuItem.price + priceAdjustment,
       quantity: 1,
+      imageUrl: selectedMenuItem.imageUrl,
+      attributesArr: selectedMenuItem.attributesArr,
       selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
       selectedIngredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
       selectedGlobalCustomizations: selectedGlobalCustomizations && selectedGlobalCustomizations.length > 0 
@@ -235,6 +266,7 @@ export function MenuSelectionModal({
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                  keyboardShouldPersistTaps="handled"
                 >
                   <TouchableOpacity
                     onPress={() => setSelectedCategory(null)}
@@ -284,19 +316,35 @@ export function MenuSelectionModal({
               <ScrollView
                 className="flex-1 px-4"
                 contentContainerStyle={{ paddingBottom: 40 }}
+                keyboardShouldPersistTaps="handled"
               >
                 <View className="flex-row flex-wrap justify-between gap-y-4">
-                  {filteredItems.map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      onPress={() => handleItemPress(item)}
-                      className="w-[48%] rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:opacity-70 dark:border-slate-800 dark:bg-slate-900"
-                    >
-                      <View className="mb-2 h-24 w-full items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800">
-                        <Ionicons
-                          name="fast-food-outline"
-                          size={32}
-                          color={colors.tabIconDefault}
+                  {filteredItems.map((item) => {
+                    const isTableTimingItem = isTableTimingMenuItem(item);
+                    const imageKey = `${item.id}:${item.imageUrl ?? ""}`;
+                    const itemImageUrl = failedImageKeys.has(imageKey)
+                      ? DEFAULT_MENU_IMAGE_URL
+                      : resolveMenuImageUrl(item.imageUrl);
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => handleItemPress(item)}
+                        className="w-[48%] rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:opacity-70 dark:border-slate-800 dark:bg-slate-900"
+                      >
+                      <View className="mb-2 h-24 w-full overflow-hidden rounded-lg bg-slate-50 dark:bg-slate-800">
+                        <Image
+                          source={{ uri: itemImageUrl }}
+                          style={{ width: "100%", height: "100%" }}
+                          contentFit="cover"
+                          transition={120}
+                          onError={() => {
+                            if (itemImageUrl === DEFAULT_MENU_IMAGE_URL) return;
+                            setFailedImageKeys((current) => {
+                              const next = new Set(current);
+                              next.add(imageKey);
+                              return next;
+                            });
+                          }}
                         />
                       </View>
                       <Text
@@ -312,7 +360,46 @@ export function MenuSelectionModal({
                       >
                         ${item.price.toFixed(2)}
                       </Text>
-                      {(item.optionGroups?.length || 0) > 0 && (
+                      <View className="mt-3 flex-row items-center justify-between">
+                        <TouchableOpacity
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            if (isTableTimingItem) handleQuickAddItem(item);
+                            else handleItemEditPress(item);
+                          }}
+                          className={`flex-row items-center rounded-md border px-2.5 py-1.5 ${
+                            isTableTimingItem
+                              ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
+                              : "border-slate-400 dark:border-slate-600"
+                          }`}
+                        >
+                          <Ionicons
+                            name={isTableTimingItem ? "time-outline" : "create-outline"}
+                            size={14}
+                            color={isTableTimingItem ? "#2563eb" : colors.text}
+                          />
+                          <Text
+                            style={{ fontSize: responsive.captionFontSize }}
+                            className={`ml-1 font-semibold ${
+                              isTableTimingItem
+                                ? "text-blue-700 dark:text-blue-300"
+                                : "text-slate-800 dark:text-slate-200"
+                            }`}
+                          >
+                            {isTableTimingItem ? "Start Table" : "Edit"}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            handleQuickAddItem(item);
+                          }}
+                          className="h-8 w-8 items-center justify-center rounded-full border border-slate-400 dark:border-slate-600"
+                        >
+                          <Ionicons name="add" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                      </View>
+                      {!isTableTimingItem && (item.optionGroups?.length || 0) > 0 && (
                         <View className="mt-2 flex-row items-center">
                           <Ionicons
                             name="settings-outline"
@@ -327,8 +414,9 @@ export function MenuSelectionModal({
                           </Text>
                         </View>
                       )}
-                    </TouchableOpacity>
-                  ))}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 {filteredItems.length === 0 && (

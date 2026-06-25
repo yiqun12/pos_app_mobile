@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
+import { useAuth } from "@/context/auth";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,23 +17,26 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function EditProfileScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
-  const [name, setName] = useState("John Smith");
-  const [email, setEmail] = useState("john@restaurant.com");
-  const [phone, setPhone] = useState("555-0123");
+  const [name, setName] = useState(user?.email?.split("@")[0] ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      // P1: implement profile update (Firebase Auth updateProfile + Firestore user doc).
+      await new Promise((r) => setTimeout(r, 300));
       Alert.alert(
         t("common.success"),
-        t("settings.editProfile.alertSaved")
+        "Profile editing will be saved in P1."
       );
       router.back();
-    }, 1000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -59,6 +63,7 @@ export default function EditProfileScreen() {
               placeholder={t("settings.editProfile.emailPlaceholder")}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={false}
             />
 
             <Input

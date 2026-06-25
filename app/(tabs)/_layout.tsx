@@ -40,13 +40,14 @@ export default function TabLayout() {
             justifyContent: "center",
             alignItems: "center",
           },
-          tabBarLabelPosition: "beside-icon",
-          tabBarAllowFontScaling: true,
+          tabBarShowLabel: responsive.isTablet,
+          tabBarLabelPosition: responsive.isTablet ? "beside-icon" : "below-icon",
+          tabBarAllowFontScaling: false,
           tabBarLabelStyle: {
             fontSize: tabTokens.labelFontSize,
             lineHeight: tabTokens.labelLineHeight,
             fontWeight: "600",
-            textAlign: "left",
+            textAlign: responsive.isTablet ? "left" : "center",
           },
           tabBarIconStyle: {
             marginRight: tabTokens.iconMarginRight,

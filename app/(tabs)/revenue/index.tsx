@@ -1,19 +1,51 @@
-﻿import { StatCard } from "@/components/analytics/StatCard";
-import { DateRangeSelector } from "@/components/revenue/DateRangeSelector";
+import { StatCard } from "@/components/analytics/StatCard";
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
+import { RevenueBreakdownPieChart } from "@/components/revenue/RevenueBreakdownPieChart";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useModalAction } from "@/hooks/useModalAction";
+import { useStore } from "@/hooks/firestore/useStore";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
-import { useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/context/auth";
+import { useStoreSelection } from "@/context/store";
+import { db } from "@/lib/firebase";
+import {
+  deriveStoreTimeZone,
+  formatBusinessDayLabel,
+  getBusinessDayWindow,
+  type RevenueBusinessDayWindow,
+} from "@/lib/pos/revenueBusinessDay";
+import {
+  parseReceiptItems,
+  type RevenueDashboardSummary,
+  type RevenueOrderSummary,
+  summarizeRevenueDashboard,
+  summarizeRevenueStats,
+  transformSuccessPaymentSummary,
+} from "@/lib/pos/revenueTransforms";
+import { sliceRevenuePage } from "@/lib/pos/revenuePagination";
+import {
+  collection,
+  type DocumentData,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
+  startAfter,
+  where,
+} from "firebase/firestore";
 import {
   Alert,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -31,6 +63,8 @@ type Order = {
   tax?: number;
   gratuity?: number;
   total?: number;
+  dateTime?: string;
+  receiptData?: string;
 };
 
 type OrderItem = {
@@ -40,187 +74,257 @@ type OrderItem = {
   total: number;
 };
 
-const DEFAULT_RANGE = {
-  startDate: "01/01/2026",
-  endDate: "01/11/2026",
+const INITIAL_ORDERS: Order[] = [];
+const REVENUE_PAGE_SIZE = 100;
+const REVENUE_SUMMARY_PAGE_SIZE = 500;
+
+type RevenueTab = "orders" | "cash" | "sales";
+
+const REVENUE_TABS: Array<{ key: RevenueTab; labelKey: string }> = [
+  { key: "orders", labelKey: "revenue.tab.allOrders" },
+  { key: "cash", labelKey: "revenue.tab.cashDrawer" },
+  { key: "sales", labelKey: "revenue.tab.salesAnalysis" },
+];
+
+const EMPTY_DASHBOARD_SUMMARY: RevenueDashboardSummary = {
+  stats: summarizeRevenueStats([]),
+  cashDrawer: {
+    orderCount: 0,
+    cashSales: 0,
+    cardSales: 0,
+    unpaid: 0,
+    otherSales: 0,
+    total: 0,
+    averageOrder: 0,
+  },
+  itemSales: [],
+  revenueBreakdown: {
+    totalRevenue: 0,
+    totalParts: 0,
+    items: [
+      { key: "subtotal", label: "Subtotal", value: 0, percentage: 0, color: "#0088FE" },
+      { key: "tax", label: "Tax", value: 0, percentage: 0, color: "#00C49F" },
+      { key: "gratuity", label: "Cash Gratuity", value: 0, percentage: 0, color: "#FF8042" },
+      { key: "serviceFee", label: "Service Fee", value: 0, percentage: 0, color: "#9e2820" },
+      { key: "discount", label: "Discount", value: 0, percentage: 0, color: "#000000" },
+    ],
+  },
 };
 
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: "A1001",
-    guest: "Table 12",
-    time: "10:12 AM",
-    amount: 42.5,
-    channel: "Dine-In",
-    items: [
-      {
-        name: "Hot And Spicy Sichuan Style Chicken",
-        quantity: 1,
-        price: 16.95,
-        total: 16.95,
-      },
-      { name: "Beef Rice Noodle Rolls", quantity: 1, price: 6.8, total: 6.8 },
-      {
-        name: "3pc Leek and Pork Dumplings",
-        quantity: 1,
-        price: 7.2,
-        total: 7.2,
-      },
-      {
-        name: "Garlic Romaine Lettuce (A choy)",
-        quantity: 1,
-        price: 15.0,
-        total: 15.0,
-      },
-      {
-        name: "Ginkgo and Scallop Congee (Porridge)",
-        quantity: 1,
-        price: 8.5,
-        total: 8.5,
-      },
-      {
-        name: "Eel Claypot Crispy Rice",
-        quantity: 1,
-        price: 15.8,
-        total: 15.8,
-      },
-    ],
-    subtotal: 70.25,
-    serviceFee: 10.54,
-    tax: 6.06,
-    gratuity: 0.0,
-    total: 86.85,
+const styles = StyleSheet.create({
+  segmentedTabsScroll: {
+    flexGrow: 0,
+    height: 48,
   },
-  {
-    id: "A1002",
-    guest: "DoorDash",
-    time: "10:30 AM",
-    amount: 28.0,
-    channel: "Pickup",
-    items: [
-      { name: "Beef Rice Noodle Rolls", quantity: 2, price: 6.8, total: 13.6 },
-      { name: "Spring Rolls", quantity: 1, price: 5.0, total: 5.0 },
-    ],
-    subtotal: 18.6,
-    serviceFee: 2.79,
-    tax: 1.61,
-    gratuity: 5.0,
-    total: 28.0,
+  segmentedTabsContent: {
+    alignItems: "center",
+    borderRadius: 10,
+    minHeight: 48,
+    padding: 4,
   },
-  {
-    id: "A1003",
-    guest: "Table 4",
-    time: "11:05 AM",
-    amount: 65.75,
-    channel: "Dine-In",
+  segmentedTab: {
+    alignItems: "center",
+    height: 40,
+    justifyContent: "center",
+    minWidth: 128,
+    borderRadius: 8,
+    paddingHorizontal: 16,
   },
-  {
-    id: "A1004",
-    guest: "Uber Eats",
-    time: "11:25 AM",
-    amount: 33.25,
-    channel: "Delivery",
+  segmentedTabActive: {
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  {
-    id: "A1005",
-    guest: "Table 2",
-    time: "12:10 PM",
-    amount: 85.0,
-    channel: "Dine-In",
+  segmentedTabText: {
+    fontWeight: "600",
+    textAlign: "center",
   },
-];
+});
 
 export default function RevenueScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
   const isPhone = !responsive.isTablet;
-  const tabFontSize = responsive.isTablet ? 17 : 14;
+  const tabFontSize = responsive.isTablet ? 13 : 12;
   const { t } = useTranslation();
 
-  const PRESETS = useMemo(
-    () => [
-      { label: t("revenue.preset.today"), startDate: "01/11/2026", endDate: "01/11/2026" },
-      {
-        label: t("revenue.preset.yesterday"),
-        startDate: "01/10/2026",
-        endDate: "01/10/2026",
-      },
-      { label: t("revenue.preset.january"), startDate: "01/01/2026", endDate: "01/31/2026" },
-      {
-        label: t("revenue.preset.december"),
-        startDate: "12/01/2025",
-        endDate: "12/31/2025",
-      },
-    ],
-    [t]
+  const { user } = useAuth();
+  const { currentStoreId } = useStoreSelection();
+  const { data: store } = useStore();
+  const storeTimeZone = useMemo(
+    () => deriveStoreTimeZone(store?.address.zip, store?.address.state),
+    [store?.address.state, store?.address.zip]
   );
 
-  const tabs = useMemo(
-    () => [
-      t("revenue.tab.allOrders"),
-      t("revenue.tab.cashDrawer"),
-      t("revenue.tab.salesAnalysis"),
-    ] as const,
-    [t]
-  );
-
-  const [dateRange, setDateRange] = useState(DEFAULT_RANGE);
-  const [selectedPreset, setSelectedPreset] = useState<string | null>(
-    t("revenue.preset.today")
-  );
-  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>(tabs[0]);
+  const [businessDayWindow, setBusinessDayWindow] = useState(() => getBusinessDayWindow(new Date(), storeTimeZone));
+  const [activeTab, setActiveTab] = useState<RevenueTab>("orders");
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [dashboardSummary, setDashboardSummary] = useState<RevenueDashboardSummary>(EMPTY_DASHBOARD_SUMMARY);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
+  const [lastOrderDoc, setLastOrderDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderModalVisible, setOrderModalVisible] = useState(false);
 
-  const total = useMemo(
-    () => orders.reduce((sum, order) => sum + order.amount, 0).toFixed(2),
-    [orders]
-  );
+  const fetchRevenuePage = React.useCallback(async ({
+    append = false,
+    afterDoc = null,
+    windowOverride,
+  }: {
+    append?: boolean;
+    afterDoc?: QueryDocumentSnapshot<DocumentData> | null;
+    windowOverride?: RevenueBusinessDayWindow;
+  } = {}) => {
+    if (!user || !currentStoreId) return;
 
-  const handlePreset = (label: string) => {
-    const preset = PRESETS.find((p) => p.label === label);
-    if (!preset) return;
-    setSelectedPreset(label);
-    setDateRange({ startDate: preset.startDate, endDate: preset.endDate });
+    const window = windowOverride ?? businessDayWindow;
+
+    if (!append) setLoadingOrders(true);
+    else setLoadingMoreOrders(true);
+
+    try {
+      const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
+      const constraints: QueryConstraint[] = [
+        where("dateTime", ">=", window.start),
+        where("dateTime", "<=", window.end),
+        orderBy("dateTime", "desc"),
+      ];
+
+      if (afterDoc) constraints.push(startAfter(afterDoc));
+      constraints.push(limit(REVENUE_PAGE_SIZE + 1));
+
+      const snapshot = await getDocs(query(colRef, ...constraints));
+      const page = sliceRevenuePage(snapshot.docs, REVENUE_PAGE_SIZE);
+      const fetched: Order[] = page.rows.map((docSnap) => {
+        const data = docSnap.data();
+        return transformSuccessPaymentSummary(docSnap.id, data);
+      });
+
+      setOrders((prev) => append ? [...prev, ...fetched] : fetched);
+      setLastOrderDoc(page.rows[page.rows.length - 1] ?? null);
+      setHasMoreOrders(page.hasMore);
+    } catch (err) {
+      console.error("Error loading success_payment:", err);
+      if (!append) setOrders([]);
+      Alert.alert(t("common.error"), "Failed to load revenue orders");
+    } finally {
+      if (!append) setLoadingOrders(false);
+      else setLoadingMoreOrders(false);
+    }
+  }, [businessDayWindow, currentStoreId, t, user]);
+
+  const fetchRevenueSummary = React.useCallback(async (
+    windowOverride?: RevenueBusinessDayWindow
+  ) => {
+    if (!user || !currentStoreId) return;
+
+    const window = windowOverride ?? businessDayWindow;
+    setLoadingSummary(true);
+
+    try {
+      const colRef = collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment");
+      const allOrders: RevenueOrderSummary[] = [];
+      let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+
+      while (true) {
+        const constraints: QueryConstraint[] = [
+          where("dateTime", ">=", window.start),
+          where("dateTime", "<=", window.end),
+          orderBy("dateTime", "desc"),
+          limit(REVENUE_SUMMARY_PAGE_SIZE),
+        ];
+
+        if (cursor) constraints.push(startAfter(cursor));
+
+        const snapshot = await getDocs(query(colRef, ...constraints));
+        allOrders.push(
+          ...snapshot.docs.map((docSnap) =>
+            transformSuccessPaymentSummary(docSnap.id, docSnap.data())
+          )
+        );
+
+        if (snapshot.docs.length < REVENUE_SUMMARY_PAGE_SIZE) break;
+        cursor = snapshot.docs[snapshot.docs.length - 1];
+      }
+
+      setDashboardSummary(summarizeRevenueDashboard(allOrders));
+    } catch (err) {
+      console.error("Error loading success_payment summary:", err);
+      setDashboardSummary(EMPTY_DASHBOARD_SUMMARY);
+      Alert.alert(t("common.error"), "Failed to load revenue summary");
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [businessDayWindow, currentStoreId, t, user]);
+
+  // Load from Firestore success_payment
+  useEffect(() => {
+    setOrders([]);
+    setDashboardSummary(EMPTY_DASHBOARD_SUMMARY);
+    setLastOrderDoc(null);
+    setHasMoreOrders(false);
+    void fetchRevenuePage();
+    void fetchRevenueSummary();
+  }, [fetchRevenuePage, fetchRevenueSummary]);
+
+  const stats = dashboardSummary.stats;
+  const total = stats.totalRevenue;
+  const cashDrawerSummary = dashboardSummary.cashDrawer;
+  const itemSales = dashboardSummary.itemSales;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const nextBusinessDayWindow = getBusinessDayWindow(new Date(), storeTimeZone);
+      if (
+        nextBusinessDayWindow.start !== businessDayWindow.start ||
+        nextBusinessDayWindow.end !== businessDayWindow.end
+      ) {
+        setBusinessDayWindow(nextBusinessDayWindow);
+      }
+      await Promise.all([
+        fetchRevenuePage({ windowOverride: nextBusinessDayWindow }),
+        fetchRevenueSummary(nextBusinessDayWindow),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setOrders((prev) => {
-        const rotated = [...prev.slice(1), prev[0]];
-        return rotated;
-      });
-      setRefreshing(false);
-    }, 600);
+  const businessDayLabel = useMemo(
+    () => formatBusinessDayLabel(businessDayWindow, storeTimeZone),
+    [businessDayWindow, storeTimeZone]
+  );
+
+  useEffect(() => {
+    setBusinessDayWindow(getBusinessDayWindow(new Date(), storeTimeZone));
+  }, [storeTimeZone]);
+
+  const handleLoadMoreOrders = () => {
+    if (!lastOrderDoc || !hasMoreOrders || loadingOrders || loadingMoreOrders) return;
+    void fetchRevenuePage({ append: true, afterDoc: lastOrderDoc });
+  };
+
+  const handleRevenueScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (activeTab !== "orders") return;
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+    if (distanceFromBottom < 180) handleLoadMoreOrders();
   };
 
   const handleOrderPress = (order: Order) => {
-    setSelectedOrder(order);
+    setSelectedOrder({
+      ...order,
+      items: order.items ?? parseReceiptItems(order.receiptData),
+    });
     setOrderModalVisible(true);
   };
-
-  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
-
-  useModalAction((modalName) => {
-    if (modalName === "orderDetail") {
-      if (orderId) {
-        const targetOrder = orders.find((o) => o.id === orderId);
-        if (targetOrder) {
-          setSelectedOrder(targetOrder);
-          setOrderModalVisible(true);
-        } else {
-          Alert.alert(t("common.error"), t("revenue.orderNotFound", { orderId }));
-        }
-      } else if (orders.length > 0) {
-        setSelectedOrder(orders[0]);
-        setOrderModalVisible(true);
-      }
-    }
-  });
 
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
@@ -236,6 +340,8 @@ export default function RevenueScreen() {
           padding: responsive.mediumSpacing,
         }}
         showsVerticalScrollIndicator={false}
+        onScroll={handleRevenueScroll}
+        scrollEventThrottle={200}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -244,17 +350,17 @@ export default function RevenueScreen() {
           />
         }
       >
-        <DateRangeSelector
-          dateRange={dateRange}
-          selectedPreset={selectedPreset}
-          presets={PRESETS}
-          colors={colors}
-          onPresetSelect={handlePreset}
-          onDateChange={(range) => {
-            setDateRange(range);
-            setSelectedPreset(null);
-          }}
-        />
+        <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <Text className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+            {t("revenue.businessDay")}
+          </Text>
+          <Text className="mt-1 text-base font-bold text-slate-900 dark:text-white">
+            {businessDayLabel}
+          </Text>
+          <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {loadingSummary ? t("common.loading") : t("revenue.businessDayHint")}
+          </Text>
+        </View>
 
         {isPhone ? (
           <ScrollView
@@ -264,97 +370,165 @@ export default function RevenueScreen() {
             contentContainerStyle={{ gap: responsive.baseSpacing }}
           >
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalRevenue")} value={`$${total}`} trend="+12.5%" trendUp={true} />
+              <StatCard title={t("revenue.totalRevenue")} value={loadingSummary ? "..." : `$${stats.totalRevenue}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.netSales")} value="$130,500.00" trend="+10.2%" trendUp={true} />
+              <StatCard title={t("revenue.netSales")} value={loadingSummary ? "..." : `$${stats.netSales}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.tax")} value="$12,040.22" trend="+5.4%" trendUp={true} />
+              <StatCard title={t("revenue.tax")} value={loadingSummary ? "..." : `$${stats.tax}`} />
             </View>
             <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalTips")} value="$5,225.06" trend="+2.1%" trendUp={true} />
+              <StatCard title={t("revenue.totalTips")} value={loadingSummary ? "..." : `$${stats.tips}`} />
             </View>
           </ScrollView>
         ) : (
           <View className="flex-row gap-4">
             <View className="flex-1">
-              <StatCard title={t("revenue.totalRevenue")} value={`$${total}`} trend="+12.5%" trendUp={true} />
+              <StatCard title={t("revenue.totalRevenue")} value={loadingSummary ? "..." : `$${stats.totalRevenue}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.netSales")} value="$130,500.00" trend="+10.2%" trendUp={true} />
+              <StatCard title={t("revenue.netSales")} value={loadingSummary ? "..." : `$${stats.netSales}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.tax")} value="$12,040.22" trend="+5.4%" trendUp={true} />
+              <StatCard title={t("revenue.tax")} value={loadingSummary ? "..." : `$${stats.tax}`} />
             </View>
             <View className="flex-1">
-              <StatCard title={t("revenue.totalTips")} value="$5,225.06" trend="+2.1%" trendUp={true} />
+              <StatCard title={t("revenue.totalTips")} value={loadingSummary ? "..." : `$${stats.tips}`} />
             </View>
           </View>
         )}
 
         <ScrollView
-          horizontal={isPhone}
+          horizontal
+          style={styles.segmentedTabsScroll}
           showsHorizontalScrollIndicator={false}
           bounces={false}
-          contentContainerStyle={{
-            gap: responsive.smallSpacing,
-            borderBottomWidth: 1,
-            borderBottomColor: colorScheme === "dark" ? "#1e293b" : "#e2e8f0",
-          }}
+          contentContainerStyle={[
+            styles.segmentedTabsContent,
+            {
+              gap: responsive.smallSpacing,
+              backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f1f5f9",
+            },
+          ]}
         >
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab;
+          {REVENUE_TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
             return (
               <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                className={`px-4 py-2 border-b-2 ${
-                  isActive ? "border-orange-500" : "border-transparent"
-                }`}
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
+                style={[
+                  styles.segmentedTab,
+                  {
+                    backgroundColor: isActive
+                      ? colorScheme === "dark" ? "#1e293b" : "#ffffff"
+                      : "transparent",
+                  },
+                  isActive && styles.segmentedTabActive,
+                ]}
               >
                 <Text
                   numberOfLines={1}
-                  className={`font-semibold ${
-                    isActive ? "text-orange-600" : "text-slate-500"
-                  }`}
-                  style={{ fontSize: tabFontSize }}
+                  style={[
+                    styles.segmentedTabText,
+                    {
+                      fontSize: tabFontSize,
+                      color: isActive ? "#ea580c" : "#64748b",
+                    },
+                  ]}
                 >
-                  {tab}
+                  {t(tab.labelKey)}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
-        {activeTab === tabs[0] && (
+        {activeTab === "orders" && (
           <OrdersList
             orders={orders}
             total={total}
             colors={colors}
+            loading={loadingOrders}
+            loadingMore={loadingMoreOrders}
+            hasMore={hasMoreOrders}
             onOrderPress={handleOrderPress}
+            onLoadMore={handleLoadMoreOrders}
           />
         )}
 
-        {activeTab === tabs[1] && (
+        {activeTab === "cash" && (
           <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <Text className="mb-1 text-base font-semibold text-slate-900 dark:text-white">
+            <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.cashDrawer")}
             </Text>
-            <Text className="text-sm text-slate-500 dark:text-slate-400">
-              {t("revenue.cashDrawerPlaceholder")}
-            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              {[
+                ["Orders", cashDrawerSummary.orderCount.toString()],
+                ["Cash", `$${cashDrawerSummary.cashSales.toFixed(2)}`],
+                ["Card", `$${cashDrawerSummary.cardSales.toFixed(2)}`],
+                ["Unpaid", `$${cashDrawerSummary.unpaid.toFixed(2)}`],
+                ["Other", `$${cashDrawerSummary.otherSales.toFixed(2)}`],
+                ["Avg", `$${cashDrawerSummary.averageOrder.toFixed(2)}`],
+              ].map(([label, value]) => (
+                <View
+                  key={label}
+                  className="min-w-[45%] flex-1 rounded-lg bg-slate-50 p-3 dark:bg-slate-800"
+                >
+                  <Text className="text-xs font-semibold uppercase text-slate-500">
+                    {label}
+                  </Text>
+                  <Text className="mt-1 text-lg font-bold text-slate-900 dark:text-white">
+                    {value}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
-        {activeTab === tabs[2] && (
+        {activeTab === "sales" && (
           <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <Text className="mb-1 text-base font-semibold text-slate-900 dark:text-white">
+            <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.salesAnalysis")}
             </Text>
-            <Text className="text-sm text-slate-500 dark:text-slate-400">
-              {t("revenue.salesAnalysisPlaceholder")}
-            </Text>
+            <RevenueBreakdownPieChart
+              revenueBreakdown={dashboardSummary.revenueBreakdown}
+              loading={loadingSummary}
+            />
+            {itemSales.length === 0 ? (
+              <Text className="text-sm text-slate-500 dark:text-slate-400">
+                {t("revenue.salesAnalysisPlaceholder")}
+              </Text>
+            ) : (
+              <View>
+                <View className="mb-2 flex-row border-b border-slate-100 pb-2 dark:border-slate-800">
+                  <Text className="flex-1 text-xs font-bold uppercase text-slate-500">Item</Text>
+                  <Text className="w-16 text-right text-xs font-bold uppercase text-slate-500">Qty</Text>
+                  <Text className="w-24 text-right text-xs font-bold uppercase text-slate-500">Revenue</Text>
+                </View>
+                {itemSales.map((item) => (
+                  <View
+                    key={item.name}
+                    className="flex-row border-b border-slate-100 py-2 dark:border-slate-800"
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className="flex-1 font-medium text-slate-900 dark:text-white"
+                    >
+                      {item.name}
+                    </Text>
+                    <Text className="w-16 text-right text-slate-600 dark:text-slate-300">
+                      {item.quantity}
+                    </Text>
+                    <Text className="w-24 text-right font-semibold text-slate-900 dark:text-white">
+                      ${item.revenue.toFixed(2)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>

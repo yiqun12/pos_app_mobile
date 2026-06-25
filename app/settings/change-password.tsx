@@ -1,7 +1,13 @@
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
+import { auth } from "@/lib/firebase";
 import { useRouter } from "expo-router";
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from "firebase/auth";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,33 +28,43 @@ export default function ChangePasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (newPassword !== confirmPassword) {
-      Alert.alert(
-        t("common.error"),
-        t("settings.changePassword.passwordMismatch")
-      );
+      Alert.alert(t("common.error"), t("settings.changePassword.passwordMismatch"));
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert(t("common.error"), t("settings.changePassword.passwordTooShort"));
       return;
     }
 
-    if (newPassword.length < 6) {
-      Alert.alert(
-        t("common.error"),
-        t("settings.changePassword.passwordTooShort")
-      );
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) {
+      Alert.alert(t("common.error"), "Not signed in.");
       return;
     }
 
     setSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      setSaving(false);
-      Alert.alert(
-        t("common.success"),
-        t("settings.changePassword.passwordUpdated")
-      );
+    try {
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, newPassword);
+      Alert.alert(t("common.success"), t("settings.changePassword.passwordUpdated"));
       router.back();
-    }, 1000);
+    } catch (err: any) {
+      const code = err?.code as string | undefined;
+      let msg = err?.message ?? "Failed to update password.";
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        msg = "Current password is incorrect.";
+      } else if (code === "auth/weak-password") {
+        msg = "Password is too weak.";
+      } else if (code === "auth/network-request-failed") {
+        msg = "Network error. Check your connection.";
+      }
+      Alert.alert(t("common.error"), msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

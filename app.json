@@ -1,16 +1,30 @@
 {
   "expo": {
-    "name": "7dollar-pos-app",
+    "name": "7Dollar POS",
     "slug": "7dollar-pos-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "sevendollarposapp",
+    "icon": "./assets/images/app-icon.png",
+    "scheme": [
+      "sevendollarposapp",
+      "com.googleusercontent.apps.579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en"
+    ],
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "updates": {
+      "url": "https://u.expo.dev/3b6fb366-c8c3-4073-8783-455ecfe3a5f2",
+      "checkAutomatically": "ON_ERROR_RECOVERY"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sevendollar.pos"
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.sevendollar.pos",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.sevendollar.pos",
@@ -42,7 +56,27 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "expo-apple-authentication",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPods": [
+              {
+                "name": "GoogleUtilities",
+                "modular_headers": true
+              },
+              {
+                "name": "RecaptchaInterop",
+                "modular_headers": true
+              }
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -51,7 +85,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "22d0b918-97fd-441b-b7da-329ff353cb58"
+        "projectId": "3b6fb366-c8c3-4073-8783-455ecfe3a5f2"
+      },
+      "googleAuth": {
+        "webClientId": "579212375301-m68l020er9v91lhg225cv1me5pm86tsi.apps.googleusercontent.com",
+        "iosClientId": "579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en.apps.googleusercontent.com",
+        "androidClientId": "579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en.apps.googleusercontent.com"
       }
     }
   }

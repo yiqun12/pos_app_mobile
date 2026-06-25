@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { normalizeAmountInput } from "@/lib/pos/amountInput";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface PriceEditModalProps {
   visible: boolean;
@@ -41,6 +42,10 @@ export function PriceEditModal({
       animationType="fade"
       onShow={() => setPrice(initialPrice.toString())}
     >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
       <View className="flex-1 items-center justify-center bg-black/50 p-4">
         <View className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-slate-900">
           <View className="flex-row items-center justify-between mb-4">
@@ -63,7 +68,10 @@ export function PriceEditModal({
             </Text>
             <TextInput
               value={price}
-              onChangeText={setPrice}
+              onChangeText={(value) => {
+                const normalized = normalizeAmountInput(value);
+                if (normalized !== null) setPrice(normalized);
+              }}
               keyboardType="decimal-pad"
               className="text-2xl font-bold text-slate-900 dark:text-white"
               autoFocus
@@ -81,6 +89,7 @@ export function PriceEditModal({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -1,18 +1,18 @@
 import { useWindowDimensions } from "react-native";
 
 // ─── 字体缩放倍率配置 ──────────────────────────────────────────
-// 手机端永远是 1.0（不受影响），只需在这里调整平板倍率
+// Keep typography dense enough for POS screens; touch targets stay large.
 const FONT_SCALE = {
   phone:       1.0,
-  tablet:      1.35,  // 平板放大 35%
-  largeTablet: 1.5,   // 大平板放大 50%
+  tablet:      1.08,
+  largeTablet: 1.14,
 };
 
 const PHONE_FONTS = {
-  base:       16,
-  heading:    28,
-  subheading: 16,
-  caption:    12,
+  base:       15,
+  heading:    22,
+  subheading: 15,
+  caption:    11,
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ export function useResponsiveLayout(): ResponsiveValues {
   const seatSize = isTablet ? 90 : 80;
   const seatBorderRadius = isTablet ? 20 : 16;
 
-  // Font sizes - scale up for tablet readability
+  // Font sizes - tablet gets slightly more presence without bloating dense POS screens.
   const scale = isLargeTablet
     ? FONT_SCALE.largeTablet
     : isTablet
@@ -70,18 +70,18 @@ export function useResponsiveLayout(): ResponsiveValues {
   const captionFontSize    = Math.round(PHONE_FONTS.caption     * scale);
 
   // Spacing & Padding
-  const baseSpacing = isLargeTablet ? 20 : isTablet ? 16 : 12;
-  const smallSpacing = isLargeTablet ? 12 : isTablet ? 10 : 8;
-  const mediumSpacing = isLargeTablet ? 24 : isTablet ? 20 : 16;
-  const largeSpacing = isLargeTablet ? 32 : isTablet ? 28 : 24;
+  const baseSpacing = isLargeTablet ? 16 : isTablet ? 14 : 12;
+  const smallSpacing = isLargeTablet ? 10 : isTablet ? 9 : 8;
+  const mediumSpacing = isLargeTablet ? 20 : isTablet ? 18 : 16;
+  const largeSpacing = isLargeTablet ? 28 : isTablet ? 24 : 22;
 
   // Button sizing - larger touch targets
-  const buttonPaddingX = isLargeTablet ? 28 : isTablet ? 24 : 16;
-  const buttonPaddingY = isLargeTablet ? 16 : isTablet ? 14 : 10;
-  const buttonIconSize = isLargeTablet ? 28 : isTablet ? 24 : 20;
+  const buttonPaddingX = isLargeTablet ? 20 : isTablet ? 18 : 14;
+  const buttonPaddingY = isLargeTablet ? 12 : isTablet ? 11 : 9;
+  const buttonIconSize = isLargeTablet ? 22 : isTablet ? 21 : 19;
 
   // Minimum touch target size per accessibility guidelines (44pt on iPhone)
-  const minTouchTargetSize = isTablet ? 52 : 44;
+  const minTouchTargetSize = isTablet ? 48 : 44;
 
   return {
     isTablet,

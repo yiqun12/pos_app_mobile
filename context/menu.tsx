@@ -1,39 +1,40 @@
 
-import { GlobalCustomization, GlobalCustomizationGroup, MenuCategory, MenuItem } from "@/types/menu";
-import React, { createContext, useContext, useState } from "react";
-
-/* ---------- Fallback Data ---------- */
-const FALLBACK_CATEGORIES: MenuCategory[] = [
-  { id: "c1", name: "Appetizers" },
-  { id: "c2", name: "Main Courses" },
-  { id: "c3", name: "Dim Sum" },
-  { id: "c4", name: "Beverages" },
-];
-
-const FALLBACK_ITEMS: MenuItem[] = [
-  { id: "m1", categoryId: "c1", name: "Spring Rolls", price: 5 },
-  { id: "m2", categoryId: "c1", name: "Garlic Romaine Lettuce", price: 15 },
-  { id: "m3", categoryId: "c2", name: "Sichuan Style Chicken", price: 16.95 },
-  { id: "m4", categoryId: "c2", name: "Eel Claypot Crispy Rice", price: 15.8 },
-  { id: "m5", categoryId: "c3", name: "Beef Rice Noodle Rolls", price: 6.8 },
-  { id: "m6", categoryId: "c3", name: "Pork Dumplings (3pc)", price: 7.2 },
-  { id: "m7", categoryId: "c3", name: "Scallop Congee", price: 8.5 },
-];
-
-/* ---------- Fallback Global Customizations ---------- */
-const FALLBACK_GLOBAL_CUSTOMIZATIONS: GlobalCustomization[] = [
-  { id: "gc-1", type: "外卖", price: 0, typeCategory: "要求添加" },
-  { id: "gc-2", type: "加酱料", price: 0, typeCategory: "要求添加" },
-  { id: "gc-3", type: "加饭", price: 0, typeCategory: "要求添加" },
-  { id: "gc-4", type: "加辣", price: 0, typeCategory: "要求添加" },
-  { id: "gc-5", type: "加葱", price: 0, typeCategory: "要求添加" },
-  { id: "gc-6", type: "堂食", price: 0, typeCategory: "要求减少" },
-  { id: "gc-7", type: "不要酱料", price: 0, typeCategory: "要求减少" },
-  { id: "gc-8", type: "不要辣", price: 0, typeCategory: "要求减少" },
-  { id: "gc-9", type: "不要葱", price: 0, typeCategory: "要求减少" },
-];
+import { useAuth } from "@/context/auth";
+import { useStoreSelection } from "@/context/store";
+import { useStore } from "@/hooks/firestore/useStore";
+import { useMenu as useFirestoreMenu } from "@/hooks/firestore/useMenu";
+import { fetchStore } from "@/lib/firestore/repositories/store";
+import {
+  updateGlobalModifications as persistGlobalModifications,
+  updateMenu as persistMenu,
+} from "@/lib/firestore/repositories/menu";
+import { MOCK_GLOBAL_MODIFICATIONS, MOCK_MENU } from "@/lib/firestore/mocks";
+import {
+  addCategoryToMenu,
+  addItemToMenu,
+  deleteCategoryFromMenu,
+  deleteItemFromMenu,
+  makeMenuId,
+  mergeScannedRawItemsIntoMenu,
+  updateCategoryInMenu,
+  updateItemInMenu,
+} from "@/lib/pos/menuMutations";
+import type { WebMenuItem } from "@/lib/pos/menuTransforms";
+import type {
+  GlobalCustomization,
+  GlobalCustomizationGroup,
+  Menu,
+  MenuCategory,
+  MenuItem,
+} from "@/types/menu";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 /* ---------- Types ---------- */
+type CategoryInput = {
+  name: string;
+  nameCN?: string;
+};
+
 interface MenuContextType {
   categories: MenuCategory[];
   items: MenuItem[];
@@ -41,14 +42,19 @@ interface MenuContextType {
   globalCustomizationGroups: GlobalCustomizationGroup[];
   loading: boolean;
   error: string | null;
-  addCategory: (name: string) => void;
-  updateCategory: (id: string, name: string) => void;
-  deleteCategory: (id: string) => void;
-  addItem: (item: Omit<MenuItem, "id">) => void;
-  updateItem: (id: string, updates: Partial<Omit<MenuItem, "id">>) => void;
-  deleteItem: (id: string) => void;
+  saving: boolean;
+  saveError: string | null;
+  addCategory: (category: CategoryInput) => Promise<MenuCategory>;
+  updateCategory: (id: string, updates: Partial<CategoryInput>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  addItem: (item: Omit<MenuItem, "id">) => Promise<void>;
+  updateItem: (id: string, updates: Partial<Omit<MenuItem, "id">>) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
+  mergeScannedItems: (items: Omit<MenuItem, "id">[]) => Promise<void>;
+  mergeScannedRawItems: (rawItems: WebMenuItem[]) => Promise<void>;
   setGlobalCustomizations: (customizations: GlobalCustomization[]) => void;
-  scanMenuAI: (imageUri: string) => Promise<void>;
+  saveGlobalCustomizations: (customizations: GlobalCustomization[]) => Promise<void>;
+  refreshMenuData: () => Promise<void>;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
@@ -86,9 +92,58 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
 
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
-  const [globalCustomizations, setGlobalCustomizationsState] = useState<GlobalCustomization[]>(FALLBACK_GLOBAL_CUSTOMIZATIONS);
+  const [globalCustomizations, setGlobalCustomizationsState] = useState<GlobalCustomization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { data: firestoreMenu, loading: fsLoading, error: fsError } = useFirestoreMenu();
+  const { data: store } = useStore();
+  const { user } = useAuth();
+  const { currentStoreId } = useStoreSelection();
+
+  const menu = useMemo<Menu>(
+    () => ({ categories, items }),
+    [categories, items]
+  );
+
+  useEffect(() => {
+    if (firestoreMenu && (firestoreMenu.categories.length > 0 || firestoreMenu.items.length > 0)) {
+      setCategories(firestoreMenu.categories);
+      setItems(firestoreMenu.items);
+    } else if (fsError && __DEV__) {
+      setCategories(MOCK_MENU.categories);
+      setItems(MOCK_MENU.items);
+    }
+  }, [firestoreMenu, fsError]);
+
+  useEffect(() => {
+    if (store?.globalModifications && store.globalModifications.length > 0) {
+      setGlobalCustomizationsState(
+        store.globalModifications.map((m) => ({
+          id: m.id,
+          type: m.type,
+          price: m.price,
+          typeCategory: m.typeCategory,
+        }))
+      );
+    } else if (fsError && __DEV__) {
+      setGlobalCustomizationsState(
+        MOCK_GLOBAL_MODIFICATIONS.map((m) => ({
+          id: m.id,
+          type: m.type,
+          price: m.price,
+          typeCategory: m.typeCategory,
+        }))
+      );
+    }
+  }, [store, fsError]);
+
+  useEffect(() => {
+    setLoading(fsLoading);
+    setError(fsError ? fsError.message : null);
+  }, [fsLoading, fsError]);
 
   // Computed grouped customizations
   const globalCustomizationGroups = React.useMemo(
@@ -100,63 +155,189 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     setGlobalCustomizationsState(customizations);
   };
 
- 
+  const refreshMenuData = useCallback(async () => {
+    if (!user?.uid || !currentStoreId) {
+      if (firestoreMenu) {
+        setCategories(firestoreMenu.categories);
+        setItems(firestoreMenu.items);
+      }
+      return;
+    }
+
+    try {
+      setSaveError(null);
+      const latestStore = await fetchStore(user.uid, currentStoreId);
+      if (!latestStore) return;
+      setCategories(latestStore.menu.categories);
+      setItems(latestStore.menu.items);
+      setGlobalCustomizationsState(
+        latestStore.globalModifications.map((m) => ({
+          id: m.id,
+          type: m.type,
+          price: m.price,
+          typeCategory: m.typeCategory,
+        }))
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to refresh menu data.";
+      setSaveError(message);
+      throw error;
+    }
+  }, [currentStoreId, firestoreMenu, user?.uid]);
+
+  const commitMenu = useCallback(
+    async (nextMenu: Menu, previousMenu: Menu) => {
+      if (!user?.uid || !currentStoreId) {
+        const message = "No selected store for menu save.";
+        setSaveError(message);
+        throw new Error(message);
+      }
+
+      setSaveError(null);
+      setSaving(true);
+      setCategories(nextMenu.categories);
+      setItems(nextMenu.items);
+
+      try {
+        await persistMenu(user.uid, currentStoreId, nextMenu);
+      } catch (error) {
+        setCategories(previousMenu.categories);
+        setItems(previousMenu.items);
+        const message =
+          error instanceof Error ? error.message : "Unable to save menu.";
+        setSaveError(message);
+        throw error;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [currentStoreId, user?.uid]
+  );
+
+  const saveGlobalCustomizations = useCallback(
+    async (customizations: GlobalCustomization[]) => {
+      if (!user?.uid || !currentStoreId) {
+        const message = "No selected store for global customization save.";
+        setSaveError(message);
+        throw new Error(message);
+      }
+
+      const previousCustomizations = globalCustomizations;
+      setSaveError(null);
+      setSaving(true);
+      setGlobalCustomizationsState(customizations);
+
+      try {
+        await persistGlobalModifications(user.uid, currentStoreId, customizations);
+      } catch (error) {
+        setGlobalCustomizationsState(previousCustomizations);
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to save global customizations.";
+        setSaveError(message);
+        throw error;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [currentStoreId, globalCustomizations, user?.uid]
+  );
+
+
 
   /* ---------- Category Actions ---------- */
-  const addCategory = (name: string) => {
-    setCategories((prev) => [
-      ...prev,
-      { id: Date.now().toString(), name },
-    ]);
-  };
+  const addCategory = useCallback(
+    async ({ name, nameCN }: CategoryInput) => {
+      const previousMenu = menu;
+      const category = {
+        id: makeMenuId("category"),
+        name,
+        nameCN,
+      };
+      const nextMenu = addCategoryToMenu(previousMenu, {
+        ...category,
+      });
+      await commitMenu(nextMenu, previousMenu);
+      return category;
+    },
+    [commitMenu, menu]
+  );
 
-  const updateCategory = (id: string, name: string) => {
-    setCategories((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, name } : c))
-    );
-  };
+  const updateCategory = useCallback(
+    async (id: string, updates: Partial<CategoryInput>) => {
+      const previousMenu = menu;
+      const nextMenu = updateCategoryInMenu(previousMenu, id, updates);
+      await commitMenu(nextMenu, previousMenu);
+    },
+    [commitMenu, menu]
+  );
 
-  const deleteCategory = (id: string) => {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-    setItems((prev) => prev.filter((i) => i.categoryId !== id));
-  };
+  const deleteCategory = useCallback(
+    async (id: string) => {
+      const previousMenu = menu;
+      const nextMenu = deleteCategoryFromMenu(previousMenu, id);
+      await commitMenu(nextMenu, previousMenu);
+    },
+    [commitMenu, menu]
+  );
 
   /* ---------- Item Actions ---------- */
-  const addItem = (item: Omit<MenuItem, "id">) => {
-    setItems((prev) => [
-      ...prev,
-      { ...item, id: Date.now().toString() },
-    ]);
-  };
+  const addItem = useCallback(
+    async (item: Omit<MenuItem, "id">) => {
+      const previousMenu = menu;
+      const nextMenu = addItemToMenu(previousMenu, {
+        ...item,
+        id: makeMenuId("item"),
+      });
+      await commitMenu(nextMenu, previousMenu);
+    },
+    [commitMenu, menu]
+  );
 
-  const updateItem = (
-    id: string,
-    updates: Partial<Omit<MenuItem, "id">>
-  ) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, ...updates } : i))
-    );
-  };
+  const updateItem = useCallback(
+    async (id: string, updates: Partial<Omit<MenuItem, "id">>) => {
+      const previousMenu = menu;
+      const nextMenu = updateItemInMenu(previousMenu, id, updates);
+      await commitMenu(nextMenu, previousMenu);
+    },
+    [commitMenu, menu]
+  );
 
-  const deleteItem = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-  };
+  const deleteItem = useCallback(
+    async (id: string) => {
+      const previousMenu = menu;
+      const nextMenu = deleteItemFromMenu(previousMenu, id);
+      await commitMenu(nextMenu, previousMenu);
+    },
+    [commitMenu, menu]
+  );
 
-  /* ---------- AI Placeholder ---------- */
-  const scanMenuAI = async (imageUri: string) => {
-    console.log("Scanning menu from:", imageUri);
-    await new Promise((r) => setTimeout(r, 2000));
+  const mergeScannedItems = useCallback(
+    async (scannedItems: Omit<MenuItem, "id">[]) => {
+      const previousMenu = menu;
+      const nextMenu = scannedItems.reduce<Menu>(
+        (current, item) =>
+          addItemToMenu(current, {
+            ...item,
+            id: makeMenuId("item"),
+          }),
+        previousMenu
+      );
+      await commitMenu(nextMenu, previousMenu);
+    },
+    [commitMenu, menu]
+  );
 
-    const categoryId = Date.now().toString();
-    setCategories((prev) => [...prev, { id: categoryId, name: "Scanned Items" }]);
-
-    addItem({
-      categoryId,
-      name: "AI Verified Special",
-      price: 19.99,
-      description: "Scanned from physical menu",
-    });
-  };
+  const mergeScannedRawItems = useCallback(
+    async (rawItems: WebMenuItem[]) => {
+      const previousMenu = menu;
+      const nextMenu = mergeScannedRawItemsIntoMenu(previousMenu, rawItems);
+      await commitMenu(nextMenu, previousMenu);
+    },
+    [commitMenu, menu]
+  );
 
   return (
     <MenuContext.Provider
@@ -167,14 +348,19 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         globalCustomizationGroups,
         loading,
         error,
+        saving,
+        saveError,
         addCategory,
         updateCategory,
         deleteCategory,
         addItem,
         updateItem,
         deleteItem,
+        mergeScannedItems,
+        mergeScannedRawItems,
         setGlobalCustomizations,
-        scanMenuAI,
+        saveGlobalCustomizations,
+        refreshMenuData,
       }}
     >
       {children}

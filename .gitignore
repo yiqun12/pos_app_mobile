@@ -70,9 +70,27 @@ app-example
 *.ipa
 eatifyPos/
 
+# Claude Code
+.claude/
+
+# AI-generated docs and test reports (keep README.md only)
+*.md
+!README.md
+docs/
+test-results/
+playwright-report/
+
 # Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 venv/
 .venv/
+
+# Expo export check artifacts (large build outputs)
+.expo-export-check/
+
+# i18n scan artifacts
+.tmp_i18n_*.json
+
+.cursor/

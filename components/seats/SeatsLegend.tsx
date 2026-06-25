@@ -22,11 +22,14 @@ export function SeatsLegend() {
       <View className="flex-row justify-around">
         <View className="flex-row items-center">
           <View
-            className="rounded border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-600"
+            className="rounded"
             style={{
               width: indicatorSize * 2,
               height: indicatorSize * 2,
               marginRight: responsive.smallSpacing,
+              backgroundColor: "#966f33",
+              borderColor: "#805c28",
+              borderWidth: 1,
             }}
           />
           <Text
@@ -41,11 +44,14 @@ export function SeatsLegend() {
 
         <View className="flex-row items-center">
           <View
-            className="rounded bg-orange-600"
+            className="rounded"
             style={{
               width: indicatorSize * 2,
               height: indicatorSize * 2,
               marginRight: responsive.smallSpacing,
+              backgroundColor: "#00008b",
+              borderColor: "#000066",
+              borderWidth: 1,
             }}
           />
           <Text
@@ -60,11 +66,14 @@ export function SeatsLegend() {
 
         <View className="flex-row items-center">
           <View
-            className="rounded bg-orange-200"
+            className="rounded"
             style={{
               width: indicatorSize * 2,
               height: indicatorSize * 2,
               marginRight: responsive.smallSpacing,
+              backgroundColor: "#8c2828",
+              borderColor: "#702020",
+              borderWidth: 1,
             }}
           />
           <Text

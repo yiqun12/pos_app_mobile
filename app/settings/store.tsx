@@ -5,10 +5,9 @@ import { Input } from "@/components/ui/Input";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
-import { db } from "@/lib/firebase";
+import { useStore } from "@/hooks/firestore/useStore";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -23,139 +22,54 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-interface RestaurantData {
-  Name: string;
-  Address: string;
-  Description: string;
-  Image: string;
-  Open_time: string;
-  Phone: string;
-  State: string;
-  TaxRate: string;
-  ZipCode: string;
-  physical_address: string;
-  storeNameCHI: string;
-}
-
-interface WorkingHours {
-  [day: string]: {
-    open: string;
-    close: string;
-  };
-}
-
 export default function StoreScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const storeId = params.id as string | undefined;
-  const isEditMode = !!storeId;
 
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
 
-  const [loading, setLoading] = useState(isEditMode);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [, setWorkingHours] = useState<WorkingHours | null>(null);
+  const { data: store, loading, error } = useStore();
 
-  const [data, setData] = useState<RestaurantData>({
-    Name: "",
-    Address: "",
-    Description: "",
-    Image: "",
-    Open_time: "",
-    Phone: "",
-    State: "",
-    TaxRate: "",
-    ZipCode: "",
-    physical_address: "",
-    storeNameCHI: "",
-  });
+  // Local edit state mirrors store fields; writes are P1.
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [stateField, setStateField] = useState("");
+  const [zip, setZip] = useState("");
+  const [description, setDescription] = useState("");
+  const [openTimeRaw, setOpenTimeRaw] = useState("{}");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!isEditMode) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchRestaurantData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const docRef = doc(db, "TitleLogoNameContent", storeId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const restaurantData = docSnap.data() as RestaurantData;
-          setData(restaurantData);
-
-          if (restaurantData.Open_time) {
-            try {
-              const parsedHours = JSON.parse(restaurantData.Open_time);
-              setWorkingHours(parsedHours);
-            } catch (parseError) {
-              console.error("Error parsing working hours:", parseError);
-            }
-          }
-        } else {
-          setError(t("settings.store.restaurantNotFound"));
-        }
-      } catch (fetchError: any) {
-        console.error("Error fetching restaurant data:", fetchError);
-        setError(fetchError.message || t("settings.store.fetchDataFailed"));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchRestaurantData();
-  }, [isEditMode, storeId, t]);
+    if (!store) return;
+    setName(store.name);
+    setPhone(store.phone);
+    setAddressLine(store.address.line1);
+    setStateField(store.address.state);
+    setZip(store.address.zip);
+    setDescription(store.description ?? "");
+    setOpenTimeRaw(JSON.stringify(store.openHours));
+  }, [store]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      setTimeout(() => {
-        setSaving(false);
-        const action = isEditMode
-          ? t("settings.store.updated")
-          : t("settings.store.created");
-        Alert.alert(
-          t("common.success"),
-          t("settings.store.saveSuccess", { action }),
-          [{ text: t("common.ok"), onPress: () => router.back() }]
-        );
-      }, 1000);
-    } catch (_err) {
+      await new Promise((r) => setTimeout(r, 300));
+      Alert.alert("Not implemented", "Saving store edits will be added in P1.", [
+        { text: "OK" },
+      ]);
+    } finally {
       setSaving(false);
-      Alert.alert(
-        t("common.error"),
-        isEditMode
-          ? t("settings.store.updateFailed")
-          : t("settings.store.createFailed")
-      );
     }
-  };
-
-  const updateField = (field: keyof RestaurantData, value: string) => {
-    setData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleWorkingHoursChange = (value: string) => {
-    updateField("Open_time", value);
-    try {
-      const parsed = JSON.parse(value);
-      setWorkingHours(parsed);
-    } catch (parseError) {
-      console.error("Error parsing working hours", parseError);
-    }
+    setOpenTimeRaw(value);
   };
 
-  const screenTitle = isEditMode
-    ? t("settings.store.editStore")
-    : t("settings.store.createStore");
+  const screenTitle = "Edit Store";
 
   if (loading) {
     return (
@@ -181,7 +95,7 @@ export default function StoreScreen() {
             {t("settings.store.unableToLoadStore")}
           </Text>
           <Text className="mt-2 text-center text-slate-600 dark:text-slate-400">
-            {error}
+            {error?.message ?? ""}
           </Text>
         </View>
       </SafeAreaView>
@@ -225,8 +139,8 @@ export default function StoreScreen() {
                         {t("settings.store.storeName")}
                       </Text>
                       <Input
-                        value={data.Name}
-                        onChangeText={(v) => updateField("Name", v)}
+                        value={name}
+                        onChangeText={setName}
                         placeholder={t("settings.store.storeNamePlaceholder")}
                         className="mb-0"
                       />
@@ -250,8 +164,8 @@ export default function StoreScreen() {
                       {t("settings.store.address")}
                     </Text>
                     <Input
-                      value={data.Address}
-                      onChangeText={(v) => updateField("Address", v)}
+                      value={addressLine}
+                      onChangeText={setAddressLine}
                       placeholder={t("settings.store.addressPlaceholder")}
                       className="mb-0"
                     />
@@ -322,7 +236,7 @@ export default function StoreScreen() {
                 </Text>
 
                 <WorkingHoursEditor
-                  initialValue={data.Open_time || "{}"}
+                  initialValue={openTimeRaw}
                   onChange={handleWorkingHoursChange}
                 />
 
@@ -355,14 +269,10 @@ export default function StoreScreen() {
           style={{ padding: responsive.mediumSpacing }}
         >
           <Button
-            label={
-              isEditMode
-                ? t("common.saveChanges")
-                : t("settings.store.createStore")
-            }
+            label={t("common.saveChanges")}
             onPress={handleSave}
             loading={saving}
-            disabled={!data.Name}
+            disabled={!name}
           />
         </View>
       </KeyboardAvoidingView>

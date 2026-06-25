@@ -11,6 +11,10 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LogBox } from "react-native";
 import { useEffect } from "react";
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from "react-native-safe-area-context";
 
 // 忽略特定的 Firebase 网络超时警告
 LogBox.ignoreLogs([
@@ -24,15 +28,24 @@ LogBox.ignoreLogs([
 import AIChat from "@/components/AIChat";
 
 import { ActivationModal } from "@/components/license";
+import { OtaUpdateModal } from "@/components/updates";
 import { AuthProvider } from "@/context/auth";
 import { LanguageProvider } from "@/context/language";
 import { LicenseProvider } from "@/context/license";
 import { MenuProvider } from "@/context/menu";
+import { OtaUpdateProvider } from "@/context/ota-update";
+import { StoreProvider } from "@/context/store";
+import { useAuthRedirect } from "@/hooks/use-auth-redirect";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+function RouteGuard() {
+  useAuthRedirect();
+  return null;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -52,36 +65,45 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <LicenseProvider>
-          <MenuProvider>
-            <ThemeProvider
-              value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-            >
-              {/* 这里的 Stack 负责页面跳转 */}
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="pickup/new" />
-                <Stack.Screen
-                  name="orders/[id]"
-                  options={{ presentation: "modal" }}
-                />
-                <Stack.Screen name="analytics/index" />
-              </Stack>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics} style={{ flex: 1 }}>
+      <AuthProvider>
+        <StoreProvider>
+          <LanguageProvider>
+            <LicenseProvider>
+              <MenuProvider>
+                <ThemeProvider
+                  value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+                >
+                  <OtaUpdateProvider>
+                    <RouteGuard />
+                    {/* 这里的 Stack 负责页面跳转 */}
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="(auth)" />
+                      <Stack.Screen name="(tabs)" />
+                      <Stack.Screen name="select-store" />
+                      <Stack.Screen name="pickup/new" />
+                      <Stack.Screen
+                        name="orders/[id]"
+                        options={{ presentation: "modal" }}
+                      />
+                      <Stack.Screen name="analytics/index" />
+                    </Stack>
 
-              {/* Activation Modal - 全局激活弹窗 */}
-              <ActivationModal />
+                    {/* Activation Modal - 全局激活弹窗 */}
+                    <ActivationModal />
+                    <OtaUpdateModal />
 
-              {/* === 2. AI 悬浮球在这里！(全剧置顶) === */}
-              <AIChat />
+                    {/* === 2. AI 悬浮球在这里！(全剧置顶) === */}
+                    <AIChat />
 
-              <StatusBar style="auto" />
-            </ThemeProvider>
-          </MenuProvider>
-        </LicenseProvider>
-      </LanguageProvider>
-    </AuthProvider>
+                    <StatusBar style="auto" />
+                  </OtaUpdateProvider>
+                </ThemeProvider>
+              </MenuProvider>
+            </LicenseProvider>
+          </LanguageProvider>
+        </StoreProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
