@@ -21,6 +21,8 @@ export interface OpenHours {
   [day: string]: { open: string; close: string } | undefined;
 }
 
+export type SeatShape = "rect" | "circle";
+
 export interface Seat {
   id: string;
   name: string;
@@ -28,6 +30,8 @@ export interface Seat {
   y: number;
   width: number;
   height: number;
+  type?: SeatShape;
+  radius?: number;
   status?: "vacant" | "reserved" | "occupied";
   itemCount?: number;
 }
@@ -51,6 +55,7 @@ export interface MenuItem {
   categoryName?: string;
   categoryNameCN?: string;
   price: number;
+  image?: string;
   imageUrl?: string;
   availability?: boolean | string | string[];
   attributesArr?: Record<
@@ -108,10 +113,37 @@ export interface PendingOrder {
   createdAtMs: number | null;
 }
 
+/** Pending dine-in notification row (mirrors eatifyPos Account_admin notification feed). */
+export interface PendingNotificationOrder {
+  id: string;
+  tableName: string;
+  status: string;
+  username: string;
+  date: string;
+  dateMs: number | null;
+  amount: number;
+  itemCount: number;
+  isConfirm: boolean;
+}
+
 export interface TableStatus {
   id: string;
   name: string;
   status: "vacant" | "reserved" | "occupied";
+  itemCount: number;
+}
+
+/** Account payment history row (`stripe_customers/{uid}/payments`). */
+export interface UserPaymentRecord {
+  id: string;
+  storeId: string;
+  dateTime: string;
+  displayDate: string;
+  amount: number;
+  channel: string;
+  tableNum?: string;
+  isDineIn: boolean;
+  total: number;
   itemCount: number;
 }
 

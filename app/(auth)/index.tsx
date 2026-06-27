@@ -55,9 +55,9 @@ if (googleClientIdConfigured) {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { language, setLanguage } = useLanguage();
-  const { t } = useTranslation();
-  const { login } = useAuth();
+  const { setLanguage } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const { login, signInAsGuest } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -240,13 +240,22 @@ export default function LoginScreen() {
   };
 
   const handleGuestSignIn = async () => {
+    setError("");
     setLoading(true);
     try {
-      // TODO: implement guest sign in
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      router.replace("/(tabs)/seats");
-    } catch (_err) {
-      setError(t("auth.guestSignInFailed"));
+      await signInAsGuest();
+    } catch (err: unknown) {
+      const code =
+        err && typeof err === "object" && "code" in err
+          ? String((err as { code?: string }).code)
+          : undefined;
+      if (code === "auth/operation-not-allowed") {
+        setError(t("auth.guestSignInDisabled"));
+      } else if (code === "auth/network-request-failed") {
+        setError(t("auth.networkError"));
+      } else {
+        setError(t("auth.guestSignInFailed"));
+      }
     } finally {
       setLoading(false);
     }
@@ -272,37 +281,37 @@ export default function LoginScreen() {
               <TouchableOpacity
                 onPress={() => setLanguage("en")}
                 className={`rounded-l-lg px-3 py-1.5 ${
-                  language === "en"
+                  i18n.language === "en"
                     ? "bg-orange-500"
                     : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
                 <Text
                   className={`text-sm font-semibold ${
-                    language === "en"
+                    i18n.language === "en"
                       ? "text-white"
                       : "text-slate-600 dark:text-slate-400"
                   }`}
                 >
-                  {t("common.english")}
+                  EN
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setLanguage("zh")}
                 className={`rounded-r-lg px-3 py-1.5 ${
-                  language === "zh"
+                  i18n.language === "zh"
                     ? "bg-orange-500"
                     : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
                 <Text
                   className={`text-sm font-semibold ${
-                    language === "zh"
+                    i18n.language === "zh"
                       ? "text-white"
                       : "text-slate-600 dark:text-slate-400"
                   }`}
                 >
-                  {t("common.chinese")}
+                  CH
                 </Text>
               </TouchableOpacity>
             </View>

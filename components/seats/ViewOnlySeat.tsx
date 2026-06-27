@@ -22,6 +22,7 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
   const seatWidth = seat.width || responsive.seatSize;
   const seatHeight = seat.height || responsive.seatSize;
   const minSide = Math.min(seatWidth, seatHeight);
+  const isCircle = seat.type === "circle";
 
   const clamp = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
@@ -76,7 +77,7 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
         onPress={() => onPress(seat.id)}
         activeOpacity={0.7}
         style={{
-          borderRadius: responsive.seatBorderRadius,
+          borderRadius: isCircle ? minSide / 2 : responsive.seatBorderRadius,
           width: "100%",
           height: "100%",
           alignItems: "center",
@@ -93,11 +94,10 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
             lineHeight: nameLineHeight,
             textAlign: "center",
             paddingHorizontal: 2,
+            flexShrink: 0,
           }}
           className="font-bold text-white"
           numberOfLines={2}
-          adjustsFontSizeToFit
-          minimumFontScale={0.72}
           ellipsizeMode="tail"
         >
           {seat.name}
@@ -107,24 +107,26 @@ export const ViewOnlySeat: React.FC<ViewOnlySeatProps> = ({ seat, onPress }) => 
             style={{
               fontSize: statusFontSize,
               marginTop: minSide < 72 ? 2 : responsive.isTablet ? 6 : 4,
+              maxWidth: "100%",
+              paddingHorizontal: 2,
             }}
             className="text-slate-200"
             numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            ellipsizeMode="tail"
           >
-            {t("seats.itemsCount", { count: seat.itemCount })}
+            ×{seat.itemCount}
           </Text>
         ) : showStatusText ? (
           <Text
             style={{
               fontSize: statusFontSize,
               marginTop: minSide < 72 ? 2 : responsive.isTablet ? 6 : 4,
+              maxWidth: "100%",
+              paddingHorizontal: 2,
             }}
-            className="text-slate-200 font-medium uppercase"
+            className="text-slate-200 font-medium"
             numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            ellipsizeMode="tail"
           >
             {statusLabelMap[seat.status]}
           </Text>

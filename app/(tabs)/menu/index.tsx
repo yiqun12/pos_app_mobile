@@ -72,7 +72,7 @@ export default function MenuScreen() {
               <Ionicons name="refresh" size={18} color="#f97316" />
             )}
             <Text className="ml-2 text-sm font-semibold text-orange-500 dark:text-orange-400">
-              Refresh
+              {t("common.refresh")}
             </Text>
           </TouchableOpacity>
         }

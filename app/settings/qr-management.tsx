@@ -34,9 +34,9 @@ export default function QRManagementScreen() {
     try {
       await new Promise((r) => setTimeout(r, 300));
       Alert.alert(
-        "Not implemented",
-        "Saving QR configuration will be added in P1.",
-        [{ text: "OK" }]
+        t("settings.qr.notImplementedTitle"),
+        t("settings.qr.notImplementedMessage"),
+        [{ text: t("common.ok") }]
       );
     } finally {
       setSaving(false);

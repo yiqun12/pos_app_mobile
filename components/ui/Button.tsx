@@ -13,6 +13,8 @@ interface ButtonProps extends TouchableOpacityProps {
   size?: "sm" | "md" | "lg";
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  iconOnly?: boolean;
+  stacked?: boolean;
   loading?: boolean;
 }
 
@@ -21,9 +23,12 @@ export function Button({
   size = "md",
   label,
   icon,
+  iconOnly = false,
+  stacked = false,
   loading,
   className,
   disabled,
+  accessibilityLabel,
   ...props
 }: ButtonProps) {
   const responsive = useResponsiveLayout();
@@ -83,8 +88,10 @@ export function Button({
   };
 
   const sizeConfig = sizes[size];
-  const buttonClass = `${baseStyle} ${variants[variant]} ${disabled ? "opacity-50" : ""} ${className || ""}`;
-  const textClass = `font-semibold ${textStyles[variant]} ${icon ? "ml-2" : ""}`;
+  const buttonClass = `${baseStyle} ${stacked ? "flex-col" : ""} ${variants[variant]} ${disabled ? "opacity-50" : ""} ${className || ""}`;
+  const textClass = `font-semibold ${textStyles[variant]} ${icon && !iconOnly && !stacked ? "ml-2" : ""}`;
+  const stackedTextClass = `font-medium ${textStyles[variant]} mt-1 text-center`;
+  const iconOnlySize = Math.max(responsive.minTouchTargetSize, sizeConfig.px * 2 + responsive.buttonIconSize);
 
   const getIconColor = () => {
     if (iconColors[variant]) return iconColors[variant];
@@ -96,16 +103,49 @@ export function Button({
     <TouchableOpacity
       className={buttonClass}
       style={{
-        paddingHorizontal: sizeConfig.px,
-        paddingVertical: sizeConfig.py,
+        paddingHorizontal: iconOnly ? 0 : stacked ? 4 : sizeConfig.px,
+        paddingVertical: iconOnly ? 0 : stacked ? 6 : sizeConfig.py,
         minHeight: responsive.minTouchTargetSize,
+        minWidth: iconOnly ? iconOnlySize : undefined,
+        width: iconOnly ? iconOnlySize : undefined,
       }}
       disabled={disabled || loading}
       activeOpacity={0.7}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityRole="button"
       {...props}
     >
       {loading ? (
         <ActivityIndicator size="small" color={getIconColor()} />
+      ) : stacked ? (
+        <>
+          {icon && (
+            <Ionicons
+              name={icon}
+              size={responsive.buttonIconSize + 1}
+              color={getIconColor()}
+            />
+          )}
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={{
+              fontSize: responsive.captionFontSize,
+            }}
+            className={stackedTextClass}
+          >
+            {label}
+          </Text>
+        </>
+      ) : iconOnly ? (
+        icon ? (
+          <Ionicons
+            name={icon}
+            size={responsive.buttonIconSize + 1}
+            color={getIconColor()}
+          />
+        ) : null
       ) : (
         <>
           {icon && (
@@ -116,6 +156,9 @@ export function Button({
             />
           )}
           <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
             style={{
               fontSize: sizeConfig.fontSize,
             }}

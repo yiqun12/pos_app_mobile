@@ -1,12 +1,10 @@
 const en = {
   "aiChat": {
-    "connectionFailed": "Connection Failed",
-    "greeting": "Greeting",
-    "inputPlaceholder": "Input Placeholder",
-    "micPermissionRequired": "Mic Permission Required",
-    "networkRequestFailed": "Network Request Failed",
-    "requestTimeout": "Request Timeout",
-    "title": "Title"
+    "greeting": "AI assistant is coming soon. This feature is not available yet.",
+    "inputPlaceholder": "Coming soon...",
+    "micPermissionRequired": "Microphone permission is required for voice input.",
+    "notImplemented": "This feature is not implemented yet. A custom AI agent with our knowledge base will be added in a future update.",
+    "title": "AI Assistant"
   },
   "analytics": {
     "table": {
@@ -35,6 +33,7 @@ const en = {
     "googleSignIn": "Continue with Google",
     "googleSignInFailed": "Google sign in failed.",
     "guestSignIn": "Guest Sign In",
+    "guestSignInDisabled": "Guest sign in is not enabled for this app. Enable Anonymous auth in Firebase.",
     "guestSignInFailed": "Guest sign in failed.",
     "invalidCredentials": "Invalid email or password.",
     "invalidEmail": "Please enter a valid email",
@@ -55,9 +54,10 @@ const en = {
     "welcomeBack": "Welcome Back"
   },
   "common": {
+    "back": "Back",
     "cancel": "Cancel",
     "changeRestaurant": "Change Restaurant",
-    "chinese": "??",
+    "chinese": "CH",
     "close": "Close",
     "confirm": "Confirm",
     "delete": "Delete",
@@ -66,11 +66,15 @@ const en = {
     "english": "EN",
     "error": "Error",
     "loading": "Loading...",
+    "notImplemented": "This feature is not implemented yet.",
     "ok": "OK",
     "or": "or",
+    "refresh": "Refresh",
+    "retry": "Retry",
     "save": "Save",
     "saveChanges": "Save Changes",
     "selectRestaurant": "Select Restaurant",
+    "signOut": "Sign Out",
     "success": "Success"
   },
   "license": {
@@ -180,56 +184,64 @@ const en = {
     "unableLoadMenu": "Unable Load Menu"
   },
   "notifications": {
-    "badgeAlert": "Badge Alert",
-    "badgeOrder": "Badge Order",
-    "badgePayment": "Badge Payment",
-    "badgeSystem": "Badge System",
-    "clearAllButton": "Clear All Button",
-    "clearAllCta": "Clear All CTA",
-    "clearAllMessage": "Clear All Message",
-    "clearAllTitle": "Clear All Title",
-    "emptySubtitle": "Empty Subtitle",
-    "emptyTitle": "Empty Title",
-    "filterAlerts": "Filter Alerts",
-    "filterAll": "Filter All",
-    "filterOrders": "Filter Orders",
-    "filterPayments": "Filter Payments",
-    "filterSystem": "Filter System",
+    "badgeAlert": "Alert",
+    "badgeOrder": "Order",
+    "badgePayment": "Payment",
+    "badgeSystem": "System",
+    "clearAllButton": "Clear All",
+    "clearAllCta": "Clear All",
+    "clearAllMessage": "Are you sure you want to clear all notifications?",
+    "clearAllTitle": "Clear Notifications",
+    "confirmFailed": "Could not update notification. Please try again.",
+    "emptySubtitle": "Pending dine-in and kiosk orders from your store will appear here.",
+    "emptyTitle": "No notifications",
+    "filterAlerts": "Alerts",
+    "filterAll": "All",
+    "filterOrders": "Orders",
+    "filterPayments": "Payments",
+    "filterSystem": "System",
     "markAllRead": "Mark All Read",
+    "pendingOrder": {
+      "deliveryTitle": "Delivery order #{{id}}",
+      "message": "{{count}} items · {{status}} · {{user}}",
+      "noTable": "No table",
+      "paymentTitle": "Payment pending · {{table}}",
+      "title": "New order · {{table}}"
+    },
     "mock": {
       "lowInventoryAlert": {
-        "message": "Message",
-        "title": "Title"
+        "message": "Kung Pao Chicken is running low. Please restock soon.",
+        "title": "Low Inventory"
       },
       "newDoorDashOrder": {
-        "message": "Message",
-        "title": "Title"
+        "message": "DoorDash order #DD2847 for $32.50",
+        "title": "New Delivery Order"
       },
       "newOrderReceived": {
-        "message": "Message",
-        "title": "Title"
+        "message": "Dine-in order #A1023 for $48.50",
+        "title": "New Order"
       },
       "orderCompleted": {
-        "message": "Message",
-        "title": "Title"
+        "message": "Order #A1020 has been completed",
+        "title": "Order Completed"
       },
       "paymentReceived": {
-        "message": "Message",
-        "title": "Title"
+        "message": "Table 3 card payment of $86.00",
+        "title": "Payment Received"
       },
       "systemUpdate": {
-        "message": "Message",
-        "title": "Title"
+        "message": "App updated to v1.0.1",
+        "title": "System Update"
       },
       "time": {
-        "15MinAgo": "15 Min Ago",
-        "1HourAgo": "1 Hour Ago",
-        "2HoursAgo": "2 Hours Ago",
-        "2MinAgo": "2 Min Ago",
+        "15MinAgo": "15 min ago",
+        "1HourAgo": "1 hour ago",
+        "2HoursAgo": "2 hours ago",
+        "2MinAgo": "2 min ago",
         "yesterday": "Yesterday"
       }
     },
-    "title": "Title",
+    "title": "Notifications",
     "unreadCount": "{{count}} unread"
   },
   "orders": {
@@ -287,6 +299,20 @@ const en = {
     "paymentSettings": "Payment Settings",
     "paymentSettingsSubtitle": "Stripe connection & terminals",
     "profile": "Profile",
+    "purchaseHistory": "Purchase History",
+    "purchaseHistoryEmptySubtitle": "Successful payments will appear here once you pay through the platform.",
+    "purchaseHistoryEmptyTitle": "No purchase history yet",
+    "purchaseHistoryError": "Unable to load purchase history.",
+    "purchaseHistoryItems": "Items",
+    "purchaseHistoryOrderId": "Order ID",
+    "purchaseHistorySubtotal": "Order total",
+    "purchaseHistorySubtitle": "{{count}} records synced from your account",
+    "purchaseHistoryTable": "Table {{table}}",
+    "purchaseHistoryTakeout": "Takeout",
+    "purchaseHistoryTitle": "Past Spending History",
+    "purchaseHistoryTotal": "Total spent: ${{amount}}",
+    "defaultUserName": "User",
+    "userIdLabel": "ID",
     "qrCodeManagement": "QR Code Management",
     "qrCodeManagementSubtitle": "Table QR codes for dine-in",
     "settings": "Settings",
@@ -306,8 +332,9 @@ const en = {
   },
   "revenue": {
     "addOns": "Add Ons",
+    "applyRange": "Apply",
     "businessDay": "Business Day",
-    "businessDayHint": "Showing today's revenue window from 05:00 to next day 05:00.",
+    "businessDayHint": "Revenue is calculated with a 05:00 business-day boundary for the selected range.",
     "cashDrawer": "Cash Drawer",
     "cashDrawerPlaceholder": "Cash Drawer Placeholder",
     "channel": "Channel",
@@ -322,6 +349,31 @@ const en = {
     },
     "creditCard": "Credit Card",
     "custom": "Custom",
+    "customRangeHint": "Leave the end date empty to view a single business day.",
+    "chartDailyBreakdown": "Daily totals within selected range",
+    "chartDays": "days",
+    "dateRange": "Date Range",
+    "datePreset": {
+      "custom": "Custom Range",
+      "lastMonth": "Last Month Orders",
+      "lastQ1": "Q1 Last Year",
+      "lastQ2": "Q2 Last Year",
+      "lastQ3": "Q3 Last Year",
+      "lastQ4": "Q4 Last Year",
+      "q1": "Q1 This Year",
+      "q2": "Q2 This Year",
+      "q3": "Q3 This Year",
+      "q4": "Q4 This Year",
+      "thisMonth": "This Month Orders",
+      "today": "Today's Orders",
+      "yesterday": "Yesterday Orders"
+    },
+    "dateSection": {
+      "custom": "Custom Dates",
+      "month": "Month Shortcuts",
+      "quarter": "Quarter Shortcuts",
+      "quick": "Quick Select"
+    },
     "datePickerUnavailable": "Date Picker Unavailable",
     "details": "Details",
     "detailUnavailable": "Detail Unavailable",
@@ -331,9 +383,31 @@ const en = {
     "guest": "Guest",
     "itemQtyPrice": "{{quantity}} x {{price}}",
     "items": "Items",
+    "loadingMore": "Loading more...",
+    "loadingOrders": "Loading orders...",
+    "loadMore": "Load more",
+    "lineChart": "Line Chart",
+    "moreMenu": "More",
+    "monthOrders": {
+      "april": "April Orders",
+      "august": "August Orders",
+      "december": "December Orders",
+      "february": "February Orders",
+      "january": "January Orders",
+      "july": "July Orders",
+      "june": "June Orders",
+      "march": "March Orders",
+      "may": "May Orders",
+      "november": "November Orders",
+      "october": "October Orders",
+      "september": "September Orders"
+    },
+    "noChartData": "No business data in this date range",
     "netSales": "Net Sales",
+    "noOrders": "No orders found",
     "orderDetails": "Order Details",
     "orderNotFound": "Order {{orderId}} not found",
+    "ordersCount": "{{count}} orders",
     "payAmount": "Pay {{amount}}",
     "preset": {
       "december": "December",
@@ -344,12 +418,21 @@ const en = {
     "print": "Print",
     "recentTransactions": "Recent Transactions",
     "salesAnalysis": "Sales Analysis",
-    "salesAnalysisPlaceholder": "Sales Analysis Placeholder",
+    "salesAnalysisPlaceholder": "No sales data available",
+    "sales": {
+      "totalItems": "Total Items",
+      "totalQuantity": "Total Quantity",
+      "totalRevenue": "Total Revenue"
+    },
     "searchOrders": "Search Orders",
     "selectDate": "Select {{type}} date",
+    "selectDateRange": "Select Date Range",
+    "selectMonth": "Select Month",
+    "singleDayHint": "Single day (leave end empty)",
     "serviceFee": "Service Fee",
     "start": "Start",
-    "subtitle": "Subtitle",
+    "subtitle": "Today's sales and transactions",
+    "subtitleForRange": "{{range}} · {{dates}}",
     "subtotal": "Subtotal",
     "tab": {
       "allOrders": "All Orders",
@@ -358,10 +441,11 @@ const en = {
     },
     "tax": "Tax",
     "time": "Time",
-    "title": "Title",
+    "title": "Revenue",
     "total": "Total",
     "totalRevenue": "Total Revenue",
-    "totalTips": "Total Tips"
+    "totalTips": "Total Tips",
+    "unknownPayment": "Unknown"
   },
   "seats": {
     "addItems": "Add Items",
@@ -374,13 +458,35 @@ const en = {
       "title": "Title"
     },
     "adminMode": "Admin Mode",
+    "admin": {
+      "addRoundTable": "Add Round Table",
+      "addSquareTable": "Add Square Table",
+      "addTable": "Add",
+      "addTableTitle": "Add Dining Table",
+      "deleteTable": "Delete",
+      "discardChanges": "Discard Changes",
+      "saveChanges": "Save Changes",
+      "saveFailed": "Failed to save layout. Please try again.",
+      "saveSuccess": "Seat layout saved successfully",
+      "selectTableToDelete": "Select a table to delete first",
+      "subtitle": "Drag to pan, pinch to zoom. Long-press a table to move it with grid snap.",
+      "tableNameDuplicate": "Table name already exists. Choose another name.",
+      "tableNameEmpty": "Table name cannot be empty",
+      "tableNameLabel": "Dining Table Name",
+      "tableNamePlaceholder": "e.g. A1, B2",
+      "toolbarAdd": "Add",
+      "toolbarCancel": "Cancel",
+      "toolbarDelete": "Delete",
+      "toolbarReset": "Reset",
+      "toolbarSave": "Save"
+    },
     "changeSeat": "Change Seat",
     "cloudSeatConfigMissing": "Cloud Seat Config Missing",
     "cloudSeatMapMissing": "Cloud Seat Map Missing",
     "customerLoyalty": "Customer Loyalty",
     "databaseConnectionFailed": "Database Connection Failed",
-    "headerSubtitle": "Header Subtitle",
-    "headerTitle": "Header Title",
+    "headerSubtitle": "Manage dine-in tables and orders",
+    "headerTitle": "Seats",
     "itemizedReceipt": "Itemized Receipt",
     "itemsCount": "{{count}} items",
     "legend": {
@@ -441,8 +547,38 @@ const en = {
     "selectAction": "Select Action",
     "shareOrder": "Share Order",
     "splitBill": "Split Bill",
+    "taxExempt": "Tax Exempt",
+    "taxExemptEnabled": "Tax Exempt (on)",
+    "adjustTotal": "Adjust Total",
+    "printOrder": "Print Order",
+    "printReceipt": "Print Receipt",
+    "printerDriver": {
+      "description": "Print commands are sent to the cloud. The print driver on your store POS computer (port 3001) must be running to print physically.",
+      "lastOrderPrint": "Last Order Print",
+      "lastReceiptPrint": "Last Receipt Print",
+      "menuLabel": "Printer Driver",
+      "none": "No recent jobs",
+      "recentJobs": "Recent Print Jobs",
+      "statusNote": "The mobile app cannot detect the local print driver directly. Open the web POS to see live connection status.",
+      "statusTitle": "Print Driver Status",
+      "tableLabel": "Table {{table}}",
+      "title": "Printer Driver"
+    },
+    "kitchenTitle": "Kitchen",
+    "kitchenSent": "Order sent to kitchen",
+    "kitchenNoChanges": "No kitchen changes to send",
+    "cardPaymentTitle": "Card Payment",
+    "cardPaymentSent": "Payment sent to terminal. Waiting for confirmation.",
+    "unpaidTitle": "Unpaid",
+    "unpaidMessage": "Order marked as unpaid and table cleared.",
     "terrace": "Terrace",
     "vipRooms": "Vip Rooms"
+  },
+  "selectStore": {
+    "createOnWebFirst": "Create a store on the eatify web admin first.",
+    "loading": "Loading stores...",
+    "noStoresFound": "No stores found",
+    "title": "Select Store"
   },
   "settings": {
     "changePassword": {
@@ -454,19 +590,20 @@ const en = {
       "newPasswordPlaceholder": "New Password Placeholder",
       "passwordMismatch": "Password Mismatch",
       "passwordTooShort": "Password Too Short",
-      "passwordUpdated": "Password Updated",
-      "title": "Title",
-      "updateButton": "Update Button"
+      "passwordUpdated": "Password updated",
+      "title": "Change Password",
+      "updateButton": "Update Password"
     },
     "editProfile": {
-      "alertSaved": "Alert Saved",
+      "alertSaved": "Saved successfully",
       "email": "Email",
-      "emailPlaceholder": "Email Placeholder",
+      "emailPlaceholder": "Email address",
       "fullName": "Full Name",
-      "fullNamePlaceholder": "Full Name Placeholder",
+      "fullNamePlaceholder": "Enter your name",
+      "notImplementedMessage": "Profile editing is not implemented yet and will be available in a future update.",
       "phone": "Phone",
-      "phonePlaceholder": "Phone Placeholder",
-      "title": "Title"
+      "phonePlaceholder": "Enter phone number",
+      "title": "Edit Profile"
     },
     "payment": {
       "active": "Active",
@@ -491,20 +628,24 @@ const en = {
       "splitPayments": "Split Payments",
       "splitPaymentsSubtitle": "Split Payments Subtitle",
       "stripeConnected": "Stripe Connected",
+      "stripeLinkFailed": "Failed to create Stripe onboarding link",
+      "stripeTerminalDefault": "Stripe Terminal",
       "terminals": "Terminals",
-      "title": "Title"
+      "title": "Payment Settings"
     },
     "qr": {
       "loadFailed": "Load Failed",
-      "menuUrlHelp": "Menu URL Help",
-      "menuUrlLabel": "Menu URL Label",
-      "menuUrlPlaceholder": "Menu URL Placeholder",
-      "saveButton": "Save Button",
-      "saving": "Saving",
-      "scanHint": "Scan Hint",
-      "title": "Title",
-      "updateFailed": "Update Failed",
-      "updateSuccess": "Update Success"
+      "menuUrlHelp": "Customers will open this menu URL after scanning the QR code",
+      "menuUrlLabel": "Menu URL",
+      "menuUrlPlaceholder": "https://eatify.app/menu/...",
+      "notImplementedMessage": "Saving QR configuration is not implemented yet.",
+      "notImplementedTitle": "Not implemented",
+      "saveButton": "Save",
+      "saving": "Saving...",
+      "scanHint": "Scan to browse the menu and place orders",
+      "title": "QR Code Management",
+      "updateFailed": "Update failed",
+      "updateSuccess": "Updated successfully"
     },
     "store": {
       "address": "Address",
@@ -516,9 +657,35 @@ const en = {
       "created": "Created",
       "createFailed": "Create Failed",
       "createStore": "Create Store",
+      "createStoreSubtitle": "Create a new restaurant store linked to your account. Default tables and a starter menu will be added automatically.",
+      "createSuccess": "Store created successfully.",
+      "createRequiredFields": "Please fill in store name, city, state, zip code, phone, and tax rate.",
+      "autoFillAddress": "Auto Fill Address",
+      "autoFillAddressSuccess": "Address filled from your current location.",
+      "autoFillAddressPermissionDenied": "Location permission is required to auto-fill your address.",
+      "autoFillAddressFailed": "Could not detect your address. Please enter it manually.",
+      "description": "Description",
+      "descriptionPlaceholder": "Optional store description",
       "editStore": "Edit Store",
+      "generatedStoreId": "Preview store ID",
+      "city": "City",
+      "cityPlaceholder": "San Francisco",
+      "physicalAddress": "Street address",
+      "physicalAddressPlaceholder": "123 Market St",
+      "state": "State",
+      "statePlaceholder": "CA",
+      "zipCode": "Zip code",
+      "zipCodePlaceholder": "94103",
+      "phonePlaceholder": "+1 (555) 000-0000",
+      "storeIdExists": "This store ID already exists. Please try again.",
+      "storeIdGenerationFailed": "Could not generate a unique store ID. Please adjust the name, city, or zip code.",
+      "storeNameChi": "Second language name (optional)",
+      "storeNameChiPlaceholder": "中文店名",
+      "taxRatePlaceholder": "8.875",
       "fetchDataFailed": "Fetch Data Failed",
-      "loadingStoreData": "Loading Store Data",
+      "loadingStoreData": "Loading store data...",
+      "notImplementedMessage": "Saving store settings is not implemented yet.",
+      "notImplementedTitle": "Not implemented",
       "paymentIntegration": "Payment Integration",
       "paymentIntegrationSubtitle": "Payment Integration Subtitle",
       "phone": "Phone",
@@ -542,7 +709,7 @@ const en = {
     }
   },
   "tabs": {
-    "alerts": "Alerts",
+    "alerts": "Notifications",
     "menu": "Menu",
     "profile": "Profile",
     "revenue": "Revenue",
@@ -560,7 +727,7 @@ const en = {
     "phone": "Phone",
     "seatArrangement": "Seat Arrangement",
     "taxRate": "Tax Rate",
-    "title": "Title"
+    "title": "Firebase Test"
   },
   "workingHours": {
     "closed": "Closed",

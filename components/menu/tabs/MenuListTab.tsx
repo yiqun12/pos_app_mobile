@@ -12,17 +12,17 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import {
   coerceAvailabilityPeriods,
-  DEFAULT_MENU_IMAGE_URL,
+  getMenuItemImageUrl,
 } from "@/lib/pos/menuTransforms";
 import { MenuItem } from "@/types/menu";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -376,9 +376,10 @@ export function MenuListTab({
                 }}
               >
                 <Image
-                  source={{ uri: item.imageUrl || DEFAULT_MENU_IMAGE_URL }}
-                  className="h-full w-full"
-                  resizeMode="cover"
+                  source={{ uri: getMenuItemImageUrl(item) }}
+                  style={{ width: "100%", height: "100%" }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
                 />
               </View>
 

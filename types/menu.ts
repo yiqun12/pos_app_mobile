@@ -41,6 +41,7 @@ export type MenuItem = {
   categoryName?: string;
   categoryNameCN?: string;
   price: number;
+  image?: string;
   imageUrl?: string;
   availability?: MenuAvailability;
   attributesArr?: WebAttributesArr; // Raw Web POS attributes, kept for compatible cart writes

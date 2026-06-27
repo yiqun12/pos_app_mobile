@@ -4,6 +4,7 @@ import { useAuth } from "@/context/auth";
 import { useStoreSelection } from "@/context/store";
 import { useRouter } from "expo-router";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,8 +17,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SelectStoreScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { logout } = useAuth();
-  const { storeList, isLoading, error, setCurrentStoreId, reloadStoreList } =
+  const { storeList, isLoading, error, currentStoreId, setCurrentStoreId, reloadStoreList } =
     useStoreSelection();
 
   const handleSelect = async (id: string) => {
@@ -25,13 +27,15 @@ export default function SelectStoreScreen() {
     router.replace("/(tabs)/seats");
   };
 
+  const showBackButton = Boolean(currentStoreId);
+
   if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-        <ScreenHeader title="Select Store" />
+        <ScreenHeader title={t("selectStore.title")} showBackButton={showBackButton} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" />
-          <Text className="mt-4 text-slate-500">Loading stores...</Text>
+          <Text className="mt-4 text-slate-500">{t("selectStore.loading")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -40,11 +44,16 @@ export default function SelectStoreScreen() {
   if (error) {
     return (
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-        <ScreenHeader title="Select Store" />
+        <ScreenHeader title={t("selectStore.title")} showBackButton={showBackButton} />
         <View className="flex-1 items-center justify-center px-6">
           <Text className="mb-4 text-center text-red-600">{error.message}</Text>
-          <Button label="Retry" onPress={reloadStoreList} />
-          <Button label="Sign out" onPress={logout} variant="outline" className="mt-3" />
+          <Button label={t("common.retry")} onPress={reloadStoreList} />
+          <Button
+            label={t("common.signOut")}
+            onPress={logout}
+            variant="outline"
+            className="mt-3"
+          />
         </View>
       </SafeAreaView>
     );
@@ -53,15 +62,15 @@ export default function SelectStoreScreen() {
   if (storeList.length === 0) {
     return (
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-        <ScreenHeader title="Select Store" />
+        <ScreenHeader title={t("selectStore.title")} showBackButton={showBackButton} />
         <View className="flex-1 items-center justify-center px-6">
           <Text className="mb-2 text-center font-semibold text-slate-900 dark:text-white">
-            No stores found
+            {t("selectStore.noStoresFound")}
           </Text>
           <Text className="mb-4 text-center text-slate-500">
-            Create a store on the eatify web admin first.
+            {t("selectStore.createOnWebFirst")}
           </Text>
-          <Button label="Sign out" onPress={logout} variant="outline" />
+          <Button label={t("common.signOut")} onPress={logout} variant="outline" />
         </View>
       </SafeAreaView>
     );
@@ -69,7 +78,7 @@ export default function SelectStoreScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-      <ScreenHeader title="Select Store" />
+      <ScreenHeader title={t("selectStore.title")} showBackButton={showBackButton} />
       <FlatList
         data={storeList}
         keyExtractor={(s) => s.id}

@@ -31,7 +31,7 @@ export default function EditProfileScreen() {
       await new Promise((r) => setTimeout(r, 300));
       Alert.alert(
         t("common.success"),
-        "Profile editing will be saved in P1."
+        t("settings.editProfile.notImplementedMessage")
       );
       router.back();
     } finally {

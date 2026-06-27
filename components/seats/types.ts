@@ -82,4 +82,6 @@ export interface Seat {
   y: number;
   width?: number;
   height?: number;
+  type?: "rect" | "circle";
+  radius?: number;
 }

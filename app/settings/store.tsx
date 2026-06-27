@@ -57,9 +57,11 @@ export default function StoreScreen() {
     setSaving(true);
     try {
       await new Promise((r) => setTimeout(r, 300));
-      Alert.alert("Not implemented", "Saving store edits will be added in P1.", [
-        { text: "OK" },
-      ]);
+      Alert.alert(
+        t("settings.store.notImplementedTitle"),
+        t("settings.store.notImplementedMessage"),
+        [{ text: t("common.ok") }]
+      );
     } finally {
       setSaving(false);
     }
@@ -69,7 +71,7 @@ export default function StoreScreen() {
     setOpenTimeRaw(value);
   };
 
-  const screenTitle = "Edit Store";
+  const screenTitle = t("settings.store.editStore");
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { SettingsItem, Store, StoreSelector } from "@/components/profile";
+import { PaymentHistoryModal, SettingsItem, Store, StoreSelector } from "@/components/profile";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
@@ -33,6 +33,8 @@ export default function ProfileScreen() {
   const storeNameFontSize = isTablet ? 24 : 16;
   const storeNameChiFontSize = isTablet ? 17 : 14;
   const storeSwitchFontSize = isTablet ? 16 : 14;
+  const userIdFontSize = isTablet ? 14 : 12;
+  const purchaseHistoryFontSize = isTablet ? 16 : 14;
   const sectionTitleFontSize = isTablet ? 16 : 14;
   const versionFontSize = isTablet ? 15 : 14;
   const { language, setLanguage } = useLanguage();
@@ -49,6 +51,7 @@ export default function ProfileScreen() {
   }));
 
   const [storeSelectorVisible, setStoreSelectorVisible] = useState(false);
+  const [purchaseHistoryVisible, setPurchaseHistoryVisible] = useState(false);
   const [deleteAccountVisible, setDeleteAccountVisible] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -78,7 +81,7 @@ export default function ProfileScreen() {
 
   const handleCreateStore = () => {
     setStoreSelectorVisible(false);
-    router.push("/settings/store");
+    router.push("/settings/create-store");
   };
 
   const handleDeleteAccount = async () => {
@@ -109,6 +112,9 @@ export default function ProfileScreen() {
     }
   };
 
+  const displayName =
+    user?.displayName?.trim() || user?.email?.split("@")[0] || t("profile.defaultUserName");
+
   return (
     <View className="flex-1 bg-white dark:bg-slate-950">
       <ScreenHeader
@@ -135,7 +141,7 @@ export default function ProfileScreen() {
             </View>
             <View className="flex-1">
               <Text className="font-bold text-white" style={{ fontSize: userNameFontSize }}>
-                {user?.email?.split("@")[0] ?? "User"}
+                {displayName}
               </Text>
               <Text
                 className="mt-1 text-orange-100"
@@ -143,6 +149,16 @@ export default function ProfileScreen() {
               >
                 {user?.email ?? "—"}
               </Text>
+              {user?.uid ? (
+                <Text
+                  className="mt-1 text-orange-100/90"
+                  style={{ fontSize: userIdFontSize }}
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
+                  {t("profile.userIdLabel")}: {user.uid}
+                </Text>
+              ) : null}
             </View>
             <TouchableOpacity
               onPress={() => router.push("/settings/edit-profile")}
@@ -151,6 +167,23 @@ export default function ProfileScreen() {
               <Ionicons name="pencil" size={18} color="white" />
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            onPress={() => setPurchaseHistoryVisible(true)}
+            activeOpacity={0.8}
+            className="mt-4 flex-row items-center justify-between rounded-xl bg-white/15 px-3.5 py-3"
+          >
+            <View className="mr-3 flex-1 flex-row items-center">
+              <Ionicons name="receipt-outline" size={18} color="#fff" />
+              <Text
+                className="ml-2 font-semibold text-white"
+                style={{ fontSize: purchaseHistoryFontSize }}
+              >
+                {t("profile.purchaseHistory")}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -324,6 +357,12 @@ export default function ProfileScreen() {
         onSelect={handleStoreSelect}
         onClose={() => setStoreSelectorVisible(false)}
         onCreateStore={handleCreateStore}
+      />
+
+      <PaymentHistoryModal
+        visible={purchaseHistoryVisible}
+        storeList={storeList}
+        onClose={() => setPurchaseHistoryVisible(false)}
       />
 
       <Modal

@@ -62,14 +62,14 @@ export const TW = {
 export const BottomTabTokens = {
   phone: {
     iconSize: TW.spacing[6],
-    barHeight: 58,
-    paddingTop: 5,
-    paddingBottom: 5,
-    paddingHorizontal: TW.spacing[1],
+    barHeight: 56,
+    paddingTop: 6,
+    paddingBottom: 4,
+    paddingHorizontal: TW.spacing[4],
     itemPaddingVertical: 0,
     itemMinHeight: 44,
-    labelFontSize: 0,
-    labelLineHeight: 0,
+    labelFontSize: 10,
+    labelLineHeight: 12,
     iconMarginRight: 0,
   },
   tablet: {

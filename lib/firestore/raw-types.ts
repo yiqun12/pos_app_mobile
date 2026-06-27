@@ -29,6 +29,8 @@ export interface RawOpenHours {
 
 export interface RawSeatLayout {
   table?: RawSeatItem[];
+  chair?: RawSeatItem[];
+  wall?: RawSeatItem[];
 }
 
 export interface RawSeatItem {
@@ -39,9 +41,11 @@ export interface RawSeatItem {
   top?: number;
   width?: number;
   height?: number;
+  radius?: number;
   scaleX?: number;
   scaleY?: number;
   angle?: number;
+  snapAngle?: number;
 }
 
 /**
@@ -106,9 +110,18 @@ export interface RawTableDoc {
  * PendingDineInOrder sub-collection document.
  */
 export interface RawPendingOrderDoc {
+  table?: string;
   tableName?: string;
   items?: unknown[];
   total?: number | string;
-  createdAt?: unknown; // Firestore Timestamp
+  amount?: number | string;
+  Status?: string;
+  status?: string;
+  username?: string;
+  date?: string;
+  isConfirm?: boolean;
+  store?: string;
+  stripe_account_store_owner?: string;
+  createdAt?: unknown;
   [k: string]: unknown;
 }

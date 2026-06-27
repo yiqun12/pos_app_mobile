@@ -1,10 +1,12 @@
 import { Tabs } from "expo-router";
 import React from "react";
 import { View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DemoModeBanner } from "@/components/license";
+import { TabNotificationIcon } from "@/components/notifications";
 import { BottomTabTokens, Colors } from "@/constants/theme";
+import { useNotifications } from "@/context/notifications";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,9 +15,12 @@ import { useTranslation } from "react-i18next";
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const responsive = useResponsiveLayout();
-  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const { t, i18n } = useTranslation();
+  const { unreadCount } = useNotifications();
   const tabSizeKey = responsive.isTablet ? "tablet" : "phone";
   const tabTokens = BottomTabTokens[tabSizeKey];
+  const tabBarBottomInset = Math.max(insets.bottom, tabSizeKey === "phone" ? 8 : 0);
 
   return (
     <View style={{ flex: 1 }} className="bg-white dark:bg-slate-950">
@@ -24,14 +29,15 @@ export default function TabLayout() {
         <DemoModeBanner />
       </SafeAreaView>
       <Tabs
+        key={i18n.language}
         screenOptions={{
           tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
           headerShown: false,
           sceneStyle: { backgroundColor: "transparent" },
           tabBarStyle: {
-            height: tabTokens.barHeight,
+            height: tabTokens.barHeight + tabBarBottomInset,
             paddingTop: tabTokens.paddingTop,
-            paddingBottom: tabTokens.paddingBottom,
+            paddingBottom: tabBarBottomInset + tabTokens.paddingBottom,
             paddingHorizontal: tabTokens.paddingHorizontal,
           },
           tabBarItemStyle: {
@@ -40,7 +46,7 @@ export default function TabLayout() {
             justifyContent: "center",
             alignItems: "center",
           },
-          tabBarShowLabel: responsive.isTablet,
+          tabBarShowLabel: true,
           tabBarLabelPosition: responsive.isTablet ? "beside-icon" : "below-icon",
           tabBarAllowFontScaling: false,
           tabBarLabelStyle: {
@@ -90,10 +96,10 @@ export default function TabLayout() {
           options={{
             title: t("tabs.alerts"),
             tabBarIcon: ({ color }) => (
-              <Ionicons
-                name="notifications"
-                size={tabTokens.iconSize}
+              <TabNotificationIcon
                 color={color}
+                size={tabTokens.iconSize}
+                unreadCount={unreadCount}
               />
             ),
           }}

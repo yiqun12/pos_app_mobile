@@ -5,7 +5,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import {
   DEFAULT_MENU_IMAGE_URL,
-  resolveMenuImageUrl,
+  getMenuItemImageUrl,
 } from "@/lib/pos/menuTransforms";
 import { isTableTimingMenuItem } from "@/lib/pos/tableTiming";
 import { MenuItem } from "@/types/menu";
@@ -73,7 +73,7 @@ export function MenuSelectionModal({
     nameCN: item.nameCN,
     price: item.price,
     quantity: 1,
-    imageUrl: item.imageUrl,
+    imageUrl: getMenuItemImageUrl(item),
     attributesArr: item.attributesArr,
   });
 
@@ -152,7 +152,7 @@ export function MenuSelectionModal({
       nameCN: selectedMenuItem.nameCN,
       price: selectedMenuItem.price + priceAdjustment,
       quantity: 1,
-      imageUrl: selectedMenuItem.imageUrl,
+      imageUrl: getMenuItemImageUrl(selectedMenuItem),
       attributesArr: selectedMenuItem.attributesArr,
       selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
       selectedIngredients: selectedIngredients.length > 0 ? selectedIngredients : undefined,
@@ -321,27 +321,37 @@ export function MenuSelectionModal({
                 <View className="flex-row flex-wrap justify-between gap-y-4">
                   {filteredItems.map((item) => {
                     const isTableTimingItem = isTableTimingMenuItem(item);
-                    const imageKey = `${item.id}:${item.imageUrl ?? ""}`;
-                    const itemImageUrl = failedImageKeys.has(imageKey)
+                    const itemImageUrl = failedImageKeys.has(item.id)
                       ? DEFAULT_MENU_IMAGE_URL
-                      : resolveMenuImageUrl(item.imageUrl);
+                      : getMenuItemImageUrl(item);
+                    const imageHeight = responsive.isTablet ? 120 : 96;
                     return (
                       <TouchableOpacity
                         key={item.id}
                         onPress={() => handleItemPress(item)}
                         className="w-[48%] rounded-xl border border-slate-200 bg-white p-4 shadow-sm active:opacity-70 dark:border-slate-800 dark:bg-slate-900"
                       >
-                      <View className="mb-2 h-24 w-full overflow-hidden rounded-lg bg-slate-50 dark:bg-slate-800">
+                      <View
+                        style={{
+                          width: "100%",
+                          height: imageHeight,
+                          marginBottom: 8,
+                          borderRadius: 8,
+                          overflow: "hidden",
+                        }}
+                        className="bg-slate-50 dark:bg-slate-800"
+                      >
                         <Image
                           source={{ uri: itemImageUrl }}
-                          style={{ width: "100%", height: "100%" }}
+                          style={{ width: "100%", height: imageHeight }}
                           contentFit="cover"
                           transition={120}
+                          cachePolicy="memory-disk"
                           onError={() => {
                             if (itemImageUrl === DEFAULT_MENU_IMAGE_URL) return;
                             setFailedImageKeys((current) => {
                               const next = new Set(current);
-                              next.add(imageKey);
+                              next.add(item.id);
                               return next;
                             });
                           }}

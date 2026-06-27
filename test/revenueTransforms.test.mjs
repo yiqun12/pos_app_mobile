@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getRevenueWindowForPreset,
+  iterateCalendarDaysInRevenueWindow,
+} from "../lib/pos/revenueBusinessDay.ts";
+import {
   parseReceiptItems,
   summarizeCashDrawer,
+  summarizeDailyRevenue,
   summarizeItemSales,
   transformSuccessPaymentSummary,
 } from "../lib/pos/revenueTransforms.ts";
@@ -94,4 +99,37 @@ test("summarizes item sales from lazy receipt data", () => {
     { name: "Tea", quantity: 3, revenue: 9, averagePrice: 3 },
     { name: "Noodles", quantity: 1, revenue: 8, averagePrice: 8 },
   ]);
+});
+
+test("fills every day in selected range for daily revenue chart", () => {
+  const timeZone = "America/Los_Angeles";
+  const now = new Date("2025-06-25T20:00:00Z");
+  const window = getRevenueWindowForPreset("thisMonth", timeZone, now);
+  const days = iterateCalendarDaysInRevenueWindow(window, timeZone);
+
+  const daily = summarizeDailyRevenue(
+    [
+      {
+        id: "1",
+        guest: "",
+        time: "",
+        amount: 100,
+        channel: "Paid by Cash",
+        subtotal: 0,
+        serviceFee: 0,
+        tax: 0,
+        gratuity: 0,
+        total: 100,
+        dateTime: "2025-06-24-18-00-00-00",
+      },
+    ],
+    window,
+    timeZone
+  );
+
+  assert.equal(daily.length, days.length);
+  assert.equal(daily.filter((point) => point.revenue > 0).length, 1);
+  assert.equal(daily.find((point) => point.date === "6/24")?.revenue, 100);
+  assert.equal(daily[0].date, "6/1");
+  assert.equal(daily[daily.length - 1].date, "6/30");
 });

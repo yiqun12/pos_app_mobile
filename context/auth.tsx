@@ -5,8 +5,10 @@ import {
   EmailAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
+  signInAnonymously,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
 } from "firebase/auth";
 import React, {
   createContext,
@@ -19,6 +21,8 @@ import React, {
 interface User {
   email: string | null;
   uid: string;
+  displayName: string | null;
+  isGuest: boolean;
 }
 
 interface AuthContextType {
@@ -26,6 +30,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  signInAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
   isLoading: boolean;
@@ -41,9 +46,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        const isGuest = firebaseUser.isAnonymous;
         setUser({
-          email: firebaseUser.email,
+          email: isGuest ? "Guest@7dollar.delivery" : firebaseUser.email,
           uid: firebaseUser.uid,
+          displayName: firebaseUser.displayName ?? (isGuest ? "Guest" : null),
+          isGuest,
         });
       } else {
         setUser(null);
@@ -72,6 +80,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await createUserWithEmailAndPassword(auth, email.trim(), password);
     } catch (error) {
       console.error("Sign up failed:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signInAsGuest = async () => {
+    setIsLoading(true);
+    try {
+      const credential = await signInAnonymously(auth);
+      if (credential.user && !credential.user.displayName) {
+        await updateProfile(credential.user, { displayName: "Guest" });
+      }
+    } catch (error) {
+      console.error("Guest sign in failed:", error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -117,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         login,
         signUp,
+        signInAsGuest,
         logout,
         deleteAccount,
         isLoading,

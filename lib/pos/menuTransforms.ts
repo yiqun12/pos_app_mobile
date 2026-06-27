@@ -4,13 +4,39 @@ export const DEFAULT_AVAILABILITY_PERIODS = ["Morning", "Afternoon", "Evening"] 
 export const DEFAULT_MENU_IMAGE_URL =
   "https://imagedelivery.net/D2Yu9GcuKDLfOUNdrm2hHQ/b686ebae-7ab0-40ec-9383-4c483dace800/public";
 
+function normalizeImageCandidate(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith("//")) return `https:${trimmed}`;
+    return trimmed;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return normalizeImageCandidate(
+      record.url ??
+        record.src ??
+        record.publicUrl ??
+        (Array.isArray(record.variants) ? record.variants[0] : undefined)
+    );
+  }
+
+  return null;
+}
+
 export function resolveMenuImageUrl(...candidates: unknown[]): string {
   for (const candidate of candidates) {
-    if (typeof candidate !== "string") continue;
-    const trimmed = candidate.trim();
-    if (trimmed.length > 0) return trimmed;
+    const normalized = normalizeImageCandidate(candidate);
+    if (normalized) return normalized;
   }
   return DEFAULT_MENU_IMAGE_URL;
+}
+
+export function getMenuItemImageUrl(
+  item: Pick<MenuItem, "imageUrl" | "image"> | { imageUrl?: string; image?: string }
+): string {
+  return resolveMenuImageUrl(item.imageUrl, item.image);
 }
 
 export type WebAttributeVariation = {
@@ -233,6 +259,11 @@ export function transformWebMenuItem(raw: WebMenuItem, index: number): MenuItem 
     rawName,
     nameCN,
     price: parseNumber(priceSource, 0),
+    image:
+      normalizeImageCandidate(raw.image) ??
+      normalizeImageCandidate(raw.Image) ??
+      normalizeImageCandidate(raw.imageUrl) ??
+      undefined,
     imageUrl: resolveMenuImageUrl(raw.imageUrl, raw.image, raw.Image),
     availability: raw.availability ?? [...DEFAULT_AVAILABILITY_PERIODS],
     attributesArr,

@@ -3,12 +3,22 @@ import { transformGlobalModifications } from "@/lib/pos/globalModificationTransf
 import { transformWebMenuItem } from "@/lib/pos/menuTransforms";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
+  setDoc,
+  updateDoc,
   type Unsubscribe,
 } from "firebase/firestore";
-import { storeListPath, storePath } from "../paths";
+import { serializeSeatLayout } from "@/lib/pos/seatLayout";
+import {
+  buildNewStoreDocument,
+  DEFAULT_CREATE_STORE_TABLES,
+  type CreateStoreInput,
+} from "@/lib/pos/createStoreDefaults";
+import { generateStoreId } from "@/lib/pos/generateStoreId";
+import { storeListPath, storePath, storeSubDocPath } from "../paths";
 import type {
   RawGlobalModifications,
   RawMenuCategory,
@@ -111,15 +121,33 @@ function transformStore(id: string, raw: RawStoreDoc): Store {
 }
 
 function transformSeatLayout(raw: RawSeatLayout): SeatLayout {
-  const tables = (raw.table ?? []).map((t, i): Seat => ({
-    id: t.id ?? `seat-${i}`,
-    name: t.tableName ?? `T${i + 1}`,
-    x: t.left ?? 0,
-    y: t.top ?? 0,
-    width: t.width ?? 60,
-    height: t.height ?? 60,
-    status: "vacant",
-  }));
+  const tables = (raw.table ?? []).map((t, i): Seat => {
+    if (t.type === "circle") {
+      const radius = t.radius ?? 30;
+      const diameter = radius * 2;
+      return {
+        id: t.id ?? `seat-${i}`,
+        name: t.tableName ?? `T${i + 1}`,
+        type: "circle",
+        radius,
+        x: t.left ?? 0,
+        y: t.top ?? 0,
+        width: diameter,
+        height: diameter,
+        status: "vacant",
+      };
+    }
+    return {
+      id: t.id ?? `seat-${i}`,
+      name: t.tableName ?? `T${i + 1}`,
+      type: "rect",
+      x: t.left ?? 0,
+      y: t.top ?? 0,
+      width: t.width ?? 60,
+      height: t.height ?? 60,
+      status: "vacant",
+    };
+  });
   return { tables };
 }
 
@@ -171,4 +199,75 @@ function transformMenu(raw: any): Menu {
 // Write API (P1 — not implemented)
 export async function updateStore(_uid: string, _storeId: string, _patch: Partial<Store>): Promise<void> {
   throw new Error("updateStore not implemented (P1)");
+}
+
+/** Persist seat layout to Firestore, mirroring web iframeDesk handleFormSubmit. */
+export async function saveSeatLayout(
+  uid: string,
+  storeId: string,
+  layout: SeatLayout,
+  previousLayout: SeatLayout | null
+): Promise<void> {
+  const prevNames = new Set((previousLayout?.tables ?? []).map((t) => t.name));
+  const nextNames = new Set(layout.tables.map((t) => t.name));
+
+  const added = layout.tables.filter((t) => !prevNames.has(t.name));
+  const deleted = (previousLayout?.tables ?? []).filter((t) => !nextNames.has(t.name));
+
+  await Promise.all([
+    ...added.map((seat) =>
+      setDoc(
+        doc(db, ...storeSubDocPath(uid, storeId, "Table", `${storeId}-${seat.name}`)),
+        { product: "[]" },
+        { merge: true }
+      )
+    ),
+    ...deleted.map((seat) =>
+      deleteDoc(doc(db, ...storeSubDocPath(uid, storeId, "Table", `${storeId}-${seat.name}`)))
+    ),
+  ]);
+
+  await updateDoc(doc(db, ...storePath(uid, storeId)), {
+    restaurant_seat_arrangement: JSON.stringify(serializeSeatLayout(layout)),
+  });
+}
+
+export type { CreateStoreInput };
+
+export async function createStore(
+  uid: string,
+  input: CreateStoreInput,
+  existingStoreIds: string[]
+): Promise<string> {
+  const storeId = generateStoreId(
+    {
+      storeName: input.storeName,
+      city: input.city,
+      zipCode: input.zipCode,
+    },
+    existingStoreIds
+  );
+
+  if (!storeId) {
+    throw new Error("STORE_ID_GENERATION_FAILED");
+  }
+
+  const storeRef = doc(db, ...storePath(uid, storeId));
+  const existing = await getDoc(storeRef);
+  if (existing.exists()) {
+    throw new Error("STORE_ID_EXISTS");
+  }
+
+  await setDoc(storeRef, buildNewStoreDocument(uid, storeId, input));
+
+  await Promise.all(
+    DEFAULT_CREATE_STORE_TABLES.map((tableName) =>
+      setDoc(
+        doc(db, ...storeSubDocPath(uid, storeId, "Table", `${storeId}-${tableName}`)),
+        { product: "[]" }
+      )
+    )
+  );
+
+  return storeId;
 }

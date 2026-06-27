@@ -23,11 +23,16 @@
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.sevendollar.pos",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Allow 7Dollar POS to use your location to auto-fill your store address."
       }
     },
     "android": {
       "package": "com.sevendollar.pos",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -60,6 +65,12 @@
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       "@react-native-google-signin/google-signin",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow 7Dollar POS to use your location to auto-fill your store address."
+        }
+      ],
       [
         "expo-build-properties",
         {

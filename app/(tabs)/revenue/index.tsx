@@ -1,12 +1,17 @@
-import { StatCard } from "@/components/analytics/StatCard";
+import { ItemSalesSummaryCard } from "@/components/revenue/ItemSalesSummaryCard";
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
 import { RevenueBreakdownPieChart } from "@/components/revenue/RevenueBreakdownPieChart";
+import { RevenueDateRangeModal } from "@/components/revenue/RevenueDateRangeModal";
+import { RevenueLineChartModal } from "@/components/revenue/RevenueLineChartModal";
+import { RevenueMoreMenuModal } from "@/components/revenue/RevenueMoreMenuModal";
+import { RevenueSummaryCard } from "@/components/revenue/RevenueSummaryCard";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useStore } from "@/hooks/firestore/useStore";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/auth";
@@ -15,8 +20,9 @@ import { db } from "@/lib/firebase";
 import {
   deriveStoreTimeZone,
   formatBusinessDayLabel,
-  getBusinessDayWindow,
+  getRevenueWindowForPreset,
   type RevenueBusinessDayWindow,
+  type RevenueDatePreset,
 } from "@/lib/pos/revenueBusinessDay";
 import {
   parseReceiptItems,
@@ -26,6 +32,7 @@ import {
   summarizeRevenueStats,
   transformSuccessPaymentSummary,
 } from "@/lib/pos/revenueTransforms";
+import { getRevenueRangeLabel } from "@/lib/pos/revenueRangeLabel";
 import { sliceRevenuePage } from "@/lib/pos/revenuePagination";
 import {
   collection,
@@ -97,7 +104,13 @@ const EMPTY_DASHBOARD_SUMMARY: RevenueDashboardSummary = {
     total: 0,
     averageOrder: 0,
   },
+  itemSalesTotals: {
+    totalItems: 0,
+    totalQuantity: 0,
+    totalRevenue: 0,
+  },
   itemSales: [],
+  dailyRevenue: [],
   revenueBreakdown: {
     totalRevenue: 0,
     totalParts: 0,
@@ -112,23 +125,22 @@ const EMPTY_DASHBOARD_SUMMARY: RevenueDashboardSummary = {
 };
 
 const styles = StyleSheet.create({
-  segmentedTabsScroll: {
-    flexGrow: 0,
-    height: 48,
-  },
-  segmentedTabsContent: {
+  segmentedTabsContainer: {
+    flexDirection: "row",
     alignItems: "center",
     borderRadius: 10,
     minHeight: 48,
     padding: 4,
+    gap: 4,
   },
   segmentedTab: {
+    flex: 1,
     alignItems: "center",
     height: 40,
     justifyContent: "center",
-    minWidth: 128,
+    minWidth: 0,
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
   },
   segmentedTabActive: {
     shadowColor: "#0f172a",
@@ -147,7 +159,6 @@ export default function RevenueScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
-  const isPhone = !responsive.isTablet;
   const tabFontSize = responsive.isTablet ? 13 : 12;
   const { t } = useTranslation();
 
@@ -159,7 +170,15 @@ export default function RevenueScreen() {
     [store?.address.state, store?.address.zip]
   );
 
-  const [businessDayWindow, setBusinessDayWindow] = useState(() => getBusinessDayWindow(new Date(), storeTimeZone));
+  const [businessDayWindow, setBusinessDayWindow] = useState<RevenueBusinessDayWindow>(() =>
+    getRevenueWindowForPreset("today", "America/Los_Angeles")
+  );
+  const [selectedPreset, setSelectedPreset] = useState<RevenueDatePreset>("today");
+  const [customStartDate, setCustomStartDate] = useState(() => new Date());
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
+  const [dateModalVisible, setDateModalVisible] = useState(false);
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [lineChartVisible, setLineChartVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<RevenueTab>("orders");
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [dashboardSummary, setDashboardSummary] = useState<RevenueDashboardSummary>(EMPTY_DASHBOARD_SUMMARY);
@@ -253,7 +272,7 @@ export default function RevenueScreen() {
         cursor = snapshot.docs[snapshot.docs.length - 1];
       }
 
-      setDashboardSummary(summarizeRevenueDashboard(allOrders));
+      setDashboardSummary(summarizeRevenueDashboard(allOrders, window, storeTimeZone));
     } catch (err) {
       console.error("Error loading success_payment summary:", err);
       setDashboardSummary(EMPTY_DASHBOARD_SUMMARY);
@@ -261,7 +280,7 @@ export default function RevenueScreen() {
     } finally {
       setLoadingSummary(false);
     }
-  }, [businessDayWindow, currentStoreId, t, user]);
+  }, [businessDayWindow, currentStoreId, storeTimeZone, t, user]);
 
   // Load from Firestore success_payment
   useEffect(() => {
@@ -277,20 +296,19 @@ export default function RevenueScreen() {
   const total = stats.totalRevenue;
   const cashDrawerSummary = dashboardSummary.cashDrawer;
   const itemSales = dashboardSummary.itemSales;
+  const itemSalesTotals = dashboardSummary.itemSalesTotals;
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const nextBusinessDayWindow = getBusinessDayWindow(new Date(), storeTimeZone);
-      if (
-        nextBusinessDayWindow.start !== businessDayWindow.start ||
-        nextBusinessDayWindow.end !== businessDayWindow.end
-      ) {
-        setBusinessDayWindow(nextBusinessDayWindow);
-      }
+      const nextWindow = getRevenueWindowForPreset(selectedPreset, storeTimeZone, new Date(), {
+        start: customStartDate,
+        end: customEndDate,
+      });
+      setBusinessDayWindow(nextWindow);
       await Promise.all([
-        fetchRevenuePage({ windowOverride: nextBusinessDayWindow }),
-        fetchRevenueSummary(nextBusinessDayWindow),
+        fetchRevenuePage({ windowOverride: nextWindow }),
+        fetchRevenueSummary(nextWindow),
       ]);
     } finally {
       setRefreshing(false);
@@ -302,9 +320,46 @@ export default function RevenueScreen() {
     [businessDayWindow, storeTimeZone]
   );
 
+  const selectedRangeLabel = useMemo(
+    () => getRevenueRangeLabel(selectedPreset, t),
+    [selectedPreset, t]
+  );
+
+  const headerSubtitle = useMemo(
+    () =>
+      t("revenue.subtitleForRange", {
+        range: selectedRangeLabel,
+        dates: businessDayLabel,
+      }),
+    [businessDayLabel, selectedRangeLabel, t]
+  );
+
   useEffect(() => {
-    setBusinessDayWindow(getBusinessDayWindow(new Date(), storeTimeZone));
+    setBusinessDayWindow(
+      getRevenueWindowForPreset(selectedPreset, storeTimeZone, new Date(), {
+        start: customStartDate,
+        end: customEndDate,
+      })
+    );
   }, [storeTimeZone]);
+
+  const handleApplyDateRange = ({
+    preset,
+    startDate,
+    endDate,
+    window,
+  }: {
+    preset: RevenueDatePreset;
+    startDate: Date;
+    endDate: Date | null;
+    window: RevenueBusinessDayWindow;
+  }) => {
+    setSelectedPreset(preset);
+    setCustomStartDate(startDate);
+    setCustomEndDate(endDate);
+    setBusinessDayWindow(window);
+    setDateModalVisible(false);
+  };
 
   const handleLoadMoreOrders = () => {
     if (!lastOrderDoc || !hasMoreOrders || loadingOrders || loadingMoreOrders) return;
@@ -330,7 +385,27 @@ export default function RevenueScreen() {
     <View className="flex-1 bg-white dark:bg-slate-950">
       <ScreenHeader
         title={t("revenue.title")}
-        subtitle={t("revenue.subtitle")}
+        subtitle={headerSubtitle}
+        rightElement={
+          <View className="flex-row items-center gap-1">
+            <TouchableOpacity
+              onPress={() => setDateModalVisible(true)}
+              className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
+              accessibilityRole="button"
+              accessibilityLabel={t("revenue.selectDateRange")}
+            >
+              <Ionicons name="calendar-outline" size={20} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMoreMenuVisible(true)}
+              className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
+              accessibilityRole="button"
+              accessibilityLabel={t("revenue.moreMenu")}
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        }
       />
 
       <ScrollView
@@ -352,7 +427,10 @@ export default function RevenueScreen() {
       >
         <View className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <Text className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
-            {t("revenue.businessDay")}
+            {t("revenue.dateRange")}
+          </Text>
+          <Text className="mt-1 text-base font-bold text-orange-600 dark:text-orange-400">
+            {selectedRangeLabel}
           </Text>
           <Text className="mt-1 text-base font-bold text-slate-900 dark:text-white">
             {businessDayLabel}
@@ -362,52 +440,12 @@ export default function RevenueScreen() {
           </Text>
         </View>
 
-        {isPhone ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            bounces={false}
-            contentContainerStyle={{ gap: responsive.baseSpacing }}
-          >
-            <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalRevenue")} value={loadingSummary ? "..." : `$${stats.totalRevenue}`} />
-            </View>
-            <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.netSales")} value={loadingSummary ? "..." : `$${stats.netSales}`} />
-            </View>
-            <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.tax")} value={loadingSummary ? "..." : `$${stats.tax}`} />
-            </View>
-            <View style={{ width: 152 }}>
-              <StatCard title={t("revenue.totalTips")} value={loadingSummary ? "..." : `$${stats.tips}`} />
-            </View>
-          </ScrollView>
-        ) : (
-          <View className="flex-row gap-4">
-            <View className="flex-1">
-              <StatCard title={t("revenue.totalRevenue")} value={loadingSummary ? "..." : `$${stats.totalRevenue}`} />
-            </View>
-            <View className="flex-1">
-              <StatCard title={t("revenue.netSales")} value={loadingSummary ? "..." : `$${stats.netSales}`} />
-            </View>
-            <View className="flex-1">
-              <StatCard title={t("revenue.tax")} value={loadingSummary ? "..." : `$${stats.tax}`} />
-            </View>
-            <View className="flex-1">
-              <StatCard title={t("revenue.totalTips")} value={loadingSummary ? "..." : `$${stats.tips}`} />
-            </View>
-          </View>
-        )}
+        <RevenueSummaryCard stats={stats} loading={loadingSummary} />
 
-        <ScrollView
-          horizontal
-          style={styles.segmentedTabsScroll}
-          showsHorizontalScrollIndicator={false}
-          bounces={false}
-          contentContainerStyle={[
-            styles.segmentedTabsContent,
+        <View
+          style={[
+            styles.segmentedTabsContainer,
             {
-              gap: responsive.smallSpacing,
               backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f1f5f9",
             },
           ]}
@@ -430,6 +468,8 @@ export default function RevenueScreen() {
               >
                 <Text
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
                   style={[
                     styles.segmentedTabText,
                     {
@@ -443,7 +483,7 @@ export default function RevenueScreen() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         {activeTab === "orders" && (
           <OrdersList
@@ -493,6 +533,7 @@ export default function RevenueScreen() {
             <Text className="mb-4 text-base font-semibold text-slate-900 dark:text-white">
               {t("revenue.salesAnalysis")}
             </Text>
+            <ItemSalesSummaryCard totals={itemSalesTotals} loading={loadingSummary} />
             <RevenueBreakdownPieChart
               revenueBreakdown={dashboardSummary.revenueBreakdown}
               loading={loadingSummary}
@@ -504,9 +545,15 @@ export default function RevenueScreen() {
             ) : (
               <View>
                 <View className="mb-2 flex-row border-b border-slate-100 pb-2 dark:border-slate-800">
-                  <Text className="flex-1 text-xs font-bold uppercase text-slate-500">Item</Text>
-                  <Text className="w-16 text-right text-xs font-bold uppercase text-slate-500">Qty</Text>
-                  <Text className="w-24 text-right text-xs font-bold uppercase text-slate-500">Revenue</Text>
+                  <Text className="flex-1 text-xs font-bold uppercase text-slate-500">
+                    {t("analytics.table.item")}
+                  </Text>
+                  <Text className="w-16 text-right text-xs font-bold uppercase text-slate-500">
+                    {t("analytics.table.qty")}
+                  </Text>
+                  <Text className="w-24 text-right text-xs font-bold uppercase text-slate-500">
+                    {t("analytics.table.revenue")}
+                  </Text>
                 </View>
                 {itemSales.map((item) => (
                   <View
@@ -538,6 +585,34 @@ export default function RevenueScreen() {
         order={selectedOrder}
         colors={colors}
         onClose={() => setOrderModalVisible(false)}
+      />
+
+      <RevenueDateRangeModal
+        visible={dateModalVisible}
+        colors={colors}
+        timeZone={storeTimeZone}
+        selectedPreset={selectedPreset}
+        startDate={customStartDate}
+        endDate={customEndDate}
+        onClose={() => setDateModalVisible(false)}
+        onApply={handleApplyDateRange}
+      />
+
+      <RevenueMoreMenuModal
+        visible={moreMenuVisible}
+        colors={colors}
+        onClose={() => setMoreMenuVisible(false)}
+        onOpenLineChart={() => setLineChartVisible(true)}
+      />
+
+      <RevenueLineChartModal
+        visible={lineChartVisible}
+        colors={colors}
+        data={dashboardSummary.dailyRevenue}
+        rangeLabel={selectedRangeLabel}
+        rangeDates={businessDayLabel}
+        loading={loadingSummary}
+        onClose={() => setLineChartVisible(false)}
       />
     </View>
   );

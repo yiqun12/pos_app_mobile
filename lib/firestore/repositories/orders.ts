@@ -23,9 +23,15 @@ export function subscribePendingOrders(
     (snap) => {
       const orders: PendingOrder[] = snap.docs.map((d) => {
         const raw = d.data() as RawPendingOrderDoc;
+        const tableName =
+          typeof raw.table === "string"
+            ? raw.table
+            : typeof raw.tableName === "string"
+              ? raw.tableName
+              : "";
         return {
           id: d.id,
-          tableName: typeof raw.tableName === "string" ? raw.tableName : "",
+          tableName,
           total:
             typeof raw.total === "number" ? raw.total : parseNumericField(raw.total, 0),
           itemCount: Array.isArray(raw.items) ? raw.items.length : 0,

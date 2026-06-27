@@ -30,9 +30,6 @@ export function useAuthRedirect() {
       router.replace("/select-store");
       return;
     }
-    if (isAuthenticated && currentStoreId && onSelectStore) {
-      router.replace("/(tabs)/seats");
-    }
   }, [
     isAuthenticated,
     authLoading,

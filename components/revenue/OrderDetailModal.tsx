@@ -1,8 +1,16 @@
 ﻿import { Colors } from "@/constants/theme";
+import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ColorMode = (typeof Colors)["light"];
@@ -26,6 +34,11 @@ export type OrderItem = {
   quantity: number;
   price: number;
   total: number;
+  selectedOptions?: {
+    groupName: string;
+    selectedChoices: { name: string }[];
+  }[];
+  selectedIngredients?: { name: string }[];
 };
 
 type OrderDetailModalProps = {
@@ -35,14 +48,195 @@ type OrderDetailModalProps = {
   onClose: () => void;
 };
 
+function MetaChip({ label, value }: { label: string; value: string }) {
+  const responsive = useResponsiveLayout();
+
+  return (
+    <View className="min-w-[30%] flex-1 rounded-xl bg-slate-100 px-3 py-2.5 dark:bg-slate-800">
+      <Text
+        style={{ fontSize: responsive.captionFontSize }}
+        className="font-medium text-slate-500 dark:text-slate-400"
+      >
+        {label}
+      </Text>
+      <Text
+        numberOfLines={1}
+        style={{ fontSize: responsive.subheadingFontSize, marginTop: 2 }}
+        className="font-bold text-slate-900 dark:text-white"
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function OrderItemRow({ item }: { item: OrderItem }) {
+  const responsive = useResponsiveLayout();
+  const { t } = useTranslation();
+  const nameSize = responsive.baseFontSize + 2;
+  const priceSize = responsive.baseFontSize + 1;
+
+  return (
+    <View className="mb-3 flex-row rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+      <View
+        style={{
+          minWidth: 36,
+          height: 36,
+          borderRadius: 10,
+          marginRight: 12,
+          marginTop: 2,
+        }}
+        className="items-center justify-center bg-orange-100 dark:bg-orange-950"
+      >
+        <Text
+          style={{ fontSize: responsive.subheadingFontSize }}
+          className="font-bold text-orange-700 dark:text-orange-300"
+        >
+          ×{item.quantity}
+        </Text>
+      </View>
+
+      <View className="min-w-0 flex-1">
+        <Text
+          style={{ fontSize: nameSize, lineHeight: nameSize + 6 }}
+          className="font-bold text-slate-900 dark:text-white"
+        >
+          {item.name}
+        </Text>
+        <Text
+          style={{ fontSize: responsive.captionFontSize + 1, marginTop: 4 }}
+          className="text-slate-500 dark:text-slate-400"
+        >
+          {t("revenue.itemQtyPrice", {
+            quantity: item.quantity,
+            price: item.price.toFixed(2),
+          })}
+        </Text>
+
+        {item.selectedOptions?.map((option, optIdx) => (
+          <Text
+            key={optIdx}
+            style={{ fontSize: responsive.captionFontSize + 1, marginTop: 4 }}
+            className="text-slate-600 dark:text-slate-300"
+          >
+            {option.groupName}:{" "}
+            {option.selectedChoices.map((c) => c.name).join(", ")}
+          </Text>
+        ))}
+
+        {item.selectedIngredients && item.selectedIngredients.length > 0 && (
+          <Text
+            style={{ fontSize: responsive.captionFontSize + 1, marginTop: 4 }}
+            className="text-slate-600 dark:text-slate-300"
+          >
+            {t("revenue.addOns")}:{" "}
+            {item.selectedIngredients.map((i) => i.name).join(", ")}
+          </Text>
+        )}
+      </View>
+
+      <Text
+        style={{
+          fontSize: priceSize,
+          lineHeight: priceSize + 4,
+          marginLeft: 8,
+          marginTop: 2,
+        }}
+        className="font-bold text-slate-900 dark:text-white"
+      >
+        ${item.total.toFixed(2)}
+      </Text>
+    </View>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  const responsive = useResponsiveLayout();
+  const labelSize = emphasize ? responsive.baseFontSize + 1 : responsive.baseFontSize;
+  const valueSize = emphasize ? responsive.headingFontSize : responsive.baseFontSize;
+
+  return (
+    <View className="flex-row items-center justify-between py-1.5">
+      <Text
+        style={{ fontSize: labelSize }}
+        className={`${emphasize ? "font-bold" : "font-medium"} text-slate-600 dark:text-slate-300`}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{ fontSize: valueSize }}
+        className={`${emphasize ? "font-bold text-green-600 dark:text-green-400" : "font-semibold text-slate-900 dark:text-white"}`}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function OrderTotals({ order }: { order: Order }) {
+  const { t } = useTranslation();
+  const responsive = useResponsiveLayout();
+  const hasTotals = order.subtotal != null || order.total != null;
+
+  if (!hasTotals) return null;
+
+  return (
+    <View className="border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/80">
+      {order.subtotal != null && (
+        <SummaryRow
+          label={t("revenue.subtotal")}
+          value={`$${order.subtotal.toFixed(2)}`}
+        />
+      )}
+      {order.serviceFee != null && (
+        <SummaryRow
+          label={t("revenue.serviceFee")}
+          value={`$${order.serviceFee.toFixed(2)}`}
+        />
+      )}
+      {order.tax != null && (
+        <SummaryRow
+          label={t("revenue.tax")}
+          value={`$${order.tax.toFixed(2)}`}
+        />
+      )}
+      {order.gratuity != null && (
+        <SummaryRow
+          label={t("revenue.gratuity")}
+          value={`$${order.gratuity.toFixed(2)}`}
+        />
+      )}
+      {order.total != null && (
+        <>
+          <View
+            style={{ marginVertical: responsive.smallSpacing }}
+            className="h-px bg-slate-200 dark:bg-slate-700"
+          />
+          <SummaryRow
+            label={t("revenue.total")}
+            value={`$${order.total.toFixed(2)}`}
+            emphasize
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
 export function OrderDetailModal({
   visible,
   order,
   colors,
   onClose,
 }: OrderDetailModalProps) {
-  const insets = useSafeAreaInsets();
-
   return (
     <Modal
       visible={visible}
@@ -50,11 +244,13 @@ export function OrderDetailModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={{ flex: 1, paddingTop: insets.top }}>
-        <View className="flex-1 pb-4">
-          <View className="mt-auto flex-1 rounded-t-2xl bg-white dark:bg-slate-900">
-            <OrderDetailContent order={order} colors={colors} onClose={onClose} />
-          </View>
+      <View className="flex-1 justify-end bg-black/45">
+        <Pressable className="flex-1" onPress={onClose} accessibilityRole="button" />
+        <View
+          className="rounded-t-3xl bg-white dark:bg-slate-950"
+          style={{ height: "92%" }}
+        >
+          <OrderDetailContent order={order} colors={colors} onClose={onClose} />
         </View>
       </View>
     </Modal>
@@ -73,184 +269,96 @@ export function OrderDetailContent({
   onPay?: () => void;
 }) {
   const { t } = useTranslation();
+  const responsive = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
+  const hasItems = Boolean(order?.items && order.items.length > 0);
+  const hasTotals = order?.subtotal != null || order?.total != null;
 
   if (!order) return null;
 
   return (
     <View className="flex-1">
-      <View className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-slate-900 dark:text-white">
+      <View className="border-b border-slate-200 px-4 pb-3 pt-4 dark:border-slate-800">
+        <View className="flex-row items-start justify-between">
+          <View className="min-w-0 flex-1 pr-3">
+            <Text
+              style={{ fontSize: responsive.headingFontSize }}
+              className="font-bold text-slate-900 dark:text-white"
+            >
               {t("revenue.orderDetails")}
             </Text>
-            <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              {order.id}
+            <Text
+              style={{ fontSize: responsive.subheadingFontSize, marginTop: 4 }}
+              className="font-medium text-slate-500 dark:text-slate-400"
+            >
+              #{order.id}
             </Text>
           </View>
           <TouchableOpacity
             onPress={onClose}
-            className="rounded-full bg-slate-100 p-2 dark:bg-slate-800"
+            className="rounded-full bg-slate-100 p-2.5 dark:bg-slate-800"
           >
-            <Ionicons name="close" size={24} color={colors.text} />
+            <Ionicons name="close" size={22} color={colors.text} />
           </TouchableOpacity>
+        </View>
+
+        <View
+          style={{ gap: responsive.smallSpacing, marginTop: responsive.mediumSpacing }}
+          className="flex-row flex-wrap"
+        >
+          <MetaChip label={t("revenue.guest")} value={order.guest} />
+          <MetaChip label={t("revenue.time")} value={order.time} />
+          <MetaChip label={t("revenue.channel")} value={order.channel} />
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-4 py-4">
-        <View className="mb-4 rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-          <View className="flex-row justify-between">
-            <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {t("revenue.guest")}
-            </Text>
-            <Text className="text-sm font-bold text-slate-900 dark:text-white">
-              {order.guest}
-            </Text>
-          </View>
-          <View className="mt-2 flex-row justify-between">
-            <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {t("revenue.time")}
-            </Text>
-            <Text className="text-sm font-bold text-slate-900 dark:text-white">
-              {order.time}
-            </Text>
-          </View>
-          <View className="mt-2 flex-row justify-between">
-            <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {t("revenue.channel")}
-            </Text>
-            <Text className="text-sm font-bold text-slate-900 dark:text-white">
-              {order.channel}
-            </Text>
-          </View>
-        </View>
-
-        {order.items && order.items.length > 0 && (
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-bold text-slate-900 dark:text-white">
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: responsive.mediumSpacing,
+          paddingTop: responsive.mediumSpacing,
+          paddingBottom: responsive.smallSpacing,
+        }}
+      >
+        {hasItems ? (
+          <>
+            <Text
+              style={{ fontSize: responsive.subheadingFontSize + 1, marginBottom: responsive.smallSpacing }}
+              className="font-bold text-slate-900 dark:text-white"
+            >
               {t("revenue.items")}
             </Text>
-            {order.items.map((item, idx) => (
-              <View
-                key={idx}
-                className="mb-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-800"
-              >
-                <View className="flex-row justify-between">
-                  <View className="flex-1">
-                    <Text className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {item.name}
-                    </Text>
-                    <Text className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {t("revenue.itemQtyPrice", {
-                        quantity: item.quantity,
-                        price: item.price.toFixed(2),
-                      })}
-                    </Text>
-
-                    {(item as any).selectedOptions &&
-                      (item as any).selectedOptions.length > 0 && (
-                        <View className="mt-2">
-                          {(item as any).selectedOptions.map(
-                            (option: any, optIdx: number) => (
-                              <Text
-                                key={optIdx}
-                                className="text-xs text-slate-600 dark:text-slate-400"
-                              >
-                                {option.groupName}: {option.selectedChoices
-                                  .map((c: any) => c.name)
-                                  .join(", ")}
-                              </Text>
-                            )
-                          )}
-                        </View>
-                      )}
-
-                    {(item as any).selectedIngredients &&
-                      (item as any).selectedIngredients.length > 0 && (
-                        <Text className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                          {t("revenue.addOns")}: {(item as any).selectedIngredients
-                            .map((i: any) => i.name)
-                            .join(", ")}
-                        </Text>
-                      )}
-                  </View>
-                  <Text className="text-sm font-bold text-slate-900 dark:text-white">
-                    ${item.total.toFixed(2)}
-                  </Text>
-                </View>
-              </View>
+            {order.items!.map((item, idx) => (
+              <OrderItemRow key={`${item.name}-${idx}`} item={item} />
             ))}
-          </View>
-        )}
-
-        {order.subtotal && (
-          <View className="mb-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-            <View className="flex-row justify-between py-2">
-              <Text className="text-sm text-slate-600 dark:text-slate-400">
-                {t("revenue.subtotal")}
-              </Text>
-              <Text className="font-semibold text-slate-900 dark:text-white">
-                ${order.subtotal.toFixed(2)}
-              </Text>
-            </View>
-            {order.serviceFee !== undefined && (
-              <View className="flex-row justify-between py-2">
-                <Text className="text-sm text-slate-600 dark:text-slate-400">
-                  {t("revenue.serviceFee")}
-                </Text>
-                <Text className="font-semibold text-slate-900 dark:text-white">
-                  ${order.serviceFee.toFixed(2)}
-                </Text>
-              </View>
-            )}
-            {order.tax !== undefined && (
-              <View className="flex-row justify-between py-2">
-                <Text className="text-sm text-slate-600 dark:text-slate-400">
-                  {t("revenue.tax")}
-                </Text>
-                <Text className="font-semibold text-slate-900 dark:text-white">
-                  ${order.tax.toFixed(2)}
-                </Text>
-              </View>
-            )}
-            {order.gratuity !== undefined && (
-              <View className="flex-row justify-between py-2">
-                <Text className="text-sm text-slate-600 dark:text-slate-400">
-                  {t("revenue.gratuity")}
-                </Text>
-                <Text className="font-semibold text-slate-900 dark:text-white">
-                  ${order.gratuity.toFixed(2)}
-                </Text>
-              </View>
-            )}
-            {order.total && (
-              <View className="mt-2 flex-row justify-between border-t border-slate-200 py-2 dark:border-slate-700">
-                <Text className="font-bold text-slate-900 dark:text-white">
-                  {t("revenue.total")}
-                </Text>
-                <Text className="text-lg font-bold text-green-600 dark:text-green-400">
-                  ${order.total.toFixed(2)}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {(!order.items || order.items.length === 0) && !order.subtotal && (
-          <View className="rounded-lg bg-slate-100 p-4 dark:bg-slate-800">
-            <Text className="text-center text-sm text-slate-500 dark:text-slate-400">
+          </>
+        ) : !hasTotals ? (
+          <View className="rounded-2xl bg-slate-100 px-4 py-8 dark:bg-slate-800">
+            <Text
+              style={{ fontSize: responsive.baseFontSize }}
+              className="text-center text-slate-500 dark:text-slate-400"
+            >
               {t("revenue.detailUnavailable")}
             </Text>
           </View>
-        )}
+        ) : null}
       </ScrollView>
 
-      <View className="flex-row gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+      <OrderTotals order={order} />
+
+      <View
+        className="flex-row gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+      >
         <TouchableOpacity
           onPress={onClose}
-          className="flex-1 rounded-lg bg-slate-100 py-3 dark:bg-slate-800"
+          className="flex-1 rounded-xl bg-slate-100 py-3.5 dark:bg-slate-800"
         >
-          <Text className="text-center font-bold text-slate-900 dark:text-white">
+          <Text
+            style={{ fontSize: responsive.baseFontSize }}
+            className="text-center font-bold text-slate-900 dark:text-white"
+          >
             {t("common.close")}
           </Text>
         </TouchableOpacity>
@@ -258,9 +366,12 @@ export function OrderDetailContent({
         {onPay && (
           <TouchableOpacity
             onPress={onPay}
-            className="flex-1 rounded-lg bg-blue-600 py-3"
+            className="flex-1 rounded-xl bg-blue-600 py-3.5"
           >
-            <Text className="text-center font-bold text-white">
+            <Text
+              style={{ fontSize: responsive.baseFontSize }}
+              className="text-center font-bold text-white"
+            >
               {t("revenue.payAmount", {
                 amount: (order.total || order.amount || 0).toFixed(2),
               })}

@@ -150,11 +150,10 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
               lineHeight: nameLineHeight,
               textAlign: "center",
               paddingHorizontal: 2,
+              flexShrink: 0,
             }}
             className="font-bold text-slate-700 dark:text-slate-100"
             numberOfLines={2}
-            adjustsFontSizeToFit
-            minimumFontScale={0.72}
             ellipsizeMode="tail"
           >
             {seat.name}
@@ -164,24 +163,26 @@ export const DraggableSeat: React.FC<DraggableSeatProps> = ({
               style={{
                 fontSize: statusFontSize,
                 marginTop: SEAT_SIZE < 72 ? 2 : responsive.isTablet ? 6 : 4,
+                maxWidth: "100%",
+                paddingHorizontal: 2,
               }}
               className="text-slate-500 dark:text-slate-400"
               numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              ellipsizeMode="tail"
             >
-              {t("seats.itemsCount", { count: seat.itemCount })}
+              ×{seat.itemCount}
             </Text>
           ) : showStatusText ? (
             <Text
               style={{
                 fontSize: statusFontSize,
                 marginTop: SEAT_SIZE < 72 ? 2 : responsive.isTablet ? 6 : 4,
+                maxWidth: "100%",
+                paddingHorizontal: 2,
               }}
-              className="text-slate-400 dark:text-slate-500 font-medium uppercase"
+              className="text-slate-400 dark:text-slate-500 font-medium"
               numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              ellipsizeMode="tail"
             >
               {statusLabelMap[seat.status]}
             </Text>

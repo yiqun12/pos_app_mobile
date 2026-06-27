@@ -33,6 +33,7 @@ import { AuthProvider } from "@/context/auth";
 import { LanguageProvider } from "@/context/language";
 import { LicenseProvider } from "@/context/license";
 import { MenuProvider } from "@/context/menu";
+import { NotificationsProvider } from "@/context/notifications";
 import { OtaUpdateProvider } from "@/context/ota-update";
 import { StoreProvider } from "@/context/store";
 import { useAuthRedirect } from "@/hooks/use-auth-redirect";
@@ -71,6 +72,7 @@ export default function RootLayout() {
           <LanguageProvider>
             <LicenseProvider>
               <MenuProvider>
+                <NotificationsProvider>
                 <ThemeProvider
                   value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
                 >
@@ -99,6 +101,7 @@ export default function RootLayout() {
                     <StatusBar style="auto" />
                   </OtaUpdateProvider>
                 </ThemeProvider>
+                </NotificationsProvider>
               </MenuProvider>
             </LicenseProvider>
           </LanguageProvider>

@@ -3,13 +3,16 @@ import { Colors } from "@/constants/theme";
 import { useStore } from "@/hooks/firestore/useStore";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Image, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function TestFirebaseScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const { t } = useTranslation();
   const { data: store, loading, error } = useStore();
+  const screenTitle = t("testFirebase.title");
 
   if (loading) {
     return (
@@ -17,10 +20,10 @@ export default function TestFirebaseScreen() {
         className="flex-1 bg-white dark:bg-slate-950"
         edges={["top", "left", "right", "bottom"]}
       >
-        <ScreenHeader title="Firebase Test" />
+        <ScreenHeader title={screenTitle} showBackButton />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.tint} />
-          <Text className="mt-4 text-slate-500">Fetching store data...</Text>
+          <Text className="mt-4 text-slate-500">{t("testFirebase.fetchingData")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -29,7 +32,7 @@ export default function TestFirebaseScreen() {
   if (error) {
     return (
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-        <ScreenHeader title="Firebase Test" />
+        <ScreenHeader title={screenTitle} showBackButton />
         <View className="flex-1 items-center justify-center p-4">
           <Text className="text-center text-red-500">{error.message}</Text>
         </View>
@@ -40,9 +43,9 @@ export default function TestFirebaseScreen() {
   if (!store) {
     return (
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-950">
-        <ScreenHeader title="Firebase Test" />
+        <ScreenHeader title={screenTitle} showBackButton />
         <View className="flex-1 items-center justify-center p-4">
-          <Text className="text-slate-500">No store selected.</Text>
+          <Text className="text-slate-500">{t("profile.noStoreSelected")}</Text>
         </View>
       </SafeAreaView>
     );
@@ -53,7 +56,7 @@ export default function TestFirebaseScreen() {
       className="flex-1 bg-white dark:bg-slate-950"
       edges={["top", "left", "right", "bottom"]}
     >
-      <ScreenHeader title="Firebase Test" />
+      <ScreenHeader title={screenTitle} showBackButton />
       <ScrollView className="flex-1 px-4 py-4">
         <View className="mb-6 flex-row items-start gap-4">
           {store.image ? (
@@ -79,19 +82,19 @@ export default function TestFirebaseScreen() {
 
         <View className="mb-6 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
           <Text className="mb-2 font-semibold text-slate-900 dark:text-white">
-            Contact & Location
+            {t("testFirebase.contactLocation")}
           </Text>
           <Text className="text-slate-600 dark:text-slate-400">
-            Phone: {store.phone}
+            {t("testFirebase.phone")}: {store.phone}
           </Text>
           <Text className="text-slate-600 dark:text-slate-400">
-            Address: {store.address.line1}
+            {t("testFirebase.address")}: {store.address.line1}
           </Text>
           <Text className="text-slate-600 dark:text-slate-400">
             {store.address.physical}, {store.address.state} {store.address.zip}
           </Text>
           <Text className="text-slate-600 dark:text-slate-400">
-            Tax Rate: {store.taxRate}%
+            {t("testFirebase.taxRate")}: {store.taxRate}%
           </Text>
         </View>
 
@@ -113,7 +116,9 @@ export default function TestFirebaseScreen() {
           </Text>
         </View>
 
-        <Text className="font-semibold text-slate-900 dark:text-white">Open Hours</Text>
+        <Text className="font-semibold text-slate-900 dark:text-white">
+          {t("testFirebase.openingTimes")}
+        </Text>
         <View className="mb-4 rounded bg-slate-100 p-2 dark:bg-slate-800">
           <Text className="font-mono text-xs text-slate-600 dark:text-slate-400">
             {JSON.stringify(store.openHours, null, 2)}

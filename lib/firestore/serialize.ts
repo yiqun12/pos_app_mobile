@@ -3,6 +3,8 @@
  * Returns fallback on any error (missing field, invalid JSON, wrong type).
  */
 export function parseJsonField<T>(raw: unknown, fallback: T): T {
+  if (raw === null || raw === undefined) return fallback;
+  if (typeof raw === "object") return raw as T;
   if (typeof raw !== "string" || raw.length === 0) return fallback;
   try {
     return JSON.parse(raw) as T;

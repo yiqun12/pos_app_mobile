@@ -3,6 +3,7 @@ import { MenuSelectionModal } from "@/components/menu/modals/MenuSelectionModal"
 import { AdjustmentModal } from "@/components/seats/modals/AdjustmentModal";
 import { CashPaymentModal } from "@/components/seats/modals/CashPaymentModal";
 import { PaymentModal } from "@/components/seats/modals/PaymentModal";
+import { PrinterDriverModal } from "@/components/seats/modals/PrinterDriverModal";
 import { ServiceFeeModal } from "@/components/seats/modals/ServiceFeeModal";
 import { SplitPaymentModal, type SplitPaymentPayload } from "@/components/seats/modals/SplitPaymentModal";
 import { TableTimingModal } from "@/components/seats/modals/TableTimingModal";
@@ -113,6 +114,7 @@ export default function SeatScreen() {
   const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
   const [changeDeskVisible, setChangeDeskVisible] = useState(false);
   const [changeDeskProcessing, setChangeDeskProcessing] = useState(false);
+  const [printerDriverVisible, setPrinterDriverVisible] = useState(false);
   const [tableTimingContext, setTableTimingContext] = useState<{
     menuItem: MenuItem;
     product?: any;
@@ -566,7 +568,12 @@ export default function SeatScreen() {
 
     await Promise.all(writes);
     if (!silent) {
-      Alert.alert("Kitchen", cleanedAdded.length || cleanedDeleted.length ? "Order sent to kitchen" : "No kitchen changes to send");
+      Alert.alert(
+        t("seats.kitchenTitle"),
+        cleanedAdded.length || cleanedDeleted.length
+          ? t("seats.kitchenSent")
+          : t("seats.kitchenNoChanges")
+      );
     }
   };
 
@@ -648,7 +655,7 @@ export default function SeatScreen() {
       connected_stripe_account_id: store.stripeStoreAcct,
       amount: Math.round(amount * 100),
     });
-    Alert.alert("Card payment", "Payment sent to terminal. Waiting for terminal confirmation.");
+    Alert.alert(t("seats.cardPaymentTitle"), t("seats.cardPaymentSent"));
   };
 
   useModalAction((modalName) => {
@@ -1295,7 +1302,7 @@ export default function SeatScreen() {
       setTipAmount(0);
       setTaxExempt(false);
       setServiceFeeAmount(0);
-      Alert.alert("Unpaid", "Order marked as unpaid and table cleared.");
+      Alert.alert(t("seats.unpaidTitle"), t("seats.unpaidMessage"));
     } catch (e) {
       console.error("Error marking order unpaid:", e);
       Alert.alert(t("common.error"), "Failed to mark order unpaid");
@@ -1314,6 +1321,28 @@ export default function SeatScreen() {
       console.error(`Error writing ${type} print event:`, e);
       Alert.alert(t("common.error"), `Failed to print ${type}`);
     }
+  };
+
+  const openSeatOptionsMenu = () => {
+    const buttons: {
+      text: string;
+      onPress?: () => void;
+      style?: "cancel" | "default" | "destructive";
+    }[] = [];
+
+    if (hasOrderItems) {
+      buttons.push(
+        { text: t("seats.changeSeat"), onPress: () => setChangeDeskVisible(true) }
+      );
+    }
+
+    buttons.push(
+      { text: t("seats.printerDriver.menuLabel"), onPress: () => setPrinterDriverVisible(true) },
+      { text: t("common.back"), onPress: () => router.back() },
+      { text: t("common.cancel"), style: "cancel" }
+    );
+
+    Alert.alert(t("seats.options"), t("seats.selectAction"), buttons);
   };
 
   const handleChangeDesk = async (target: { id: string; name: string }) => {
@@ -1402,7 +1431,7 @@ export default function SeatScreen() {
 
       <View className="mt-4">
         <Button
-          label={taxExempt ? "✓ Tax Exempt" : "Tax Exempt"}
+          label={taxExempt ? t("seats.taxExemptEnabled") : t("seats.taxExempt")}
           variant={taxExempt ? "primary" : "outline"}
           icon="pricetag"
           onPress={() => setTaxExempt((enabled) => !enabled)}
@@ -1413,7 +1442,7 @@ export default function SeatScreen() {
       <View className="mt-4 flex-row gap-2">
         <View className="flex-1">
           <Button
-            label={serviceFeeAmount > 0 ? `Service Fee $${serviceFeeAmount.toFixed(2)}` : "Service Fee"}
+            label={serviceFeeAmount > 0 ? `${t("seats.orderSummary.serviceFee")} $${serviceFeeAmount.toFixed(2)}` : t("seats.orderSummary.serviceFee")}
             variant={serviceFeeAmount > 0 ? "primary" : "outline"}
             icon="receipt"
             onPress={() => {
@@ -1425,7 +1454,7 @@ export default function SeatScreen() {
         </View>
         <View className="flex-1">
           <Button
-            label="Adjust Total"
+            label={t("seats.adjustTotal")}
             variant="outline"
             icon="create"
             onPress={() => {
@@ -1440,7 +1469,7 @@ export default function SeatScreen() {
       <View className="mt-3 flex-row gap-2">
         <View className="flex-1">
           <Button
-            label="Print Order"
+            label={t("seats.printOrder")}
             variant="outline"
             icon="restaurant"
             onPress={() => {
@@ -1452,7 +1481,7 @@ export default function SeatScreen() {
         </View>
         <View className="flex-1">
           <Button
-            label="Print Receipt"
+            label={t("seats.printReceipt")}
             variant="outline"
             icon="print"
             onPress={() => {
@@ -1467,7 +1496,7 @@ export default function SeatScreen() {
       <View className="mt-3 flex-row gap-2">
         <View className="flex-1">
           <Button
-            label="Split Payment"
+            label={t("seats.splitBill")}
             variant="outline"
             icon="git-branch"
             onPress={() => {
@@ -1520,22 +1549,7 @@ export default function SeatScreen() {
           {t("seats.seatOrder", { seatId: tableName ?? seatId ?? "-" })}
         </Text>
         <TouchableOpacity
-          onPress={() => {
-            Alert.alert(
-              t("seats.options"),
-              t("seats.selectAction"),
-              hasOrderItems
-                ? [
-                    {
-                      text: t("seats.changeSeat"),
-                      onPress: () => setChangeDeskVisible(true),
-                    },
-                    { text: t("seats.markUnpaid"), onPress: () => void handleMarkAsUnpaid() },
-                    { text: t("common.cancel"), style: "cancel" },
-                  ]
-                : [{ text: t("common.cancel"), style: "cancel" }]
-            );
-          }}
+          onPress={openSeatOptionsMenu}
           className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
         >
           <Ionicons name="ellipsis-horizontal" size={19} color={colors.text} />
@@ -1825,6 +1839,13 @@ export default function SeatScreen() {
         onClose={() => setTableTimingContext(null)}
         onStart={(payload) => void handleStartTableTiming(payload)}
         onEnd={(payload) => void handleEndTableTiming(payload)}
+      />
+
+      <PrinterDriverModal
+        visible={printerDriverVisible}
+        onClose={() => setPrinterDriverVisible(false)}
+        userId={user?.uid}
+        storeId={currentStoreId ?? undefined}
       />
     </View>
   );

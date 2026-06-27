@@ -1,3 +1,10 @@
+import {
+  formatChartDateKey,
+  getChartDateKeyFromDateTime,
+  iterateCalendarDaysInRevenueWindow,
+  type RevenueBusinessDayWindow,
+} from "@/lib/pos/revenueBusinessDay";
+
 export type RevenueOrderItem = {
   name: string;
   quantity: number;
@@ -30,6 +37,17 @@ export type CashDrawerSummary = {
   otherSales: number;
   total: number;
   averageOrder: number;
+};
+
+export type ItemSalesTotals = {
+  totalItems: number;
+  totalQuantity: number;
+  totalRevenue: number;
+};
+
+export type DailyRevenuePoint = {
+  date: string;
+  revenue: number;
 };
 
 export type ItemSalesSummary = {
@@ -65,7 +83,9 @@ export type RevenueBreakdownSummary = {
 export type RevenueDashboardSummary = {
   stats: RevenueStatsSummary;
   cashDrawer: CashDrawerSummary;
+  itemSalesTotals: ItemSalesTotals;
   itemSales: ItemSalesSummary[];
+  dailyRevenue: DailyRevenuePoint[];
   revenueBreakdown: RevenueBreakdownSummary;
 };
 
@@ -269,13 +289,54 @@ export function summarizeItemSales(orders: RevenueOrderSummary[]): ItemSalesSumm
     .sort((a, b) => b.revenue - a.revenue);
 }
 
+export function summarizeDailyRevenue(
+  orders: RevenueOrderSummary[],
+  window: RevenueBusinessDayWindow,
+  timeZone: string
+): DailyRevenuePoint[] {
+  const days = iterateCalendarDaysInRevenueWindow(window, timeZone);
+  if (days.length === 0) return [];
+
+  const includeYear =
+    days[0].year !== days[days.length - 1].year
+    || days[0].month !== days[days.length - 1].month;
+
+  const totals = new Map<string, number>(
+    days.map((day) => [
+      formatChartDateKey(day.year, day.month, day.day, includeYear),
+      0,
+    ])
+  );
+
+  orders.forEach((order) => {
+    if (!order.dateTime) return;
+    const key = getChartDateKeyFromDateTime(order.dateTime, timeZone, includeYear);
+    if (!totals.has(key)) return;
+    totals.set(key, roundMoney((totals.get(key) ?? 0) + order.total));
+  });
+
+  return Array.from(totals.entries()).map(([date, revenue]) => ({ date, revenue }));
+}
+
 export function summarizeRevenueDashboard(
-  orders: RevenueOrderSummary[]
+  orders: RevenueOrderSummary[],
+  window: RevenueBusinessDayWindow,
+  timeZone: string
 ): RevenueDashboardSummary {
+  const allItemSales = summarizeItemSales(orders);
+  const totalQuantity = roundMoney(allItemSales.reduce((sum, item) => sum + item.quantity, 0));
+  const totalItemRevenue = roundMoney(allItemSales.reduce((sum, item) => sum + item.revenue, 0));
+
   return {
     stats: summarizeRevenueStats(orders),
     cashDrawer: summarizeCashDrawer(orders),
-    itemSales: summarizeItemSales(orders).slice(0, 20),
+    itemSalesTotals: {
+      totalItems: allItemSales.length,
+      totalQuantity,
+      totalRevenue: totalItemRevenue,
+    },
+    itemSales: allItemSales.slice(0, 20),
+    dailyRevenue: summarizeDailyRevenue(orders, window, timeZone),
     revenueBreakdown: summarizeRevenueBreakdown(orders),
   };
 }

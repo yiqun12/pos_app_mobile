@@ -1,3 +1,5 @@
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -24,7 +26,9 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const router = useRouter();
   const responsive = useResponsiveLayout();
-  const headerPadding = responsive.isTablet ? responsive.baseSpacing : 14;
+  const colorScheme = useColorScheme();
+  const iconColor = Colors[colorScheme ?? "light"].text;
+  const headerPadding = responsive.isTablet ? responsive.baseSpacing : 16;
   const headerGap = responsive.isTablet ? responsive.smallSpacing : 10;
   const backButtonSize = responsive.isTablet ? 24 : 22;
 
@@ -38,20 +42,30 @@ export function ScreenHeader({
       }}
       {...props}
     >
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1 flex-row items-center gap-2">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1 flex-row items-center gap-2">
           {showBackButton && !showCloseButton && (
-            <TouchableOpacity onPress={() => router.back()}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
               <Ionicons
                 name="arrow-back"
                 size={backButtonSize}
-                color="#0f172a"
+                color={iconColor}
               />
             </TouchableOpacity>
           )}
           {showCloseButton && (
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="close" size={backButtonSize} color="#0f172a" />
+            <TouchableOpacity
+              onPress={() => router.back()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={backButtonSize} color={iconColor} />
             </TouchableOpacity>
           )}
           <View>
@@ -75,7 +89,9 @@ export function ScreenHeader({
             )}
           </View>
         </View>
-        <View className="flex-row items-center gap-2">{rightElement}</View>
+        <View className="max-w-[52%] shrink-0 flex-row items-center justify-end gap-2">
+          {rightElement}
+        </View>
       </View>
       {children}
     </View>

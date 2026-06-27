@@ -58,11 +58,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setLanguage = (nextLanguage: AppLanguage) => {
-    setLanguageState(nextLanguage);
-    void Promise.all([
-      i18n.changeLanguage(nextLanguage),
-      AsyncStorage.setItem(STORAGE_KEY, nextLanguage),
-    ]).catch((error) => {
+    void (async () => {
+      await i18n.changeLanguage(nextLanguage);
+      setLanguageState(nextLanguage);
+      await AsyncStorage.setItem(STORAGE_KEY, nextLanguage);
+    })().catch((error) => {
       console.warn("Failed to update app language:", error);
     });
   };

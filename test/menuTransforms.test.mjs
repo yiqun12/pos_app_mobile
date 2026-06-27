@@ -34,6 +34,8 @@ test("transforms Web attributesArr into App option groups", () => {
   assert.equal(item.rawName, "Beef Noodle");
   assert.equal(item.nameCN, "牛肉面");
   assert.equal(item.price, 12.5);
+  assert.equal(item.imageUrl, "https://example.com/noodle.jpg");
+  assert.equal(item.image, "https://example.com/noodle.jpg");
   assert.equal(item.categoryId, "Noodles");
   assert.equal(item.optionGroups?.length, 2);
   assert.deepEqual(item.optionGroups?.[0], {

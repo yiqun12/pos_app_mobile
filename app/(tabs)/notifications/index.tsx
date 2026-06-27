@@ -5,13 +5,16 @@
 } from "@/components/notifications";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Colors } from "@/constants/theme";
+import { useNotifications } from "@/context/notifications";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useSeats } from "@/hooks/firestore/useSeats";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   RefreshControl,
@@ -28,71 +31,20 @@ export default function NotificationsScreen() {
   const colors = Colors[colorScheme ?? "light"];
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+    clearAll,
+    refresh,
+  } = useNotifications();
+  const { data: seatLayout } = useSeats();
   const isTablet = responsive.isTablet;
   const filterLabelSize = isTablet ? 17 : 14;
   const filterCountSize = isTablet ? 15 : 12;
   const markAllFontSize = isTablet ? 16 : 12;
-
-  const initialNotifications = useMemo<Notification[]>(
-    () => [
-      {
-        id: "1",
-        type: "order",
-        title: t("notifications.mock.newOrderReceived.title"),
-        message: t("notifications.mock.newOrderReceived.message"),
-        timestamp: t("notifications.mock.time.2MinAgo"),
-        isRead: false,
-        orderId: "A1023",
-        amount: 48.5,
-      },
-      {
-        id: "2",
-        type: "order",
-        title: t("notifications.mock.newDoorDashOrder.title"),
-        message: t("notifications.mock.newDoorDashOrder.message"),
-        timestamp: t("notifications.mock.time.15MinAgo"),
-        isRead: false,
-        orderId: "D4521",
-        amount: 32.0,
-      },
-      {
-        id: "3",
-        type: "payment",
-        title: t("notifications.mock.paymentReceived.title"),
-        message: t("notifications.mock.paymentReceived.message"),
-        timestamp: t("notifications.mock.time.1HourAgo"),
-        isRead: true,
-        orderId: "A1019",
-        amount: 86.75,
-      },
-      {
-        id: "4",
-        type: "alert",
-        title: t("notifications.mock.lowInventoryAlert.title"),
-        message: t("notifications.mock.lowInventoryAlert.message"),
-        timestamp: t("notifications.mock.time.2HoursAgo"),
-        isRead: true,
-      },
-      {
-        id: "5",
-        type: "system",
-        title: t("notifications.mock.systemUpdate.title"),
-        message: t("notifications.mock.systemUpdate.message"),
-        timestamp: t("notifications.mock.time.yesterday"),
-        isRead: true,
-      },
-      {
-        id: "6",
-        type: "order",
-        title: t("notifications.mock.orderCompleted.title"),
-        message: t("notifications.mock.orderCompleted.message"),
-        timestamp: t("notifications.mock.time.yesterday"),
-        isRead: true,
-        orderId: "A1015",
-      },
-    ],
-    [t]
-  );
 
   const filters: { key: FilterType; label: string }[] = useMemo(
     () => [
@@ -105,37 +57,47 @@ export default function NotificationsScreen() {
     [t]
   );
 
-  const [notifications, setNotifications] =
-    useState<Notification[]>(initialNotifications);
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [refreshing, setRefreshing] = useState(false);
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const filteredNotifications =
     activeFilter === "all"
       ? notifications
       : notifications.filter((n) => n.type === activeFilter);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    await refresh();
+    setRefreshing(false);
   };
 
-  const handleNotificationPress = (notification: Notification) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
-    );
+  const handleNotificationPress = async (notification: Notification) => {
+    try {
+      await markAsRead(notification.id);
+    } catch {
+      Alert.alert(t("common.error"), t("notifications.confirmFailed"));
+      return;
+    }
+
+    if (notification.tableName && seatLayout?.tables?.length) {
+      const seat = seatLayout.tables.find((table) => table.name === notification.tableName);
+      if (seat) {
+        router.push(`/(tabs)/seats/${seat.id}`);
+        return;
+      }
+    }
 
     if (notification.type === "order" && notification.orderId) {
       router.push(`/orders/${notification.orderId}`);
     }
   };
 
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllAsRead();
+    } catch {
+      Alert.alert(t("common.error"), t("notifications.confirmFailed"));
+    }
   };
 
   const handleClearAll = () => {
@@ -147,7 +109,13 @@ export default function NotificationsScreen() {
         {
           text: t("notifications.clearAllButton"),
           style: "destructive",
-          onPress: () => setNotifications([]),
+          onPress: async () => {
+            try {
+              await clearAll();
+            } catch {
+              Alert.alert(t("common.error"), t("notifications.confirmFailed"));
+            }
+          },
         },
       ]
     );
@@ -247,6 +215,12 @@ export default function NotificationsScreen() {
           />
         }
         ListEmptyComponent={
+          loading ? (
+            <View className="items-center py-20">
+              <ActivityIndicator size="large" color={colors.tint} />
+              <Text className="mt-4 text-slate-500 dark:text-slate-400">{t("common.loading")}</Text>
+            </View>
+          ) : (
           <View className="items-center py-20">
             <View className="mb-4 h-20 w-20 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
               <Ionicons
@@ -262,6 +236,7 @@ export default function NotificationsScreen() {
               {t("notifications.emptySubtitle")}
             </Text>
           </View>
+          )
         }
         ListHeaderComponent={
           unreadCount > 0 ? (

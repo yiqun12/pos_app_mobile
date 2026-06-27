@@ -64,7 +64,7 @@ export default function PaymentSettingsScreen() {
       })
       .catch((error) => {
         console.error("Error creating Stripe link:", error);
-        Alert.alert(t("common.error"), "Failed to create Stripe onboarding link");
+        Alert.alert(t("common.error"), t("settings.payment.stripeLinkFailed"));
       })
       .finally(() => {
         setConnecting(false);
@@ -81,7 +81,10 @@ export default function PaymentSettingsScreen() {
           text: t("settings.payment.disconnectButton"),
           style: "destructive",
           onPress: () => {
-            Alert.alert(t("settings.payment.disconnectTitle"), "Disconnecting Stripe must be done from the Stripe dashboard.");
+            Alert.alert(
+              t("settings.payment.disconnectTitle"),
+              t("settings.payment.disconnectMessage")
+            );
           },
         },
       ]
@@ -188,7 +191,7 @@ export default function PaymentSettingsScreen() {
                       </View>
                       <View>
                         <Text className="font-semibold text-slate-900 dark:text-white">
-                          {terminal.name ?? terminal.label ?? "Stripe Terminal"}
+                          {terminal.name ?? terminal.label ?? t("settings.payment.stripeTerminalDefault")}
                         </Text>
                         <Text className="text-xs text-slate-500 dark:text-slate-400">
                           {t("settings.payment.idPrefix")} {terminal.id}

@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import Constants from 'expo-constants';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,29 +22,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// API 地址（推荐）：
-// - 开发环境：自动从 Expo host 推断你电脑的局域网 IP（无需每次手改）
-// - 生产/特殊网络：用环境变量覆盖 EXPO_PUBLIC_AI_API_URL（例如 http://192.168.1.10:3000/api/chat）
-function getDefaultApiUrl() {
-  // Expo dev 通常能拿到类似 "10.112.21.246:8081" 或 "exp://10.112.21.246:8081"
-  const hostUri =
-    (Constants.expoConfig as any)?.hostUri ??
-    (Constants as any)?.manifest?.debuggerHost ??
-    (Constants as any)?.manifest2?.extra?.expoClient?.hostUri ??
-    (Constants as any)?.expoGoConfig?.debuggerHost;
-
-  if (typeof hostUri === 'string' && hostUri.length > 0) {
-    const host = hostUri.replace(/^\w+:\/\//, '').split(':')[0];
-    if (host) return `http://${host}:3000/api/chat`;
-  }
-
-  // Web 兜底用 localhost；真机如果走到这里，说明拿不到 hostUri，建议用 EXPO_PUBLIC_AI_API_URL 覆盖
-  if (Platform.OS === 'web') return 'http://localhost:3000/api/chat';
-  return 'http://127.0.0.1:3000/api/chat';
-}
-
-const API_URL = process.env.EXPO_PUBLIC_AI_API_URL || getDefaultApiUrl();
-const VOICE_API_URL = API_URL.replace('/api/chat', '/api/voice-to-text');
+// P1: Connect custom agent + knowledge base via backend_server.
+const AI_ASSISTANT_ENABLED = false;
 
 type ChatSender = 'ai' | 'user';
 type ChatMessage = { id: string; text: string; sender: ChatSender };
@@ -173,7 +151,7 @@ function matchAutoNavigation(rawText: string): AutoNavMatch | null {
 export default function AIChat() {
   const router = useRouter();
   const pathname = usePathname();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isTabRoute = /^\/(seats|menu|revenue|notifications|profile)(\/|$)/.test(
@@ -184,9 +162,7 @@ export default function AIChat() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', text: t('aiChat.greeting'), sender: 'ai' },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastAutoNavAt, setLastAutoNavAt] = useState<number>(0);
   const flatListRef = useRef<FlatList>(null);
@@ -209,6 +185,10 @@ export default function AIChat() {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const isPressing = useRef(false); 
   const recordStartTime = useRef<number>(0);
+
+  useEffect(() => {
+    setMessages([{ id: '1', text: t('aiChat.greeting'), sender: 'ai' }]);
+  }, [i18n.language, t]);
 
   useEffect(() => {
     const id = fabPosition.addListener((value) => {
@@ -289,6 +269,8 @@ export default function AIChat() {
   ).current;
 
   async function startRecording() {
+    if (!AI_ASSISTANT_ENABLED) return;
+
     isPressing.current = true;
     recordStartTime.current = Date.now();
     setIsRecording(true); 
@@ -323,48 +305,19 @@ export default function AIChat() {
     }
   }
 
-  async function uploadVoiceToText(uri: string) {
-    setLoading(true);
+  async function uploadVoiceToText(_uri: string) {
+    appendNotImplementedReply();
+  }
 
-    try {
-      const formData = new FormData();
-      formData.append('audio', { uri, name: 'voice_message.m4a', type: 'audio/m4a' } as any);
-
-      const response = await fetch(VOICE_API_URL, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.error) {
-        alert(data.error);
-        return;
-      }
-
-      // 1. 显示用户刚说的话（翻译后的中文）
-      if (data.recognizedText) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), text: `🎤 ${data.recognizedText}`, sender: 'user' }]);
-      }
-
-      // 2. 显示 AI 的回复
-      if (data.reply) {
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), text: String(data.reply), sender: 'ai' }]);
-      }
-
-      // 3. 🎯 核心动作：如果有跳转指令，执行跳转！
-      if (typeof data.navigateTo === 'string' && data.navigateTo) {
-        console.log('🚀 准备跳转到:', data.navigateTo, '打开弹窗:', data.openModal);
-        // 👇 就是加上这一句！和文字输入那边完全对齐
-        tryAutoNavigatePath(data.navigateTo, data.openModal);
-      }
-
-    } catch (error) {
-      console.error('上传语音报错:', error);
-      alert(t('aiChat.networkRequestFailed'));
-    } finally {
-      setLoading(false);
-    }
+  function appendNotImplementedReply() {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: (Date.now() + 1).toString(),
+        text: t('aiChat.notImplemented'),
+        sender: 'ai',
+      },
+    ]);
   }
 
   async function stopRecording() {
@@ -430,77 +383,20 @@ export default function AIChat() {
   const sendMessage = async () => {
     if (!message.trim()) return;
 
-    // 1. 显示用户发送的消息
     const userMsg: ChatMessage = { id: Date.now().toString(), text: message, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
-    setMessage(''); 
+    setMessage('');
+
+    if (!AI_ASSISTANT_ENABLED) {
+      appendNotImplementedReply();
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 2. 发送真正的网络请求
-      console.log('正在发送请求到:', API_URL); // 方便你在终端看日志
-
-      // 给 fetch 加超时：网络不通/后端没启动时，不要一直转圈
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-      let data: any;
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            message: userMsg.text,
-            currentPath: pathname,
-            // 简单把历史记录传过去，让AI知道上下文
-            history: messages.map(m => ({ 
-              role: m.sender === 'user' ? 'user' : 'assistant',
-              content: m.text
-            }))
-          }),
-        });
-
-        data = await response.json();
-        console.log("📥 [前端] 收到后端发来的完整数据:", data);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-
-      // 3. 处理 AI 的回复
-      if (data.reply) {
-        const aiMsg: ChatMessage = { 
-          id: (Date.now() + 1).toString(), 
-          text: String(data.reply), 
-          sender: 'ai' 
-        };
-        setMessages(prev => [...prev, aiMsg]);
-        
-        // 只信任后端下发的 navigateTo；若有 openModal 则一并带在 URL 参数里
-        if (typeof data.navigateTo === 'string' && data.navigateTo) {
-          tryAutoNavigatePath(data.navigateTo, data.openModal);
-        } else {
-          // ❌ 删掉原来的 tryAutoNavigate(aiMsg.text);
-          // ✅ 如果你非要在前端做兜底猜意图，你应该去猜用户输入的话 (message)，而不是 AI 的回复！
-          // 但强烈建议直接留空，让后端完全控制跳转。
-        }
-      }
-
-    } catch (error) {
-      console.error('请求失败:', error);
-      // 给用户一个友好的错误提示
-      const errorMsg: ChatMessage = { 
-        id: (Date.now() + 1).toString(), 
-        text:
-          (error as any)?.name === 'AbortError'
-            ? t('aiChat.requestTimeout')
-            : t('aiChat.connectionFailed'),
-        sender: 'ai' 
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      // P1: wire up backend_server + custom knowledge-base agent.
+      appendNotImplementedReply();
     } finally {
       setLoading(false);
     }
@@ -585,8 +481,17 @@ export default function AIChat() {
                 
                 {/* 1. 唯一的左侧麦克风 */}
                 <Pressable
-                  onPressIn={startRecording}
-                  onPressOut={stopRecording}
+                  onPressIn={() => {
+                    if (!AI_ASSISTANT_ENABLED) {
+                      appendNotImplementedReply();
+                      return;
+                    }
+                    void startRecording();
+                  }}
+                  onPressOut={() => {
+                    if (!AI_ASSISTANT_ENABLED) return;
+                    void stopRecording();
+                  }}
                   hitSlop={20}
                   // 👇 这里直接用 isRecording 控制颜色，录音时纯红，松手时浅灰
                   style={{

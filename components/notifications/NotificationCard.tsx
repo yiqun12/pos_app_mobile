@@ -16,6 +16,7 @@ export interface Notification {
   timestamp: string;
   isRead: boolean;
   orderId?: string;
+  tableName?: string;
   amount?: number;
 }
 
