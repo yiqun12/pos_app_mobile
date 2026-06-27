@@ -144,7 +144,7 @@ export function MenuListTab({
         categoryName: category?.name,
         categoryNameCN: category?.nameCN,
         ...payload,
-        attributesArr: payload.optionGroups ? undefined : {},
+        attributesArr: payload.optionGroups ? undefined : itemModal.item.attributesArr ?? {},
       });
     }
     setItemModal({ visible: false, mode: "add", item: null });

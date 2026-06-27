@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { getLocalAiPresetReply, getLocalAiReplyDelayMs } from '@/lib/ai/presetReplies';
 import { Audio } from 'expo-av';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -185,6 +186,7 @@ export default function AIChat() {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const isPressing = useRef(false); 
   const recordStartTime = useRef<number>(0);
+  const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setMessages([{ id: '1', text: t('aiChat.greeting'), sender: 'ai' }]);
@@ -196,6 +198,9 @@ export default function AIChat() {
     });
     return () => {
       fabPosition.removeListener(id);
+      if (replyTimerRef.current) {
+        clearTimeout(replyTimerRef.current);
+      }
     };
   }, [fabPosition]);
 
@@ -310,14 +315,34 @@ export default function AIChat() {
   }
 
   function appendNotImplementedReply() {
+    queuePresetReply('');
+  }
+
+  function queuePresetReply(input: string) {
+    const reply = getLocalAiPresetReply(input);
+    const typingId = `typing-${Date.now()}`;
+    if (replyTimerRef.current) {
+      clearTimeout(replyTimerRef.current);
+    }
+    setLoading(true);
     setMessages((prev) => [
       ...prev,
       {
-        id: (Date.now() + 1).toString(),
-        text: t('aiChat.notImplemented'),
+        id: typingId,
+        text: t('aiChat.typing'),
         sender: 'ai',
       },
     ]);
+
+    replyTimerRef.current = setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((item) =>
+          item.id === typingId ? { ...item, text: reply.text } : item
+        )
+      );
+      setLoading(false);
+      replyTimerRef.current = null;
+    }, getLocalAiReplyDelayMs(input));
   }
 
   async function stopRecording() {
@@ -388,7 +413,8 @@ export default function AIChat() {
     setMessage('');
 
     if (!AI_ASSISTANT_ENABLED) {
-      appendNotImplementedReply();
+      queuePresetReply(userMsg.text);
+      tryAutoNavigate(userMsg.text);
       return;
     }
 

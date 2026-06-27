@@ -2,6 +2,7 @@ import { ItemSalesSummaryCard } from "@/components/revenue/ItemSalesSummaryCard"
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
 import { RevenueBreakdownPieChart } from "@/components/revenue/RevenueBreakdownPieChart";
+import { RevenueAdjustOrderModal } from "@/components/revenue/RevenueAdjustOrderModal";
 import { RevenueDateRangeModal } from "@/components/revenue/RevenueDateRangeModal";
 import { RevenueLineChartModal } from "@/components/revenue/RevenueLineChartModal";
 import { RevenueMoreMenuModal } from "@/components/revenue/RevenueMoreMenuModal";
@@ -35,7 +36,16 @@ import {
 import { getRevenueRangeLabel } from "@/lib/pos/revenueRangeLabel";
 import { sliceRevenuePage } from "@/lib/pos/revenuePagination";
 import {
+  buildBankReceiptPayload,
+  buildReceiptReplayPayload,
+  buildRevenueAdjustmentPatch,
+  type ReceiptReplayType,
+} from "@/lib/pos/revenueActions";
+import { formatWebDate } from "@/lib/pos/webDate";
+import {
+  addDoc,
   collection,
+  doc,
   type DocumentData,
   getDocs,
   limit,
@@ -44,6 +54,7 @@ import {
   type QueryConstraint,
   type QueryDocumentSnapshot,
   startAfter,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import {
@@ -72,6 +83,8 @@ type Order = {
   total?: number;
   dateTime?: string;
   receiptData?: string;
+  tableNum?: string;
+  metadata?: Record<string, unknown>;
 };
 
 type OrderItem = {
@@ -190,6 +203,12 @@ export default function RevenueScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderModalVisible, setOrderModalVisible] = useState(false);
+  const [adjustOrderVisible, setAdjustOrderVisible] = useState(false);
+  const [revenueActionBusy, setRevenueActionBusy] = useState<string | null>(null);
+  const [revenueActionStatus, setRevenueActionStatus] = useState<{
+    tone: "info" | "success" | "error";
+    message: string;
+  } | null>(null);
 
   const fetchRevenuePage = React.useCallback(async ({
     append = false,
@@ -378,7 +397,88 @@ export default function RevenueScreen() {
       ...order,
       items: order.items ?? parseReceiptItems(order.receiptData),
     });
+    setRevenueActionStatus(null);
     setOrderModalVisible(true);
+  };
+
+  const writeRevenueEvent = async (
+    collectionName: "bankReceipt" | "MerchantReceipt" | "CustomerReceipt",
+    payload: Record<string, unknown>
+  ) => {
+    if (!user || !currentStoreId) throw new Error("Missing store context");
+    await addDoc(
+      collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, collectionName),
+      payload
+    );
+  };
+
+  const handleAdjustOrder = async (newTotal: number, note: string) => {
+    if (!user || !currentStoreId || !selectedOrder) return;
+    setRevenueActionBusy("adjust");
+    setRevenueActionStatus({ tone: "info", message: t("revenue.savingAdjustment") });
+    try {
+      const patch = buildRevenueAdjustmentPatch(selectedOrder, newTotal, note);
+      await updateDoc(
+        doc(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment", selectedOrder.id),
+        patch
+      );
+      setSelectedOrder((prev) => prev ? {
+        ...prev,
+        amount: newTotal,
+        total: newTotal,
+        metadata: patch.metadata,
+      } : prev);
+      setOrders((prev) => prev.map((order) => order.id === selectedOrder.id ? {
+        ...order,
+        amount: newTotal,
+        total: newTotal,
+        metadata: patch.metadata,
+      } : order));
+      setAdjustOrderVisible(false);
+      await handleRefresh();
+      setRevenueActionStatus({ tone: "success", message: t("revenue.orderAdjusted") });
+    } catch (err) {
+      console.error("Failed to adjust revenue order:", err);
+      setRevenueActionStatus({ tone: "error", message: t("revenue.actionFailed") });
+    } finally {
+      setRevenueActionBusy(null);
+    }
+  };
+
+  const handleBankReceipt = async () => {
+    if (!selectedOrder) return;
+    setRevenueActionBusy("bank");
+    setRevenueActionStatus({ tone: "info", message: t("revenue.queueingBankReceipt") });
+    try {
+      await writeRevenueEvent("bankReceipt", buildBankReceiptPayload(selectedOrder, formatWebDate()));
+      setRevenueActionStatus({ tone: "success", message: t("revenue.bankReceiptQueued") });
+    } catch (err) {
+      console.error("Failed to queue bank receipt:", err);
+      setRevenueActionStatus({ tone: "error", message: t("revenue.actionFailed") });
+    } finally {
+      setRevenueActionBusy(null);
+    }
+  };
+
+  const handleReceiptReplay = async (type: ReceiptReplayType) => {
+    if (!selectedOrder) return;
+    const busy = type === "MerchantReceipt" ? "merchant" : "customer";
+    setRevenueActionBusy(busy);
+    setRevenueActionStatus({
+      tone: "info",
+      message: type === "MerchantReceipt"
+        ? t("revenue.queueingMerchantReceipt")
+        : t("revenue.queueingCustomerReceipt"),
+    });
+    try {
+      await writeRevenueEvent(type, buildReceiptReplayPayload(selectedOrder, type, formatWebDate()));
+      setRevenueActionStatus({ tone: "success", message: t("revenue.receiptQueued") });
+    } catch (err) {
+      console.error("Failed to queue receipt replay:", err);
+      setRevenueActionStatus({ tone: "error", message: t("revenue.actionFailed") });
+    } finally {
+      setRevenueActionBusy(null);
+    }
   };
 
   return (
@@ -585,6 +685,21 @@ export default function RevenueScreen() {
         order={selectedOrder}
         colors={colors}
         onClose={() => setOrderModalVisible(false)}
+        onAdjustOrder={() => setAdjustOrderVisible(true)}
+        onBankReceipt={handleBankReceipt}
+        onMerchantReceipt={() => handleReceiptReplay("MerchantReceipt")}
+        onCustomerReceipt={() => handleReceiptReplay("CustomerReceipt")}
+        busyAction={revenueActionBusy}
+        actionStatus={revenueActionStatus}
+      />
+
+      <RevenueAdjustOrderModal
+        visible={adjustOrderVisible}
+        colors={colors}
+        initialTotal={selectedOrder?.total ?? selectedOrder?.amount ?? 0}
+        saving={revenueActionBusy === "adjust"}
+        onClose={() => setAdjustOrderVisible(false)}
+        onSave={handleAdjustOrder}
       />
 
       <RevenueDateRangeModal

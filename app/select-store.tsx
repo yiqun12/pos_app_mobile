@@ -27,6 +27,10 @@ export default function SelectStoreScreen() {
     router.replace("/(tabs)/seats");
   };
 
+  const handleCreateStore = () => {
+    router.push("/settings/create-store" as any);
+  };
+
   const showBackButton = Boolean(currentStoreId);
 
   if (isLoading) {
@@ -68,9 +72,16 @@ export default function SelectStoreScreen() {
             {t("selectStore.noStoresFound")}
           </Text>
           <Text className="mb-4 text-center text-slate-500">
-            {t("selectStore.createOnWebFirst")}
+            {t("selectStore.createInApp")}
           </Text>
-          <Button label={t("common.signOut")} onPress={logout} variant="outline" />
+          <View className="w-full max-w-sm gap-3">
+            <Button
+              label={t("settings.store.createStore")}
+              icon="add"
+              onPress={handleCreateStore}
+            />
+            <Button label={t("common.signOut")} onPress={logout} variant="outline" />
+          </View>
         </View>
       </SafeAreaView>
     );

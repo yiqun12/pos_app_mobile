@@ -81,7 +81,7 @@ export default function ProfileScreen() {
 
   const handleCreateStore = () => {
     setStoreSelectorVisible(false);
-    router.push("/settings/create-store");
+    router.push("/settings/create-store" as any);
   };
 
   const handleDeleteAccount = async () => {

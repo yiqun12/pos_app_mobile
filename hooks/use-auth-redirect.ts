@@ -16,6 +16,8 @@ export function useAuthRedirect() {
     if (authLoading || storeLoading) return;
     const inAuthGroup = segments[0] === "(auth)";
     const onSelectStore = segments[0] === "select-store";
+    const onCreateStore =
+      segments[0] === "settings" && String(segments[1]) === "create-store";
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/(auth)");
@@ -26,7 +28,7 @@ export function useAuthRedirect() {
       else router.replace("/select-store");
       return;
     }
-    if (isAuthenticated && !currentStoreId && !onSelectStore) {
+    if (isAuthenticated && !currentStoreId && !onSelectStore && !onCreateStore) {
       router.replace("/select-store");
       return;
     }

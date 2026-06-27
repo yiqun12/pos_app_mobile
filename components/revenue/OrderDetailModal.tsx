@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -27,6 +28,10 @@ export type Order = {
   tax?: number;
   gratuity?: number;
   total?: number;
+  dateTime?: string;
+  receiptData?: string;
+  tableNum?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type OrderItem = {
@@ -46,6 +51,15 @@ type OrderDetailModalProps = {
   order: Order | null;
   colors: ColorMode;
   onClose: () => void;
+  onAdjustOrder?: () => void;
+  onBankReceipt?: () => void;
+  onMerchantReceipt?: () => void;
+  onCustomerReceipt?: () => void;
+  busyAction?: string | null;
+  actionStatus?: {
+    tone: "info" | "success" | "error";
+    message: string;
+  } | null;
 };
 
 function MetaChip({ label, value }: { label: string; value: string }) {
@@ -236,6 +250,12 @@ export function OrderDetailModal({
   order,
   colors,
   onClose,
+  onAdjustOrder,
+  onBankReceipt,
+  onMerchantReceipt,
+  onCustomerReceipt,
+  busyAction,
+  actionStatus,
 }: OrderDetailModalProps) {
   return (
     <Modal
@@ -250,7 +270,17 @@ export function OrderDetailModal({
           className="rounded-t-3xl bg-white dark:bg-slate-950"
           style={{ height: "92%" }}
         >
-          <OrderDetailContent order={order} colors={colors} onClose={onClose} />
+          <OrderDetailContent
+            order={order}
+            colors={colors}
+            onClose={onClose}
+            onAdjustOrder={onAdjustOrder}
+            onBankReceipt={onBankReceipt}
+            onMerchantReceipt={onMerchantReceipt}
+            onCustomerReceipt={onCustomerReceipt}
+            busyAction={busyAction}
+            actionStatus={actionStatus}
+          />
         </View>
       </View>
     </Modal>
@@ -262,17 +292,35 @@ export function OrderDetailContent({
   colors,
   onClose,
   onPay,
+  onAdjustOrder,
+  onBankReceipt,
+  onMerchantReceipt,
+  onCustomerReceipt,
+  busyAction,
+  actionStatus,
 }: {
   order: Order | null;
   colors: ColorMode;
   onClose: () => void;
   onPay?: () => void;
+  onAdjustOrder?: () => void;
+  onBankReceipt?: () => void;
+  onMerchantReceipt?: () => void;
+  onCustomerReceipt?: () => void;
+  busyAction?: string | null;
+  actionStatus?: {
+    tone: "info" | "success" | "error";
+    message: string;
+  } | null;
 }) {
   const { t } = useTranslation();
   const responsive = useResponsiveLayout();
   const insets = useSafeAreaInsets();
   const hasItems = Boolean(order?.items && order.items.length > 0);
   const hasTotals = order?.subtotal != null || order?.total != null;
+  const hasActions = Boolean(
+    onAdjustOrder || onBankReceipt || onMerchantReceipt || onCustomerReceipt
+  );
 
   if (!order) return null;
 
@@ -347,6 +395,80 @@ export function OrderDetailContent({
 
       <OrderTotals order={order} />
 
+      {hasActions && (
+        <View className="border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+          {actionStatus ? (
+            <View
+              className={`mb-3 rounded-xl border px-3 py-2 ${
+                actionStatus.tone === "error"
+                  ? "border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30"
+                  : actionStatus.tone === "success"
+                    ? "border-green-200 bg-green-50 dark:border-green-900/60 dark:bg-green-950/30"
+                    : "border-orange-200 bg-orange-50 dark:border-orange-900/60 dark:bg-orange-950/30"
+              }`}
+            >
+              <Text
+                style={{ fontSize: responsive.captionFontSize + 1 }}
+                className={`font-semibold ${
+                  actionStatus.tone === "error"
+                    ? "text-red-700 dark:text-red-300"
+                    : actionStatus.tone === "success"
+                      ? "text-green-700 dark:text-green-300"
+                      : "text-orange-700 dark:text-orange-300"
+                }`}
+              >
+                {actionStatus.message}
+              </Text>
+            </View>
+          ) : null}
+
+          <Text
+            style={{ fontSize: responsive.captionFontSize, marginBottom: 8 }}
+            className="font-bold uppercase text-slate-500 dark:text-slate-400"
+          >
+            {t("revenue.adminActions")}
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            <OrderActionButton
+              label={t("revenue.adjustOrder")}
+              icon="create-outline"
+              colors={colors}
+              disabled={!onAdjustOrder || Boolean(busyAction)}
+              loading={busyAction === "adjust"}
+              loadingLabel={t("revenue.saving")}
+              onPress={onAdjustOrder}
+            />
+            <OrderActionButton
+              label={t("revenue.bankReceipt")}
+              icon="receipt-outline"
+              colors={colors}
+              disabled={!onBankReceipt || Boolean(busyAction)}
+              loading={busyAction === "bank"}
+              loadingLabel={t("revenue.queueing")}
+              onPress={onBankReceipt}
+            />
+            <OrderActionButton
+              label={t("revenue.merchantReceipt")}
+              icon="print-outline"
+              colors={colors}
+              disabled={!onMerchantReceipt || Boolean(busyAction)}
+              loading={busyAction === "merchant"}
+              loadingLabel={t("revenue.queueing")}
+              onPress={onMerchantReceipt}
+            />
+            <OrderActionButton
+              label={t("revenue.customerReceipt")}
+              icon="person-outline"
+              colors={colors}
+              disabled={!onCustomerReceipt || Boolean(busyAction)}
+              loading={busyAction === "customer"}
+              loadingLabel={t("revenue.queueing")}
+              onPress={onCustomerReceipt}
+            />
+          </View>
+        </View>
+      )}
+
       <View
         className="flex-row gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800"
         style={{ paddingBottom: Math.max(insets.bottom, 12) }}
@@ -380,5 +502,49 @@ export function OrderDetailContent({
         )}
       </View>
     </View>
+  );
+}
+
+function OrderActionButton({
+  label,
+  icon,
+  colors,
+  disabled,
+  loading,
+  loadingLabel,
+  onPress,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  colors: ColorMode;
+  disabled?: boolean;
+  loading?: boolean;
+  loadingLabel?: string;
+  onPress?: () => void;
+}) {
+  const responsive = useResponsiveLayout();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      className={`min-w-[47%] flex-1 flex-row items-center justify-center rounded-xl border border-orange-500 px-3 py-3 ${
+        disabled ? "opacity-50" : ""
+      }`}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.tint} />
+      ) : (
+        <Ionicons name={icon} size={18} color={colors.tint} />
+      )}
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        style={{ fontSize: responsive.captionFontSize + 1 }}
+        className="ml-2 font-bold text-orange-600 dark:text-orange-400"
+      >
+        {loading ? loadingLabel ?? "..." : label}
+      </Text>
+    </TouchableOpacity>
   );
 }

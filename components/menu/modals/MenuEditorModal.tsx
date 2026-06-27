@@ -3,6 +3,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { normalizeAmountInput } from "@/lib/pos/amountInput";
+import { autoFillChineseName, autoFillEnglishName } from "@/lib/pos/menuBilingual";
 import {
   deleteDishRevisionOption,
   getInitialDishRevisionDraft,
@@ -188,6 +189,16 @@ export function MenuEditorModal({
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  const handleAutoFillEnglish = () => {
+    const nextName = autoFillEnglishName("", rawName || nameCN || initialName);
+    if (nextName) setRawName(nextName);
+  };
+
+  const handleAutoFillChinese = () => {
+    const nextName = autoFillChineseName(rawName || initialName, nameCN);
+    if (nextName) setNameCN(nextName);
   };
 
   const addOptionGroup = () => {
@@ -385,6 +396,14 @@ export function MenuEditorModal({
                   placeholderTextColor="#94a3b8"
                   autoFocus={mode === "add"}
                 />
+                <TouchableOpacity
+                  onPress={handleAutoFillEnglish}
+                  className="mt-2 self-start rounded-lg border border-orange-500 px-3 py-2"
+                >
+                  <Text className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                    {t("menu.item.autoFillEnglish")}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View>
@@ -392,7 +411,7 @@ export function MenuEditorModal({
                   style={{ fontSize: responsive.baseFontSize - 2 }}
                   className="mb-2 font-medium text-slate-700 dark:text-slate-300"
                 >
-                  Chinese Name
+                  {t("menu.item.chineseName")}
                 </Text>
                 <TextInput
                   value={nameCN}
@@ -401,6 +420,14 @@ export function MenuEditorModal({
                   placeholder="Chinese Name"
                   placeholderTextColor="#94a3b8"
                 />
+                <TouchableOpacity
+                  onPress={handleAutoFillChinese}
+                  className="mt-2 self-start rounded-lg border border-orange-500 px-3 py-2"
+                >
+                  <Text className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                    {t("menu.item.autoFillChinese")}
+                  </Text>
+                </TouchableOpacity>
                 <View
                   className={`mt-2 flex-row rounded-xl border px-3 py-2 ${
                     tableTimingHint.enabled

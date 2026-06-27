@@ -2,6 +2,7 @@ import { useAuth } from "@/context/auth";
 import { createStore, subscribeStoreList } from "@/lib/firestore/repositories/store";
 import type { StoreSummary } from "@/lib/firestore/types";
 import { GUEST_DEFAULT_STORE_INPUT } from "@/lib/pos/createStoreDefaults";
+import { resolveInitialStoreSelection } from "@/lib/pos/storeSelection";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
@@ -42,28 +43,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     else await AsyncStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const applyStoreSelection = useCallback(
-    (list: StoreSummary[]) => {
-      AsyncStorage.getItem(STORAGE_KEY)
-        .then((stored) => {
-          if (stored && list.some((s) => s.id === stored)) {
-            setCurrentStoreIdState(stored);
-          } else if (list.length === 1) {
-            void setCurrentStoreId(list[0].id);
-          } else {
-            setCurrentStoreIdState(null);
-          }
-        })
-        .catch(() => {
-          if (list.length === 1) {
-            void setCurrentStoreId(list[0].id);
-          }
-        });
-    },
-    [setCurrentStoreId]
-  );
+  const applyStoreSelection = useCallback(async (list: StoreSummary[]) => {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+    const nextStoreId = resolveInitialStoreSelection(list, stored);
+    setCurrentStoreIdState(nextStoreId);
+    if (nextStoreId) {
+      await AsyncStorage.setItem(STORAGE_KEY, nextStoreId).catch(() => {});
+    } else if (stored) {
+      await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
+    let active = true;
+
     if (isAuthenticated && user) {
       setIsLoading(true);
       setError(null);
@@ -89,17 +82,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return;
           }
 
-          setStoreList(list);
-          setIsLoading(false);
-          applyStoreSelection(list);
+          void (async () => {
+            await applyStoreSelection(list);
+            if (!active) return;
+            setStoreList(list);
+            setIsLoading(false);
+          })().catch((err) => {
+            if (!active) return;
+            setError(err instanceof Error ? err : new Error(String(err)));
+            setIsLoading(false);
+          });
         },
         (err) => {
+          if (!active) return;
           setError(err);
           setIsLoading(false);
         }
       );
 
-      return unsub;
+      return () => {
+        active = false;
+        unsub();
+      };
     }
 
     guestStoreBootstrapRef.current = false;

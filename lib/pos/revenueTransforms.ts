@@ -27,6 +27,8 @@ export type RevenueOrderSummary = {
   total: number;
   dateTime: string;
   receiptData?: string;
+  tableNum?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type CashDrawerSummary = {
@@ -141,10 +143,16 @@ export function transformSuccessPaymentSummary(
   const total = parseNumber(meta.total, 0);
   const amount = typeof data.amount === "number" ? data.amount / 100 : total;
   const dateTime = data.dateTime || "";
+  const tableNum =
+    typeof data.tableNum === "string"
+      ? data.tableNum
+      : typeof meta.tableNum === "string"
+        ? meta.tableNum
+        : "";
 
   return {
     id,
-    guest: meta.isDine && data.tableNum ? `Table ${data.tableNum}` : "TakeOut",
+    guest: meta.isDine && tableNum ? `Table ${tableNum}` : "TakeOut",
     time: parseTimeToDisplay(dateTime),
     amount,
     channel: data.powerBy || (meta.isDine ? "Dine-In" : "TakeOut"),
@@ -156,6 +164,8 @@ export function transformSuccessPaymentSummary(
     total,
     dateTime,
     receiptData: data.receiptData,
+    tableNum,
+    metadata: meta,
   };
 }
 
