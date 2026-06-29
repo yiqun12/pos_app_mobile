@@ -1,27 +1,30 @@
-type RevenueActionOrder = {
-  id: string;
-  guest?: string;
-  tableNum?: string;
-  receiptData?: string;
-  metadata?: Record<string, unknown>;
-  total?: number;
-  amount?: number;
-  dateTime?: string;
+import {
+  buildWebReceiptPrintPayload,
+  type ReceiptPreviewOrder,
+  type ReceiptReplayType,
+} from "@/lib/pos/receiptPreviewCore";
+
+export type { ReceiptReplayType } from "@/lib/pos/receiptPreviewCore";
+
+type RevenueActionOrder = ReceiptPreviewOrder & {
   channel?: string;
 };
-
-export type ReceiptReplayType = "MerchantReceipt" | "CustomerReceipt";
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-function formatMoney(value: number) {
-  return roundMoney(value).toFixed(2);
-}
-
 function toCents(value: number) {
   return Math.round(roundMoney(value) * 100);
+}
+
+function parseMetadataNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
 }
 
 function resolveTableNumber(order: RevenueActionOrder) {
@@ -41,24 +44,26 @@ function parseReceiptData(receiptData?: string) {
   }
 }
 
-export function buildRevenueAdjustmentPatch(
+/** Mirrors eatifyPos Account_admin handleConfirm — add cash gratuity after payment. */
+export function buildCashTipsPatch(
   order: RevenueActionOrder,
-  newTotal: number,
-  note: string
+  extraTip: number
 ) {
-  const total = roundMoney(newTotal);
+  const currentTips = roundMoney(
+    parseMetadataNumber(order.metadata?.tips, order.gratuity ?? 0)
+  );
+  const currentTotal = roundMoney(
+    parseMetadataNumber(order.metadata?.total, order.total ?? order.amount ?? 0)
+  );
+  const extra = roundMoney(Math.max(0, extraTip));
+  const tipsUpdated = roundMoney(currentTips + extra);
+  const totalUpdated = roundMoney(currentTotal - currentTips + tipsUpdated);
+
   return {
-    amount: toCents(total),
-    amount_received: toCents(total),
-    metadata: {
-      ...(order.metadata ?? {}),
-      total: formatMoney(total),
-    },
-    adminAdjustment: {
-      originalTotal: roundMoney(order.total ?? order.amount ?? 0),
-      newTotal: total,
-      note: note.trim(),
-    },
+    amount: toCents(totalUpdated),
+    amount_received: toCents(totalUpdated),
+    "metadata.total": totalUpdated,
+    "metadata.tips": tipsUpdated,
   };
 }
 
@@ -82,10 +87,7 @@ export function buildBankReceiptPayload(
 export function buildReceiptReplayPayload(
   order: RevenueActionOrder,
   type: ReceiptReplayType,
-  date = new Date().toISOString()
+  date: string
 ) {
-  return {
-    ...buildBankReceiptPayload(order, date),
-    type,
-  };
+  return buildWebReceiptPrintPayload(order, type, date);
 }

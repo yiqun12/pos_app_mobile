@@ -1,5 +1,10 @@
-﻿import { Colors } from "@/constants/theme";
+import { Colors } from "@/constants/theme";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
+import {
+  formatOrderSectionDayLabel,
+  formatOrderSectionTime,
+  getOrderSectionDayKey,
+} from "@/lib/pos/revenueBusinessDay";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -36,7 +41,11 @@ type OrderItem = {
   total: number;
 };
 
-function formatOrderDate(order: Order): string {
+function formatOrderDate(order: Order, groupedByDay = false): string {
+  if (groupedByDay) {
+    return formatOrderSectionTime(order.dateTime, order.time);
+  }
+
   if (!order.dateTime) return order.time;
 
   const parts = order.dateTime.split("-");
@@ -46,11 +55,153 @@ function formatOrderDate(order: Order): string {
   return `${month}/${day}/${year} ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }
 
+type OrderListEntry =
+  | { type: "header"; dayKey: string; label: string }
+  | { type: "order"; order: Order; groupedByDay: boolean };
+
+function buildOrderListEntries(orders: Order[], locale: string): OrderListEntry[] {
+  const entries: OrderListEntry[] = [];
+  let previousDayKey: string | null = null;
+
+  orders.forEach((order) => {
+    const dayKey = getOrderSectionDayKey(order.dateTime);
+    const groupedByDay = dayKey !== "unknown";
+    if (dayKey !== previousDayKey) {
+      entries.push({
+        type: "header",
+        dayKey,
+        label: formatOrderSectionDayLabel(dayKey, locale),
+      });
+      previousDayKey = dayKey;
+    }
+    entries.push({ type: "order", order, groupedByDay });
+  });
+
+  return entries;
+}
+
+function OrderDateSectionHeader({
+  label,
+  isFirst = false,
+}: {
+  label: string;
+  isFirst?: boolean;
+}) {
+  const responsive = useResponsiveLayout();
+
+  return (
+    <View className={isFirst ? "mb-3 mt-1" : "mb-3 mt-6"}>
+      <View className="flex-row items-center gap-3">
+        <View className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+        <View className="flex-row items-center gap-2 px-1">
+          <Ionicons name="calendar-outline" size={15} color="#ea580c" />
+          <Text
+            className="font-semibold text-slate-700 dark:text-slate-200"
+            style={{ fontSize: responsive.captionFontSize + 1 }}
+          >
+            {label}
+          </Text>
+        </View>
+        <View className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+      </View>
+    </View>
+  );
+}
+
 function paymentIcon(channel: string): keyof typeof Ionicons.glyphMap {
   const normalized = channel.toLowerCase();
   if (normalized.includes("cash")) return "cash-outline";
   if (normalized.includes("unpaid")) return "alert-circle-outline";
   return "card-outline";
+}
+
+function isOrderUnpaid(channel: string): boolean {
+  return channel.toLowerCase().includes("unpaid");
+}
+
+function getGratuityPercent(order: Order): number | null {
+  const subtotal = order.subtotal ?? 0;
+  if (subtotal <= 0) return null;
+
+  const serviceFee = order.serviceFee ?? 0;
+  const tips = order.gratuity ?? 0;
+  const percentage =
+    serviceFee === 0 ? (tips / subtotal) * 100 : (serviceFee / subtotal) * 100;
+
+  if (!Number.isFinite(percentage)) return null;
+  return percentage;
+}
+
+function GuestLabel({
+  guest,
+  fontSize,
+  className = "",
+}: {
+  guest: string;
+  fontSize: number;
+  className?: string;
+}) {
+  const tablePrefix = "Table ";
+  if (guest.startsWith(tablePrefix)) {
+    return (
+      <Text
+        numberOfLines={1}
+        className={`text-slate-700 dark:text-slate-300 ${className}`}
+        style={{ fontSize }}
+      >
+        <Text>{tablePrefix}</Text>
+        <Text className="font-bold">{guest.slice(tablePrefix.length)}</Text>
+      </Text>
+    );
+  }
+
+  return (
+    <Text
+      numberOfLines={1}
+      className={`font-bold text-slate-700 dark:text-slate-300 ${className}`}
+      style={{ fontSize }}
+    >
+      {guest}
+    </Text>
+  );
+}
+
+function OrderPriceBlock({
+  order,
+  fontSize,
+  align = "right",
+}: {
+  order: Order;
+  fontSize: number;
+  align?: "right" | "center";
+}) {
+  const { t } = useTranslation();
+  const unpaid = isOrderUnpaid(order.channel || "");
+  const priceColor = unpaid ? "text-red-600" : "text-green-600";
+  const displayAmount = order.total ?? order.amount;
+  const gratuityPercent = getGratuityPercent(order);
+  const alignClass = align === "center" ? "items-center" : "items-end";
+
+  return (
+    <View className={alignClass}>
+      <Text
+        className={`font-bold ${priceColor}`}
+        style={{ fontSize: fontSize + (align === "right" ? 2 : 0) }}
+      >
+        ${displayAmount.toFixed(2)}
+      </Text>
+      {gratuityPercent !== null ? (
+        <Text
+          className="mt-0.5 font-medium text-red-600"
+          style={{ fontSize: fontSize - 2 }}
+        >
+          {t("revenue.gratuityPercentShort", {
+            percent: gratuityPercent.toFixed(2),
+          })}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 type OrdersListProps = {
@@ -144,10 +295,11 @@ function LoadMoreFooter({
 
 type OrderCardProps = {
   order: Order;
+  groupedByDay?: boolean;
   onPress: (order: Order) => void;
 };
 
-function OrderCard({ order, onPress }: OrderCardProps) {
+function OrderCard({ order, groupedByDay = false, onPress }: OrderCardProps) {
   const responsive = useResponsiveLayout();
   const { t } = useTranslation();
   const paymentLabel = order.channel || t("revenue.unknownPayment");
@@ -167,20 +319,13 @@ function OrderCard({ order, onPress }: OrderCardProps) {
           >
             #{order.id}
           </Text>
-          <Text
-            numberOfLines={1}
-            className="mt-1 font-medium text-slate-700 dark:text-slate-300"
-            style={{ fontSize: responsive.baseFontSize - 1 }}
-          >
-            {order.guest}
-          </Text>
+          <GuestLabel
+            guest={order.guest}
+            fontSize={responsive.baseFontSize - 1}
+            className="mt-1"
+          />
         </View>
-        <Text
-          className="font-bold text-slate-900 dark:text-white"
-          style={{ fontSize: responsive.baseFontSize + 2 }}
-        >
-          ${order.amount.toFixed(2)}
-        </Text>
+        <OrderPriceBlock order={order} fontSize={responsive.baseFontSize} />
       </View>
 
       <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
@@ -200,7 +345,7 @@ function OrderCard({ order, onPress }: OrderCardProps) {
             className="text-slate-500 dark:text-slate-400"
             style={{ fontSize: responsive.captionFontSize }}
           >
-            {formatOrderDate(order)}
+            {formatOrderDate(order, groupedByDay)}
           </Text>
           <Ionicons name="chevron-forward" size={14} color="#94a3b8" />
         </View>
@@ -226,16 +371,18 @@ function OrdersTable({
   onOrderPress,
   onLoadMore,
 }: OrdersTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const headerFontSize = 12;
   const bodyFontSize = 14;
   const numberColumn = 52;
   const orderColumn = 128;
-  const amountColumn = 92;
+  const amountColumn = 108;
   const dateColumn = 166;
   const actionColumn = 66;
   const tableColumnStyle = { flex: 0.75, minWidth: 150 };
   const paymentColumnStyle = { flex: 0.85, minWidth: 170 };
+  const entries = buildOrderListEntries(orders, i18n.language);
+  let rowNumber = 0;
 
   return (
     <View style={{ width: "100%" }}>
@@ -277,18 +424,36 @@ function OrdersTable({
         </View>
       </View>
 
-      {orders.map((order, index) => (
+      {entries.map((entry, index) => {
+        if (entry.type === "header") {
+          return (
+            <View
+              key={`header-${entry.dayKey}-${index}`}
+              className="border-b border-slate-100 bg-slate-50/80 px-3 py-3 dark:border-slate-800 dark:bg-slate-950/80"
+            >
+              <OrderDateSectionHeader
+                label={entry.label}
+                isFirst={index === 0}
+              />
+            </View>
+          );
+        }
+
+        const order = entry.order;
+        rowNumber += 1;
+
+        return (
         <View
           key={order.id}
           className={`flex-row border-b border-slate-100 dark:border-slate-800 ${
-            index % 2 === 0
+            rowNumber % 2 === 0
               ? "bg-white dark:bg-slate-900"
               : "bg-slate-50/50 dark:bg-slate-900/50"
           }`}
         >
           <View style={[styles.rowCell, { width: numberColumn }]}>
             <Text className="font-medium text-slate-900 dark:text-white" style={{ fontSize: bodyFontSize }}>
-              {index + 1}
+              {rowNumber}
             </Text>
           </View>
 
@@ -303,13 +468,7 @@ function OrdersTable({
           </TouchableOpacity>
 
           <View style={[styles.rowCell, tableColumnStyle]}>
-            <Text
-              numberOfLines={1}
-              className="font-medium text-slate-700 dark:text-slate-300"
-              style={{ fontSize: bodyFontSize }}
-            >
-              {order.guest}
-            </Text>
+            <GuestLabel guest={order.guest} fontSize={bodyFontSize} />
           </View>
 
           <View
@@ -327,14 +486,12 @@ function OrdersTable({
           </View>
 
           <View style={[styles.rowCell, styles.centerCell, { width: amountColumn }]}>
-            <Text className="text-center font-bold text-slate-900 dark:text-white" style={{ fontSize: bodyFontSize }}>
-              ${order.amount.toFixed(2)}
-            </Text>
+            <OrderPriceBlock order={order} fontSize={bodyFontSize} align="center" />
           </View>
 
           <View style={[styles.rowCell, styles.centerCell, { width: dateColumn }]}>
             <Text numberOfLines={1} className="text-center text-slate-500" style={{ fontSize: bodyFontSize }}>
-              {formatOrderDate(order)}
+              {formatOrderDate(order, entry.groupedByDay)}
             </Text>
           </View>
 
@@ -347,7 +504,8 @@ function OrdersTable({
             </TouchableOpacity>
           </View>
         </View>
-      ))}
+        );
+      })}
 
       <LoadMoreFooter
         colors={colors}
@@ -370,8 +528,9 @@ export function OrdersList({
   onLoadMore,
 }: OrdersListProps) {
   const responsive = useResponsiveLayout();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isTablet = responsive.isTablet;
+  const entries = buildOrderListEntries(orders, i18n.language);
 
   return (
     <View className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -414,9 +573,22 @@ export function OrdersList({
         />
       ) : (
         <View className="px-3 pb-3 pt-3">
-          {orders.map((order) => (
-            <OrderCard key={order.id} order={order} onPress={onOrderPress} />
-          ))}
+          {entries.map((entry, index) =>
+            entry.type === "header" ? (
+              <OrderDateSectionHeader
+                key={`header-${entry.dayKey}-${index}`}
+                label={entry.label}
+                isFirst={index === 0}
+              />
+            ) : (
+              <OrderCard
+                key={entry.order.id}
+                order={entry.order}
+                groupedByDay={entry.groupedByDay}
+                onPress={onOrderPress}
+              />
+            )
+          )}
           <LoadMoreFooter
             colors={colors}
             hasMore={hasMore}

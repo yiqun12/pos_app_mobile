@@ -1,8 +1,8 @@
+import { BankReceiptPreviewModal } from "@/components/revenue/BankReceiptPreviewModal";
 import { ItemSalesSummaryCard } from "@/components/revenue/ItemSalesSummaryCard";
 import { OrderDetailModal } from "@/components/revenue/OrderDetailModal";
 import { OrdersList } from "@/components/revenue/OrdersList";
 import { RevenueBreakdownPieChart } from "@/components/revenue/RevenueBreakdownPieChart";
-import { RevenueAdjustOrderModal } from "@/components/revenue/RevenueAdjustOrderModal";
 import { RevenueDateRangeModal } from "@/components/revenue/RevenueDateRangeModal";
 import { RevenueLineChartModal } from "@/components/revenue/RevenueLineChartModal";
 import { RevenueMoreMenuModal } from "@/components/revenue/RevenueMoreMenuModal";
@@ -36,14 +36,20 @@ import {
 import { getRevenueRangeLabel } from "@/lib/pos/revenueRangeLabel";
 import { sliceRevenuePage } from "@/lib/pos/revenuePagination";
 import {
-  buildBankReceiptPayload,
-  buildReceiptReplayPayload,
-  buildRevenueAdjustmentPatch,
-  type ReceiptReplayType,
-} from "@/lib/pos/revenueActions";
-import { formatWebDate } from "@/lib/pos/webDate";
+  buildBankReceiptPreviewModel,
+  canRequestBankReceipt,
+  fetchBankReceiptViaCloudFunction,
+  formatBankReceiptDisplayDate,
+  type BankReceiptPreviewModel,
+} from "@/lib/pos/bankReceipt";
 import {
-  addDoc,
+  buildReceiptPreviewModel,
+  resolvePreviewStore,
+  type ReceiptPreviewModel,
+  type ReceiptReplayType,
+} from "@/lib/pos/receiptPreviewCore";
+import { buildCashTipsPatch } from "@/lib/pos/revenueActions";
+import {
   collection,
   doc,
   type DocumentData,
@@ -85,6 +91,8 @@ type Order = {
   receiptData?: string;
   tableNum?: string;
   metadata?: Record<string, unknown>;
+  latestCharge?: string;
+  transactionJson?: Record<string, unknown>;
 };
 
 type OrderItem = {
@@ -203,7 +211,15 @@ export default function RevenueScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderModalVisible, setOrderModalVisible] = useState(false);
-  const [adjustOrderVisible, setAdjustOrderVisible] = useState(false);
+  const [addCashTipsVisible, setAddCashTipsVisible] = useState(false);
+  const [bankReceiptPreviewVisible, setBankReceiptPreviewVisible] = useState(false);
+  const [bankReceiptPreviewModel, setBankReceiptPreviewModel] =
+    useState<BankReceiptPreviewModel | null>(null);
+  const [bankReceiptPreviewLoading, setBankReceiptPreviewLoading] = useState(false);
+  const [bankReceiptPreviewError, setBankReceiptPreviewError] = useState<string | null>(null);
+  const [receiptPreviewVisible, setReceiptPreviewVisible] = useState(false);
+  const [receiptPreviewModel, setReceiptPreviewModel] =
+    useState<ReceiptPreviewModel | null>(null);
   const [revenueActionBusy, setRevenueActionBusy] = useState<string | null>(null);
   const [revenueActionStatus, setRevenueActionStatus] = useState<{
     tone: "info" | "success" | "error";
@@ -401,44 +417,45 @@ export default function RevenueScreen() {
     setOrderModalVisible(true);
   };
 
-  const writeRevenueEvent = async (
-    collectionName: "bankReceipt" | "MerchantReceipt" | "CustomerReceipt",
-    payload: Record<string, unknown>
-  ) => {
-    if (!user || !currentStoreId) throw new Error("Missing store context");
-    await addDoc(
-      collection(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, collectionName),
-      payload
-    );
-  };
-
-  const handleAdjustOrder = async (newTotal: number, note: string) => {
+  const handleAddCashTips = async (extraTip: number) => {
     if (!user || !currentStoreId || !selectedOrder) return;
-    setRevenueActionBusy("adjust");
-    setRevenueActionStatus({ tone: "info", message: t("revenue.savingAdjustment") });
+    setRevenueActionBusy("tips");
+    setRevenueActionStatus({ tone: "info", message: t("revenue.savingCashTips") });
     try {
-      const patch = buildRevenueAdjustmentPatch(selectedOrder, newTotal, note);
+      const patch = buildCashTipsPatch(selectedOrder, extraTip);
       await updateDoc(
         doc(db, "stripe_customers", user.uid, "TitleLogoNameContent", currentStoreId, "success_payment", selectedOrder.id),
         patch
       );
+      const nextTotal = patch["metadata.total"] as number;
+      const nextTips = patch["metadata.tips"] as number;
       setSelectedOrder((prev) => prev ? {
         ...prev,
-        amount: newTotal,
-        total: newTotal,
-        metadata: patch.metadata,
+        amount: nextTotal,
+        total: nextTotal,
+        gratuity: nextTips,
+        metadata: {
+          ...(prev.metadata ?? {}),
+          total: nextTotal,
+          tips: nextTips,
+        },
       } : prev);
       setOrders((prev) => prev.map((order) => order.id === selectedOrder.id ? {
         ...order,
-        amount: newTotal,
-        total: newTotal,
-        metadata: patch.metadata,
+        amount: nextTotal,
+        total: nextTotal,
+        gratuity: nextTips,
+        metadata: {
+          ...(order.metadata ?? {}),
+          total: nextTotal,
+          tips: nextTips,
+        },
       } : order));
-      setAdjustOrderVisible(false);
+      setAddCashTipsVisible(false);
       await handleRefresh();
-      setRevenueActionStatus({ tone: "success", message: t("revenue.orderAdjusted") });
+      setRevenueActionStatus({ tone: "success", message: t("revenue.cashTipsAdded") });
     } catch (err) {
-      console.error("Failed to adjust revenue order:", err);
+      console.error("Failed to add cash tips:", err);
       setRevenueActionStatus({ tone: "error", message: t("revenue.actionFailed") });
     } finally {
       setRevenueActionBusy(null);
@@ -446,39 +463,66 @@ export default function RevenueScreen() {
   };
 
   const handleBankReceipt = async () => {
-    if (!selectedOrder) return;
+    if (!selectedOrder || !store) return;
+
+    if (!canRequestBankReceipt(selectedOrder, store.stripeStoreAcct)) {
+      Alert.alert(t("common.error"), t("revenue.bankReceiptUnavailable"));
+      return;
+    }
+
     setRevenueActionBusy("bank");
-    setRevenueActionStatus({ tone: "info", message: t("revenue.queueingBankReceipt") });
+    setBankReceiptPreviewVisible(true);
+    setBankReceiptPreviewLoading(true);
+    setBankReceiptPreviewError(null);
+    setBankReceiptPreviewModel(null);
+    setRevenueActionStatus({
+      tone: "info",
+      message: t("revenue.bankReceiptLoading"),
+    });
+
     try {
-      await writeRevenueEvent("bankReceipt", buildBankReceiptPayload(selectedOrder, formatWebDate()));
-      setRevenueActionStatus({ tone: "success", message: t("revenue.bankReceiptQueued") });
+      const response = await fetchBankReceiptViaCloudFunction({
+        chargeId: selectedOrder.latestCharge!,
+        docId: selectedOrder.id,
+        displayDate: formatBankReceiptDisplayDate(
+          selectedOrder.dateTime,
+          selectedOrder.time
+        ),
+        stripeStoreAcct: store.stripeStoreAcct!,
+      });
+
+      const model = buildBankReceiptPreviewModel({
+        store,
+        order: selectedOrder,
+        response,
+        t,
+      });
+      setBankReceiptPreviewModel(model);
+      setRevenueActionStatus(null);
     } catch (err) {
-      console.error("Failed to queue bank receipt:", err);
-      setRevenueActionStatus({ tone: "error", message: t("revenue.actionFailed") });
+      console.error("Failed to load bank receipt:", err);
+      const message =
+        err instanceof Error ? err.message : t("revenue.bankReceiptFailed");
+      setBankReceiptPreviewError(message);
+      setRevenueActionStatus({ tone: "error", message: t("revenue.bankReceiptFailed") });
     } finally {
+      setBankReceiptPreviewLoading(false);
       setRevenueActionBusy(null);
     }
   };
 
-  const handleReceiptReplay = async (type: ReceiptReplayType) => {
+  const handleReceiptPreview = (type: ReceiptReplayType) => {
     if (!selectedOrder) return;
-    const busy = type === "MerchantReceipt" ? "merchant" : "customer";
-    setRevenueActionBusy(busy);
-    setRevenueActionStatus({
-      tone: "info",
-      message: type === "MerchantReceipt"
-        ? t("revenue.queueingMerchantReceipt")
-        : t("revenue.queueingCustomerReceipt"),
+    const previewStore = resolvePreviewStore(store, currentStoreId);
+    const model = buildReceiptPreviewModel({
+      store: previewStore,
+      order: selectedOrder,
+      type,
+      t,
     });
-    try {
-      await writeRevenueEvent(type, buildReceiptReplayPayload(selectedOrder, type, formatWebDate()));
-      setRevenueActionStatus({ tone: "success", message: t("revenue.receiptQueued") });
-    } catch (err) {
-      console.error("Failed to queue receipt replay:", err);
-      setRevenueActionStatus({ tone: "error", message: t("revenue.actionFailed") });
-    } finally {
-      setRevenueActionBusy(null);
-    }
+    setReceiptPreviewModel(model);
+    setReceiptPreviewVisible(true);
+    setRevenueActionStatus(null);
   };
 
   return (
@@ -684,22 +728,45 @@ export default function RevenueScreen() {
         visible={orderModalVisible}
         order={selectedOrder}
         colors={colors}
-        onClose={() => setOrderModalVisible(false)}
-        onAdjustOrder={() => setAdjustOrderVisible(true)}
-        onBankReceipt={handleBankReceipt}
-        onMerchantReceipt={() => handleReceiptReplay("MerchantReceipt")}
-        onCustomerReceipt={() => handleReceiptReplay("CustomerReceipt")}
+        onClose={() => {
+          setAddCashTipsVisible(false);
+          setReceiptPreviewVisible(false);
+          setReceiptPreviewModel(null);
+          setOrderModalVisible(false);
+        }}
+        onAddCashTips={() => setAddCashTipsVisible(true)}
+        cashTipsVisible={addCashTipsVisible}
+        onCloseCashTips={() => setAddCashTipsVisible(false)}
+        onSaveCashTips={handleAddCashTips}
+        cashTipsSaving={revenueActionBusy === "tips"}
+        onBankReceipt={
+          canRequestBankReceipt(selectedOrder, store?.stripeStoreAcct)
+            ? handleBankReceipt
+            : undefined
+        }
+        onMerchantReceipt={() => handleReceiptPreview("MerchantReceipt")}
+        onCustomerReceipt={() => handleReceiptPreview("CustomerReceipt")}
+        receiptPreviewVisible={receiptPreviewVisible}
+        receiptPreviewModel={receiptPreviewModel}
+        onCloseReceiptPreview={() => {
+          setReceiptPreviewVisible(false);
+          setReceiptPreviewModel(null);
+        }}
         busyAction={revenueActionBusy}
         actionStatus={revenueActionStatus}
       />
 
-      <RevenueAdjustOrderModal
-        visible={adjustOrderVisible}
+      <BankReceiptPreviewModal
+        visible={bankReceiptPreviewVisible}
         colors={colors}
-        initialTotal={selectedOrder?.total ?? selectedOrder?.amount ?? 0}
-        saving={revenueActionBusy === "adjust"}
-        onClose={() => setAdjustOrderVisible(false)}
-        onSave={handleAdjustOrder}
+        loading={bankReceiptPreviewLoading}
+        error={bankReceiptPreviewError}
+        model={bankReceiptPreviewModel}
+        onClose={() => {
+          setBankReceiptPreviewVisible(false);
+          setBankReceiptPreviewError(null);
+          setBankReceiptPreviewModel(null);
+        }}
       />
 
       <RevenueDateRangeModal

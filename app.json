@@ -5,10 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
-    "scheme": [
-      "sevendollarposapp",
-      "com.googleusercontent.apps.579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en"
-    ],
+    "scheme": "sevendollarposapp",
     "userInterfaceStyle": "automatic",
     "updates": {
       "url": "https://u.expo.dev/3b6fb366-c8c3-4073-8783-455ecfe3a5f2",
@@ -64,7 +61,12 @@
       "expo-apple-authentication",
       "expo-web-browser",
       "@react-native-community/datetimepicker",
-      "@react-native-google-signin/google-signin",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.579212375301-n82ud1df6tcj7m4209cav5a7k8aa20en"
+        }
+      ],
       [
         "expo-location",
         {

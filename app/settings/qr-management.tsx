@@ -1,7 +1,11 @@
 import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/Header";
 import { Input } from "@/components/ui/Input";
+import { useAuth } from "@/context/auth";
+import { useStoreSelection } from "@/context/store";
 import { useStore } from "@/hooks/firestore/useStore";
+import { updateStore } from "@/lib/firestore/repositories/store";
+import { defaultMenuUrl } from "@/lib/pos/storeSettings";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +23,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function QRManagementScreen() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { currentStoreId } = useStoreSelection();
   const { data: store, loading, error } = useStore();
 
   const [saving, setSaving] = useState(false);
@@ -26,17 +32,30 @@ export default function QRManagementScreen() {
 
   useEffect(() => {
     if (!store) return;
-    setMenuUrl(`https://eatify.app/menu/${store.id}`);
+    setMenuUrl(store.menuUrl?.trim() || defaultMenuUrl(store.id));
   }, [store]);
 
   const handleSave = async () => {
+    if (!user?.uid || !currentStoreId) {
+      Alert.alert(t("common.error"), t("profile.noStoreSelected"));
+      return;
+    }
+
+    const trimmedUrl = menuUrl.trim();
+    if (!trimmedUrl) {
+      Alert.alert(t("common.error"), t("settings.qr.menuUrlPlaceholder"));
+      return;
+    }
+
     setSaving(true);
     try {
-      await new Promise((r) => setTimeout(r, 300));
+      await updateStore(user.uid, currentStoreId, { menuUrl: trimmedUrl });
+      Alert.alert(t("common.success"), t("settings.qr.updateSuccess"));
+    } catch (err) {
+      console.error("Failed to save QR settings:", err);
       Alert.alert(
-        t("settings.qr.notImplementedTitle"),
-        t("settings.qr.notImplementedMessage"),
-        [{ text: t("common.ok") }]
+        t("common.error"),
+        err instanceof Error ? err.message : t("settings.qr.updateFailed")
       );
     } finally {
       setSaving(false);
@@ -90,10 +109,8 @@ export default function QRManagementScreen() {
           className="flex-1 px-4 py-6"
           contentContainerClassName="pb-10"
         >
-          {/* QR Code Display */}
           <View className="items-center justify-center py-8">
-            <View className="rounded-xl bg-white p-6 shadow-sm border border-slate-100 dark:bg-white dark:border-none">
-              {/* Always render QR on white background for contrast */}
+            <View className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm dark:border-none dark:bg-white">
               {menuUrl ? (
                 <QRCode
                   value={menuUrl}
@@ -115,7 +132,6 @@ export default function QRManagementScreen() {
             </Text>
           </View>
 
-          {/* Configuration */}
           <View className="gap-4">
             <View>
               <Text className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -141,7 +157,8 @@ export default function QRManagementScreen() {
                     : t("settings.qr.saveButton")
                 }
                 onPress={handleSave}
-                disabled={saving}
+                loading={saving}
+                disabled={saving || !menuUrl.trim()}
               />
             </View>
           </View>

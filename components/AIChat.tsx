@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { getLocalAiPresetReply, getLocalAiReplyDelayMs } from '@/lib/ai/presetReplies';
-import { Audio } from 'expo-av';
 import { usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -168,8 +167,6 @@ export default function AIChat() {
   const [lastAutoNavAt, setLastAutoNavAt] = useState<number>(0);
   const flatListRef = useRef<FlatList>(null);
 
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
   const fabPosition = useRef(
     new Animated.ValueXY({
       x: Math.max(FAB_MARGIN, screenWidth - FAB_SIZE - FAB_MARGIN),
@@ -183,9 +180,6 @@ export default function AIChat() {
   const dragStart = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const isPressing = useRef(false); 
-  const recordStartTime = useRef<number>(0);
   const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -273,47 +267,6 @@ export default function AIChat() {
     })
   ).current;
 
-  async function startRecording() {
-    if (!AI_ASSISTANT_ENABLED) return;
-
-    isPressing.current = true;
-    recordStartTime.current = Date.now();
-    setIsRecording(true); 
-
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') {
-        alert(t('aiChat.micPermissionRequired'));
-        setIsRecording(false);
-        return;
-      }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-
-      if (recordingRef.current) {
-        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
-      }
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      // 防抖：如果录音设备准备好时，用户已经松手了，直接扔掉
-      if (!isPressing.current) {
-        await newRecording.stopAndUnloadAsync();
-        return;
-      }
-
-      recordingRef.current = newRecording;
-      setRecording(newRecording);
-    } catch (error) {
-      console.error('启动录音失败:', error);
-    }
-  }
-
-  async function uploadVoiceToText(_uri: string) {
-    appendNotImplementedReply();
-  }
-
   function appendNotImplementedReply() {
     queuePresetReply('');
   }
@@ -344,34 +297,6 @@ export default function AIChat() {
       replyTimerRef.current = null;
     }, getLocalAiReplyDelayMs(input));
   }
-
-  async function stopRecording() {
-    isPressing.current = false;
-    setIsRecording(false); 
-
-    const currentRecording = recordingRef.current;
-    if (!currentRecording) return; 
-
-    try {
-      await currentRecording.stopAndUnloadAsync();
-      const uri = currentRecording.getURI();
-      
-      recordingRef.current = null;
-      setRecording(null);
-
-      // 核心拦截：按压不到 1 秒的，视为误触，直接抛弃不发请求
-      const duration = Date.now() - recordStartTime.current;
-      if (duration < 1000) return; 
-
-      if (uri) {
-        uploadVoiceToText(uri);
-      }
-    } catch (error) {
-      console.error('停止录音失败:', error);
-    }
-  }
-
-  
 
   const tryAutoNavigate = (text: string) => {
     const now = Date.now();
@@ -507,23 +432,16 @@ export default function AIChat() {
                 
                 {/* 1. 唯一的左侧麦克风 */}
                 <Pressable
-                  onPressIn={() => {
+                  onPress={() => {
                     if (!AI_ASSISTANT_ENABLED) {
                       appendNotImplementedReply();
-                      return;
                     }
-                    void startRecording();
-                  }}
-                  onPressOut={() => {
-                    if (!AI_ASSISTANT_ENABLED) return;
-                    void stopRecording();
                   }}
                   hitSlop={20}
-                  // 👇 这里直接用 isRecording 控制颜色，录音时纯红，松手时浅灰
                   style={{
                     width: 44,
                     height: 44,
-                    backgroundColor: isRecording ? '#FF3B30' : '#f0f0f0', 
+                    backgroundColor: '#f0f0f0',
                     borderRadius: 22,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -531,10 +449,10 @@ export default function AIChat() {
                   }}
                 >
                   <View pointerEvents="none">
-                    <Ionicons 
-                      name={isRecording ? "mic" : "mic-outline"} 
-                      size={24} 
-                      color={isRecording ? "white" : "#666"} 
+                    <Ionicons
+                      name="mic-outline"
+                      size={24}
+                      color="#666"
                     />
                   </View>
                 </Pressable>

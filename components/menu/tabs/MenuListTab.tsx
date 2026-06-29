@@ -82,30 +82,29 @@ export function MenuListTab({
     category: { id: string; name: string; nameCN?: string } | null;
   }>({ visible: false, mode: "add", category: null });
 
-  const firstCategoryId = categories[0]?.id ?? "";
   const selectedCategoryItem = categories.find((category) => category.id === selectedCategory);
+  const isAllCategoriesSelected = selectedCategory === "";
 
-  // Auto-select the first category once data arrives.
+  // Reset to "All" if the previously selected category was deleted.
   useEffect(() => {
-    if (categories.length === 0 && selectedCategory) {
-      setSelectedCategory("");
+    if (categories.length === 0) {
+      if (selectedCategory) setSelectedCategory("");
       return;
     }
     if (
-      categories.length > 0 &&
-      (!selectedCategory ||
-        !categories.some((category) => category.id === selectedCategory))
+      selectedCategory &&
+      !categories.some((category) => category.id === selectedCategory)
     ) {
-      setSelectedCategory(categories[0].id);
+      setSelectedCategory("");
     }
   }, [categories, selectedCategory]);
 
   useEffect(() => {
-    if (focusFirstCategoryVersion > 0 && firstCategoryId) {
-      setSelectedCategory(firstCategoryId);
+    if (focusFirstCategoryVersion > 0) {
+      setSelectedCategory("");
       setSearchQuery("");
     }
-  }, [firstCategoryId, focusFirstCategoryVersion]);
+  }, [focusFirstCategoryVersion]);
 
   // Memoize filtered items to avoid recalculation
   const filteredItems = items.filter((item) => {
@@ -113,9 +112,10 @@ export function MenuListTab({
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     
-    // If searching, search globally (ignore category). Otherwise, filter by category.
+    // If searching, search globally (ignore category). "All" shows every category.
     if (searchQuery) return matchesSearch;
-    
+    if (isAllCategoriesSelected) return true;
+
     return item.categoryId === selectedCategory;
   });
 
@@ -290,6 +290,27 @@ export function MenuListTab({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingLeft: responsive.baseSpacing, gap: 10 }}
             keyExtractor={(item) => item.id}
+            ListHeaderComponent={
+              <TouchableOpacity
+                onPress={() => setSelectedCategory("")}
+                className={`min-h-[44px] justify-center rounded-full border px-4 ${
+                  isAllCategoriesSelected
+                    ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                    : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
+                }`}
+              >
+                <Text
+                  style={{ fontSize: responsive.baseFontSize - 1 }}
+                  className={`font-semibold ${
+                    isAllCategoriesSelected
+                      ? "text-orange-600 dark:text-orange-400"
+                      : "text-slate-500 dark:text-slate-400"
+                  }`}
+                >
+                  {t("menu.selection.all")}
+                </Text>
+              </TouchableOpacity>
+            }
             renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => setSelectedCategory(item.id)}

@@ -72,6 +72,7 @@ import {
   saveTableTimingTimer,
 } from "@/lib/pos/tableTimingStorage";
 import { formatWebDate } from "@/lib/pos/webDate";
+import { getSelectedTerminalId } from "@/lib/pos/terminalStorage";
 import type { MenuItem } from "@/types/menu";
 import { httpsCallable } from "firebase/functions";
 import { addDoc, collection, doc, getDoc, onSnapshot, setDoc, writeBatch } from "firebase/firestore";
@@ -625,7 +626,9 @@ export default function SeatScreen() {
       return;
     }
 
-    const terminal = terminals[0];
+    const storedTerminalId = await getSelectedTerminalId(currentStoreId);
+    const terminal =
+      terminals.find((item) => item.id === storedTerminalId) ?? terminals[0];
     const readerId = terminal?.readerId ?? terminal?.reader_id;
     if (!readerId) {
       Alert.alert(t("common.error"), "No available card terminal for this store");

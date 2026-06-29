@@ -274,6 +274,13 @@ export function RevenueDateRangeModal({
                   </View>
                 ))}
               </View>
+              <View className="mt-2">
+                <ShortcutChip
+                  label={presetLabel("all")}
+                  active={draftPreset === "all"}
+                  onPress={() => setDraftPreset("all")}
+                />
+              </View>
             </View>
 
             <View>

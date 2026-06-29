@@ -201,11 +201,63 @@ export type RevenueDatePreset =
   | "lastQ2"
   | "lastQ3"
   | "lastQ4"
+  | "all"
   | "custom";
+
+/** Matches eatifyPos Account_admin epochDate for List All Orders. */
+export const REVENUE_ALL_ORDERS_EPOCH = {
+  year: 2023,
+  month: 11,
+  day: 30,
+};
 
 export function formatRevenueDisplayDate(date: Date, timeZone: string): string {
   const parts = getZonedParts(date, timeZone);
   return `${pad(parts.month)}/${pad(parts.day)}/${parts.year}`;
+}
+
+/** Calendar day key from Firestore web dateTime (`YYYY-MM-DD-HH-mm-ss`). */
+export function getOrderSectionDayKey(dateTime?: string): string {
+  if (!dateTime) return "unknown";
+  const parts = dateTime.split("-");
+  if (parts.length >= 3) {
+    return `${parts[0]}-${parts[1]}-${parts[2]}`;
+  }
+  return dateTime;
+}
+
+export function formatOrderSectionDayLabel(dayKey: string, locale: string): string {
+  if (dayKey === "unknown") {
+    return locale.startsWith("zh") ? "未知日期" : "Unknown date";
+  }
+
+  const [yearText, monthText, dayText] = dayKey.split("-");
+  const year = Number.parseInt(yearText, 10);
+  const month = Number.parseInt(monthText, 10);
+  const day = Number.parseInt(dayText, 10);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return dayKey;
+  }
+
+  if (locale.startsWith("zh")) {
+    return `${year}年${month}月${day}日`;
+  }
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** Time portion for grouped order rows (`HH:mm`). */
+export function formatOrderSectionTime(dateTime?: string, fallback = ""): string {
+  if (!dateTime) return fallback;
+  const parts = dateTime.split("-");
+  if (parts.length >= 5) {
+    return `${parts[3].padStart(2, "0")}:${parts[4].padStart(2, "0")}`;
+  }
+  return fallback;
 }
 
 export function getRevenueBusinessDateKey(dateTime: string, timeZone: string): string {
@@ -413,6 +465,20 @@ export function getRevenueWindowForPreset(
       1,
       timeZone
     );
+  }
+
+  if (preset === "all") {
+    const startWindow = getBusinessDayWindowForCalendarDate(
+      REVENUE_ALL_ORDERS_EPOCH.year,
+      REVENUE_ALL_ORDERS_EPOCH.month,
+      REVENUE_ALL_ORDERS_EPOCH.day,
+      timeZone
+    );
+    const todayWindow = getBusinessDayWindow(now, timeZone);
+    return {
+      start: startWindow.start,
+      end: todayWindow.end,
+    };
   }
 
   const quarterMap: Record<string, { yearOffset: number; quarter: 1 | 2 | 3 | 4 }> = {

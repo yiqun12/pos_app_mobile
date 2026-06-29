@@ -21,6 +21,7 @@ export interface RawStoreDoc {
   dailyPayout?: boolean;
   storeOwnerId?: string;
   stripe_store_acct?: string;
+  menuUrl?: string;
 }
 
 export interface RawOpenHours {

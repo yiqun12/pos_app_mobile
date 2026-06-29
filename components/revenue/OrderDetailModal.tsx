@@ -1,4 +1,7 @@
-﻿import { Colors } from "@/constants/theme";
+import { RevenueAddCashTipsModal } from "@/components/revenue/RevenueAddCashTipsModal";
+import { ReceiptPreviewModal } from "@/components/revenue/ReceiptPreviewModal";
+import { Colors } from "@/constants/theme";
+import type { ReceiptPreviewModel } from "@/lib/pos/receiptPreviewCore";
 import { useResponsiveLayout } from "@/hooks/use-responsive-layout";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -32,6 +35,8 @@ export type Order = {
   receiptData?: string;
   tableNum?: string;
   metadata?: Record<string, unknown>;
+  latestCharge?: string;
+  transactionJson?: Record<string, unknown>;
 };
 
 export type OrderItem = {
@@ -51,10 +56,17 @@ type OrderDetailModalProps = {
   order: Order | null;
   colors: ColorMode;
   onClose: () => void;
-  onAdjustOrder?: () => void;
+  onAddCashTips?: () => void;
+  cashTipsVisible?: boolean;
+  onCloseCashTips?: () => void;
+  onSaveCashTips?: (extraTip: number) => void;
+  cashTipsSaving?: boolean;
   onBankReceipt?: () => void;
   onMerchantReceipt?: () => void;
   onCustomerReceipt?: () => void;
+  receiptPreviewVisible?: boolean;
+  receiptPreviewModel?: ReceiptPreviewModel | null;
+  onCloseReceiptPreview?: () => void;
   busyAction?: string | null;
   actionStatus?: {
     tone: "info" | "success" | "error";
@@ -250,13 +262,24 @@ export function OrderDetailModal({
   order,
   colors,
   onClose,
-  onAdjustOrder,
+  onAddCashTips,
+  cashTipsVisible = false,
+  onCloseCashTips,
+  onSaveCashTips,
+  cashTipsSaving = false,
   onBankReceipt,
   onMerchantReceipt,
   onCustomerReceipt,
+  receiptPreviewVisible = false,
+  receiptPreviewModel = null,
+  onCloseReceiptPreview,
   busyAction,
   actionStatus,
 }: OrderDetailModalProps) {
+  const currentTotal = order?.total ?? order?.amount ?? 0;
+  const currentTips = order?.gratuity ?? Number(order?.metadata?.tips ?? 0);
+  const subtotal = order?.subtotal ?? Number(order?.metadata?.subtotal ?? 0);
+
   return (
     <Modal
       visible={visible}
@@ -274,7 +297,7 @@ export function OrderDetailModal({
             order={order}
             colors={colors}
             onClose={onClose}
-            onAdjustOrder={onAdjustOrder}
+            onAddCashTips={onAddCashTips}
             onBankReceipt={onBankReceipt}
             onMerchantReceipt={onMerchantReceipt}
             onCustomerReceipt={onCustomerReceipt}
@@ -282,6 +305,29 @@ export function OrderDetailModal({
             actionStatus={actionStatus}
           />
         </View>
+
+        {cashTipsVisible && onCloseCashTips && onSaveCashTips ? (
+          <RevenueAddCashTipsModal
+            embedded
+            visible={cashTipsVisible}
+            subtotal={subtotal}
+            currentTotal={currentTotal}
+            currentTips={currentTips}
+            saving={cashTipsSaving}
+            onClose={onCloseCashTips}
+            onSave={onSaveCashTips}
+          />
+        ) : null}
+
+        {receiptPreviewVisible && onCloseReceiptPreview ? (
+          <ReceiptPreviewModal
+            embedded
+            visible={receiptPreviewVisible}
+            colors={colors}
+            model={receiptPreviewModel}
+            onClose={onCloseReceiptPreview}
+          />
+        ) : null}
       </View>
     </Modal>
   );
@@ -292,7 +338,7 @@ export function OrderDetailContent({
   colors,
   onClose,
   onPay,
-  onAdjustOrder,
+  onAddCashTips,
   onBankReceipt,
   onMerchantReceipt,
   onCustomerReceipt,
@@ -303,7 +349,7 @@ export function OrderDetailContent({
   colors: ColorMode;
   onClose: () => void;
   onPay?: () => void;
-  onAdjustOrder?: () => void;
+  onAddCashTips?: () => void;
   onBankReceipt?: () => void;
   onMerchantReceipt?: () => void;
   onCustomerReceipt?: () => void;
@@ -319,7 +365,7 @@ export function OrderDetailContent({
   const hasItems = Boolean(order?.items && order.items.length > 0);
   const hasTotals = order?.subtotal != null || order?.total != null;
   const hasActions = Boolean(
-    onAdjustOrder || onBankReceipt || onMerchantReceipt || onCustomerReceipt
+    onAddCashTips || onBankReceipt || onMerchantReceipt || onCustomerReceipt
   );
 
   if (!order) return null;
@@ -430,13 +476,13 @@ export function OrderDetailContent({
           </Text>
           <View className="flex-row flex-wrap gap-2">
             <OrderActionButton
-              label={t("revenue.adjustOrder")}
-              icon="create-outline"
+              label={t("revenue.addCashTips")}
+              icon="cash-outline"
               colors={colors}
-              disabled={!onAdjustOrder || Boolean(busyAction)}
-              loading={busyAction === "adjust"}
-              loadingLabel={t("revenue.saving")}
-              onPress={onAdjustOrder}
+              disabled={!onAddCashTips || Boolean(busyAction)}
+              loading={busyAction === "tips"}
+              loadingLabel={t("revenue.queueing")}
+              onPress={onAddCashTips}
             />
             <OrderActionButton
               label={t("revenue.bankReceipt")}
@@ -444,7 +490,7 @@ export function OrderDetailContent({
               colors={colors}
               disabled={!onBankReceipt || Boolean(busyAction)}
               loading={busyAction === "bank"}
-              loadingLabel={t("revenue.queueing")}
+              loadingLabel={t("revenue.bankReceiptLoading")}
               onPress={onBankReceipt}
             />
             <OrderActionButton
@@ -466,6 +512,14 @@ export function OrderDetailContent({
               onPress={onCustomerReceipt}
             />
           </View>
+          {!onBankReceipt && order ? (
+            <Text
+              style={{ fontSize: responsive.captionFontSize, marginTop: 8 }}
+              className="text-slate-500 dark:text-slate-400"
+            >
+              {t("revenue.bankReceiptUnavailable")}
+            </Text>
+          ) : null}
         </View>
       )}
 

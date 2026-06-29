@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/Button";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Modal,
@@ -58,19 +58,31 @@ export function WorkingHoursEditor({
   }>({ visible: false });
 
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const lastEmittedRef = useRef("");
 
   /* ---------- Init ---------- */
   useEffect(() => {
     try {
-      setHours(
+      const parsed =
         typeof initialValue === "string"
           ? JSON.parse(initialValue)
-          : initialValue ?? {}
-      );
+          : initialValue ?? {};
+      setHours(parsed);
+      lastEmittedRef.current =
+        typeof initialValue === "string" ? initialValue : JSON.stringify(parsed);
     } catch {
       setHours({});
+      lastEmittedRef.current = "{}";
     }
   }, [initialValue]);
+
+  useEffect(() => {
+    if (Object.keys(hours).length === 0) return;
+    const serialized = JSON.stringify(hours);
+    if (serialized === lastEmittedRef.current) return;
+    lastEmittedRef.current = serialized;
+    onChange(serialized);
+  }, [hours, onChange]);
 
   /* ---------- Helpers ---------- */
    const parseDay = (value?: string) => {
@@ -95,29 +107,20 @@ export function WorkingHoursEditor({
     time: string
   ) => {
     const { open, close } = parseDay(hours[day]);
-    setHours((prev) => {
-      const newHours = {
-        ...prev,
-        [day]:
-          type === "open" ? `${time}-${close}` : `${open}-${time}`,
-      };
-      onChange(JSON.stringify(newHours)); // Auto-save on change
-      return newHours;
-    });
+    setHours((prev) => ({
+      ...prev,
+      [day]: type === "open" ? `${time}-${close}` : `${open}-${time}`,
+    }));
   };
 
   const toggleDay = (day: string) => {
-    setHours((prev) => {
-      const newHours = {
-        ...prev,
-        [day]:
-          prev[day] && prev[day] !== "Closed"
-            ? t("workingHours.closed")
-            : `${DEFAULT_OPEN}-${DEFAULT_CLOSE}`,
-      };
-      onChange(JSON.stringify(newHours)); // Auto-save on change
-      return newHours;
-    });
+    setHours((prev) => ({
+      ...prev,
+      [day]:
+        prev[day] && prev[day] !== "Closed"
+          ? t("workingHours.closed")
+          : `${DEFAULT_OPEN}-${DEFAULT_CLOSE}`,
+    }));
   };
 
   /* ---------- Render ---------- */

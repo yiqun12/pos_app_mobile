@@ -29,6 +29,8 @@ export type RevenueOrderSummary = {
   receiptData?: string;
   tableNum?: string;
   metadata?: Record<string, unknown>;
+  latestCharge?: string;
+  transactionJson?: Record<string, unknown>;
 };
 
 export type CashDrawerSummary = {
@@ -166,6 +168,12 @@ export function transformSuccessPaymentSummary(
     receiptData: data.receiptData,
     tableNum,
     metadata: meta,
+    latestCharge:
+      typeof data.latest_charge === "string" ? data.latest_charge : undefined,
+    transactionJson:
+      data.transaction_json && typeof data.transaction_json === "object"
+        ? (data.transaction_json as Record<string, unknown>)
+        : undefined,
   };
 }
 

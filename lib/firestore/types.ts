@@ -103,6 +103,7 @@ export interface Store {
   dailyPayout: boolean;
   storeOwnerId?: string;
   stripeStoreAcct?: string;
+  menuUrl?: string;
 }
 
 export interface PendingOrder {

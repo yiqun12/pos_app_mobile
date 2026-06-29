@@ -30,6 +30,7 @@ import type {
 import {
   parseJsonField,
   parseNumericField,
+  stringifyJsonField,
 } from "../serialize";
 import type {
   Menu,
@@ -117,6 +118,7 @@ function transformStore(id: string, raw: RawStoreDoc): Store {
     dailyPayout: raw.dailyPayout ?? false,
     storeOwnerId: raw.storeOwnerId,
     stripeStoreAcct: raw.stripe_store_acct,
+    menuUrl: raw.menuUrl,
   };
 }
 
@@ -196,9 +198,54 @@ function transformMenu(raw: any): Menu {
   return { categories, items };
 }
 
-// Write API (P1 — not implemented)
-export async function updateStore(_uid: string, _storeId: string, _patch: Partial<Store>): Promise<void> {
-  throw new Error("updateStore not implemented (P1)");
+// Write API
+export type StoreSettingsPatch = {
+  name?: string;
+  nameCN?: string;
+  phone?: string;
+  address?: {
+    line1?: string;
+    physical?: string;
+    state?: string;
+    zip?: string;
+  };
+  description?: string;
+  taxRate?: number | string;
+  openHours?: Record<string, unknown>;
+  menuUrl?: string;
+};
+
+export async function updateStore(
+  uid: string,
+  storeId: string,
+  patch: StoreSettingsPatch
+): Promise<void> {
+  const rawPatch: Record<string, unknown> = {};
+
+  if (patch.name !== undefined) rawPatch.Name = patch.name;
+  if (patch.nameCN !== undefined) rawPatch.storeNameCHI = patch.nameCN;
+  if (patch.phone !== undefined) rawPatch.Phone = patch.phone;
+  if (patch.description !== undefined) rawPatch.Description = patch.description;
+  if (patch.menuUrl !== undefined) rawPatch.menuUrl = patch.menuUrl;
+
+  if (patch.address?.line1 !== undefined) rawPatch.Address = patch.address.line1;
+  if (patch.address?.physical !== undefined) {
+    rawPatch.physical_address = patch.address.physical;
+  }
+  if (patch.address?.state !== undefined) rawPatch.State = patch.address.state;
+  if (patch.address?.zip !== undefined) rawPatch.ZipCode = patch.address.zip;
+
+  if (patch.taxRate !== undefined) {
+    rawPatch.TaxRate = String(patch.taxRate);
+  }
+
+  if (patch.openHours !== undefined) {
+    rawPatch.Open_time = stringifyJsonField(patch.openHours);
+  }
+
+  if (Object.keys(rawPatch).length === 0) return;
+
+  await updateDoc(doc(db, ...storePath(uid, storeId)), rawPatch);
 }
 
 /** Persist seat layout to Firestore, mirroring web iframeDesk handleFormSubmit. */
